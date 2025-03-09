@@ -4,9 +4,16 @@ import mne
 import os
 from pathlib import Path
 from .routes import analysis_router, visualization_router, participants_router
+from .routes.analysis import init_eeg_service
 import pandas as pd
 
-app = FastAPI(title="EEG Analyzer")
+app = FastAPI(
+    title="EEG Analyzer",
+    description="EEG数据分析平台",
+    version="1.0.0",
+    docs_url="/docs",   # 明确指定文档URL
+    redoc_url="/redoc"  # 明确指定ReDoc URL
+)
 
 # 配置CORS
 app.add_middleware(
@@ -18,13 +25,37 @@ app.add_middleware(
 )
 
 # 获取项目根目录的绝对路径
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path("/app")  # 在Docker容器中的路径
 DATA_DIR = BASE_DIR / "data" / "eeg_samples"
+
+print(f"BASE_DIR: {BASE_DIR}")
+print(f"DATA_DIR: {DATA_DIR}")
+
+# 初始化 EEGService
+init_eeg_service(DATA_DIR)
 
 # 包含路由
 app.include_router(analysis_router)
 app.include_router(visualization_router)
 app.include_router(participants_router)
+
+@app.get("/")
+async def root():
+    """
+    测试API是否正常工作
+    """
+    return {"message": "EEG分析平台API正在运行"}
+
+@app.get("/health")
+async def health_check():
+    """
+    健康检查端点
+    """
+    return {
+        "status": "healthy",
+        "base_dir": str(BASE_DIR),
+        "data_dir": str(DATA_DIR)
+    }
 
 @app.get("/api/datasets")
 async def list_datasets():
