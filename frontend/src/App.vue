@@ -21,8 +21,8 @@ const fetchDatasets = async () => {
   loading.value = true
   error.value = ''
   try {
-    const response = await axios.get('http://localhost:8000/api/datasets')
-    datasets.value = response.data
+    const response = await axios.get('http://localhost:8000/api/datasets/')
+    datasets.value = response.data.data
     if (response.data.error) {
       error.value = response.data.error
     }
@@ -36,8 +36,8 @@ const fetchDatasets = async () => {
 
 const showInfo = async (dataset) => {
   try {
-    const response = await axios.get(`http://localhost:8000/api/datasets/${dataset.id}/info`)
-    currentDatasetInfo.value = response.data
+    const response = await axios.get(`http://localhost:8000/api/datasets/${dataset.id}/info/`)
+    currentDatasetInfo.value = response.data.data
     infoDialogVisible.value = true
   } catch (err) {
     console.error('Error fetching dataset info:', err)
@@ -49,7 +49,7 @@ const showEEG = async (dataset) => {
   try {
     loading.value = true
     const response = await axios.get(
-      `http://localhost:8000/api/datasets/${dataset.id}/eeg`,
+      `http://localhost:8000/api/datasets/${dataset.id}/raw/`,
       {
         params: {
           start_time: timeRange.value[0],
@@ -57,8 +57,8 @@ const showEEG = async (dataset) => {
         }
       }
     )
-    currentEEGData.value = response.data
-    selectedChannels.value = response.data.channels.slice(0, 5)
+    currentEEGData.value = response.data.data
+    selectedChannels.value = response.data.data.channels.slice(0, 5)
     eegDialogVisible.value = true
     await nextTick()
     initEEGChart()
@@ -123,7 +123,7 @@ onMounted(() => {
   <div class="container">
     <el-container>
       <el-header class="header">
-        <h1>EEG数据分析平台</h1>
+        <h1>EEG数据分析展示交互平台</h1>
       </el-header>
       
       <el-main>

@@ -1,0 +1,22 @@
+# 忽略数据文件夹
+data/eeg_samples/*
+
+# 保留必要的配置文件
+!data/eeg_samples/.gitkeep
+!data/eeg_samples/README
+!data/eeg_samples/CHANGES
+!data/eeg_samples/dataset_description.json
+!data/eeg_samples/participants.tsv
+
+# 忽略所有子文件夹中的大文件
+data/eeg_samples/sub-*/eeg/*.set
+data/eeg_samples/sub-*/eeg/*.fdt
+data/eeg_samples/sub-*/eeg/*.mat
+
+# Node modules
+frontend/node_modules/
+
+# 其他常见需要忽略的文件
+.DS_Store
+__pycache__/
+*.pyc
