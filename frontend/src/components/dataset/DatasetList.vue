@@ -25,6 +25,8 @@ const pagination = ref({
 // 数据集列表
 const datasets = ref([]);
 const loading = ref(false);
+// 控制筛选面板的显示/隐藏
+const showFilterPanel = ref(false);
 
 // 获取数据集列表
 const loadDatasets = async () => {
@@ -72,99 +74,132 @@ const analyzeDataset = (id) => {
   router.push(`/datasets/${id}/analyze`);
 };
 
+// 切换筛选面板显示状态
+const toggleFilterPanel = () => {
+  showFilterPanel.value = !showFilterPanel.value;
+};
+
+// 点击外部关闭筛选面板
+const closeFilterPanel = (event) => {
+  const filterPanel = document.querySelector('.filter-panel');
+  const filterButton = document.querySelector('.filter-button');
+  
+  if (showFilterPanel.value && filterPanel && !filterPanel.contains(event.target) && 
+      filterButton && !filterButton.contains(event.target)) {
+    showFilterPanel.value = false;
+  }
+};
+
+// 监听点击事件，用于关闭筛选面板
 onMounted(() => {
   loadDatasets();
+  document.addEventListener('click', closeFilterPanel);
 });
 </script>
 
 <template>
   <div class="dataset-container">
-    <!-- 左侧筛选区域 -->
-    <aside class="filter-sidebar">
-      <el-card class="filter-card">
-        <template #header>
-          <div class="filter-header">
-            <h3>筛选选项</h3>
-            <el-button text @click="handleFilterChange">
-              <el-icon><Refresh /></el-icon> 刷新
-            </el-button>
-          </div>
-        </template>
-        
-        <el-form :model="filterForm" label-position="top">
-          <el-form-item label="关键词搜索">
-            <el-input 
-              v-model="filterForm.keyword" 
-              placeholder="搜索数据集名称或描述" 
-              clearable
-              @change="handleFilterChange" 
-            />
-          </el-form-item>
-          
-          <el-form-item label="数据类型">
-            <el-select 
-              v-model="filterForm.tags" 
-              multiple 
-              placeholder="选择数据类型" 
-              style="width: 100%"
-              clearable
-              @change="handleFilterChange"
-            >
-              <el-option label="ERP" value="erp" />
-              <el-option label="静息态" value="resting" />
-              <el-option label="任务态" value="task" />
-              <el-option label="睡眠" value="sleep" />
-              <el-option label="运动想象" value="mi" />
-            </el-select>
-          </el-form-item>
-          
-          <el-form-item label="更新时间">
-            <el-date-picker
-              v-model="filterForm.dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              style="width: 100%"
-              value-format="YYYY-MM-DD"
-              @change="handleFilterChange"
-            />
-          </el-form-item>
-          
-          <el-form-item label="排序方式">
-            <div class="sort-options">
-              <el-select 
-                v-model="filterForm.sortBy" 
-                style="width: 70%"
-                @change="handleFilterChange"
-              >
-                <el-option label="更新时间" value="updated_at" />
-                <el-option label="下载次数" value="downloads" />
-                <el-option label="评分" value="rating" />
-              </el-select>
-              <el-switch
-                v-model="filterForm.sortOrder"
-                active-text="降序"
-                inactive-text="升序"
-                active-value="desc"
-                inactive-value="asc"
-                @change="handleFilterChange"
-              />
-            </div>
-          </el-form-item>
-        </el-form>
-      </el-card>
-    </aside>
-    
-    <!-- 右侧数据集列表 -->
+    <!-- 数据集列表 -->
     <div class="dataset-list-container">
       <el-card class="list-card">
         <template #header>
           <div class="list-header">
-            <h2>数据集列表</h2>
-            <el-button type="primary" @click="router.push('/upload')">上传数据集</el-button>
+            <div class="header-left">
+              <!-- 筛选按钮 -->
+              <el-button 
+                class="filter-button" 
+                type="primary" 
+                @click.stop="toggleFilterPanel"
+                :icon="showFilterPanel ? 'Close' : 'Filter'"
+                circle
+              />
+              <h2>数据集列表</h2>
+            </div>
+            
+            <div class="header-right">
+              <!-- 刷新按钮 -->
+              <el-button @click="loadDatasets">
+                <el-icon><Refresh /></el-icon> 刷新
+              </el-button>
+              <el-button type="primary" @click="router.push('/upload')">上传数据集</el-button>
+            </div>
           </div>
         </template>
+        
+        <!-- 悬浮筛选面板 -->
+        <div class="filter-panel-container" v-if="showFilterPanel">
+          <div class="filter-panel">
+            <h3>筛选选项</h3>
+            
+            <el-form :model="filterForm" label-position="top">
+              <el-form-item label="关键词搜索">
+                <el-input 
+                  v-model="filterForm.keyword" 
+                  placeholder="搜索数据集名称或描述" 
+                  clearable
+                  @change="handleFilterChange" 
+                />
+              </el-form-item>
+              
+              <el-form-item label="数据类型">
+                <el-select 
+                  v-model="filterForm.tags" 
+                  multiple 
+                  placeholder="选择数据类型" 
+                  style="width: 100%"
+                  clearable
+                  @change="handleFilterChange"
+                >
+                  <el-option label="ERP" value="erp" />
+                  <el-option label="静息态" value="resting" />
+                  <el-option label="任务态" value="task" />
+                  <el-option label="睡眠" value="sleep" />
+                  <el-option label="运动想象" value="mi" />
+                </el-select>
+              </el-form-item>
+              
+              <el-form-item label="更新时间">
+                <el-date-picker
+                  v-model="filterForm.dateRange"
+                  type="daterange"
+                  range-separator="至"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  style="width: 100%"
+                  value-format="YYYY-MM-DD"
+                  @change="handleFilterChange"
+                />
+              </el-form-item>
+              
+              <el-form-item label="排序方式">
+                <div class="sort-options">
+                  <el-select 
+                    v-model="filterForm.sortBy" 
+                    style="width: 70%"
+                    @change="handleFilterChange"
+                  >
+                    <el-option label="更新时间" value="updated_at" />
+                    <el-option label="下载次数" value="downloads" />
+                    <el-option label="评分" value="rating" />
+                  </el-select>
+                  <el-switch
+                    v-model="filterForm.sortOrder"
+                    active-text="降序"
+                    inactive-text="升序"
+                    active-value="desc"
+                    inactive-value="asc"
+                    @change="handleFilterChange"
+                  />
+                </div>
+              </el-form-item>
+              
+              <div class="filter-actions">
+                <el-button @click="showFilterPanel = false">取消</el-button>
+                <el-button type="primary" @click="handleFilterChange">应用筛选</el-button>
+              </div>
+            </el-form>
+          </div>
+        </div>
         
         <div v-if="loading" class="loading-container">
           <el-skeleton :rows="3" animated />
@@ -219,45 +254,14 @@ onMounted(() => {
 <style scoped>
 .dataset-container {
   display: flex;
-  gap: 20px;
   min-height: calc(100vh - 100px);
   padding: 0;
-  margin-left: -20px;
-}
-
-.filter-sidebar {
-  width: 280px;
-  flex-shrink: 0;
-  margin-left: -120px;
-}
-
-.filter-card {
-  position: sticky;
-  top: 80px;
-  border-radius: 0;
-  margin-left: 0;
-}
-
-.filter-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.filter-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.sort-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .dataset-list-container {
   flex: 1;
   padding-right: 20px;
+  width: 100%;
 }
 
 .list-header {
@@ -266,8 +270,55 @@ onMounted(() => {
   align-items: center;
 }
 
-.list-header h2 {
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-left h2 {
   margin: 0;
+}
+
+.header-right {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-panel-container {
+  position: relative;
+  z-index: 100;
+}
+
+.filter-panel {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 300px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+  z-index: 1000;
+}
+
+.filter-panel h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.sort-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .loading-container {
