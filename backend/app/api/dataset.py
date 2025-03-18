@@ -11,10 +11,10 @@ dataset_service = DatasetService(DATA_DIR)
 router = APIRouter(prefix="/api/datasets")
 
 @router.get("/", response_model=APIResponse)
-async def list_datasets():
-    """获取所有数据集列表"""
+async def list_datasets(keyword: str = None):
+    """获取所有数据集列表，支持按名称或ID搜索"""
     try:
-        datasets = dataset_service.list_datasets()
+        datasets = dataset_service.list_datasets(keyword)
         return APIResponse(
             message="获取数据集列表成功",
             data=datasets

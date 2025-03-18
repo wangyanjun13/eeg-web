@@ -5,6 +5,7 @@ import json
 from typing import List, Optional, Dict
 import pandas as pd
 from app.models.data_dataset import DatasetInfo, RawDataInfo, RawEEGData, ParticipantInfo
+import numpy as np
 
 class DatasetService:
     def __init__(self, data_dir: Path):
@@ -12,13 +13,25 @@ class DatasetService:
         if not self.data_dir.exists():
             raise ValueError(f"数据目录不存在: {self.data_dir}")
 
-    def list_datasets(self) -> List[Dict]:
-        """获取所有数据集列表"""
+    def list_datasets(self, keyword: str = None) -> List[Dict]:
+        """获取所有数据集列表，支持按名称或ID搜索"""
         datasets = []
         for dataset_dir in os.listdir(self.data_dir):
             if dataset_dir.startswith('ds'):
                 dataset_info = self._get_dataset_metadata(dataset_dir)
                 if dataset_info:
+                    # 如果提供了关键词，则进行过滤
+                    if keyword:
+                        # 检查数据集ID是否包含关键词
+                        id_match = keyword.lower() in dataset_info['dataset_id'].lower()
+                        # 检查数据集名称是否包含关键词（不区分大小写）
+                        name_match = ('Name' in dataset_info and 
+                                    keyword.lower() in dataset_info['Name'].lower().replace('  ', ' '))
+                        
+                        # 如果既不匹配ID也不匹配名称，则跳过此数据集
+                        if not (id_match or name_match):
+                            continue
+                    
                     datasets.append(dataset_info)
         return datasets
 
@@ -124,18 +137,53 @@ class DatasetService:
         except Exception:
             return {}
 
-    def get_subject_info(self, dataset_id: str, subject_id: str) -> RawDataInfo:
+    def get_subject_info(self, dataset_id: str, subject_id: str) -> Dict:
         """获取受试者详细信息"""
         try:
+            # 读取EEG数据
             raw = self._read_eeg_file(dataset_id, subject_id)
-            return RawDataInfo(
-                channels=raw.ch_names,
-                sampling_rate=raw.info['sfreq'],
-                duration=raw.times[-1],
-                n_channels=len(raw.ch_names),
-                subject_id=f"sub-{subject_id}",
-                dataset_id=dataset_id
-            )
+            
+            # 基本EEG信息
+            info = {
+                "channels": raw.ch_names,
+                "sampling_rate": float(raw.info['sfreq']),  # 确保是Python原生float
+                "duration": float(raw.times[-1]),  # 确保是Python原生float
+                "n_channels": int(len(raw.ch_names)),  # 确保是Python原生int
+                "subject_id": f"sub-{subject_id}",
+                "dataset_id": dataset_id
+            }
+            
+            # 尝试读取participants.tsv获取人口统计学信息
+            try:
+                participants_file = self.data_dir / dataset_id / "participants.tsv"
+                if participants_file.exists():
+                    df = pd.read_csv(participants_file, sep='\t')
+                    # 查找当前受试者
+                    participant_row = df[df['participant_id'] == f"sub-{subject_id}"]
+                    
+                    if not participant_row.empty:
+                        # 添加可用的人口统计学信息，确保转换为Python原生类型
+                        for col in df.columns:
+                            if col != 'participant_id' and col in participant_row:
+                                # 获取值并转换为Python原生类型
+                                value = participant_row[col].values[0]
+                                
+                                # 根据数据类型进行转换
+                                if pd.isna(value):
+                                    # 处理NaN值
+                                    info[col] = None
+                                elif isinstance(value, (np.integer, np.int64)):
+                                    info[col] = int(value)
+                                elif isinstance(value, (np.floating, np.float64)):
+                                    info[col] = float(value)
+                                else:
+                                    # 字符串和其他类型
+                                    info[col] = str(value)
+            except Exception as e:
+                # 如果读取人口统计学信息失败，记录错误但继续返回EEG信息
+                print(f"读取人口统计学信息失败: {str(e)}")
+            
+            return info
         except Exception as e:
             raise ValueError(f"获取受试者信息失败: {str(e)}")
 
@@ -173,42 +221,81 @@ class DatasetService:
         times = raw.times[start_idx:end_idx]
         return data, times
 
-    def get_participants_info(self, dataset_id: str) -> ParticipantInfo:
+    def get_participants_info(self, dataset_id: str) -> Dict:
         """获取参与者信息"""
         try:
             participants_file = self.data_dir / dataset_id / "participants.tsv"
             if not participants_file.exists():
-                return ParticipantInfo(
-                    total_count=0,
-                    group_stats={}
-                )
+                return {
+                    "total_count": 0,
+                    "group_stats": {},
+                    "participants": []
+                }
                 
             df = pd.read_csv(participants_file, sep='\t')
             
+            # 将参与者数据转换为列表
+            participants_list = []
+            for _, row in df.iterrows():
+                participant_dict = {}
+                for col in df.columns:
+                    value = row[col]
+                    # 转换为Python原生类型
+                    if pd.isna(value):
+                        participant_dict[col] = None
+                    elif isinstance(value, (np.integer, np.int64)):
+                        participant_dict[col] = int(value)
+                    elif isinstance(value, (np.floating, np.float64)):
+                        participant_dict[col] = float(value)
+                    else:
+                        participant_dict[col] = str(value)
+                participants_list.append(participant_dict)
+            
             # 检查是否有Group列
             if 'Group' in df.columns:
-                group_stats = df.groupby('Group').agg({
-                    'Age': ['mean', 'min', 'max'] if 'Age' in df.columns else [],
-                    'Gender': 'count' if 'Gender' in df.columns else []
-                }).to_dict()
+                # 手动构建统计信息，确保所有键都是字符串
+                group_stats = {}
+                for group_name, group_df in df.groupby('Group'):
+                    group_name_str = str(group_name)  # 确保键是字符串
+                    group_stats[group_name_str] = {}
+                    
+                    if 'Age' in df.columns:
+                        group_stats[group_name_str]['Age'] = {
+                            'mean': float(group_df['Age'].mean()),
+                            'min': float(group_df['Age'].min()),
+                            'max': float(group_df['Age'].max())
+                        }
+                    
+                    if 'Gender' in df.columns:
+                        gender_counts = group_df['Gender'].value_counts().to_dict()
+                        # 确保键是字符串
+                        group_stats[group_name_str]['Gender'] = {
+                            str(k): int(v) for k, v in gender_counts.items()
+                        }
             else:
                 # 如果没有Group列，创建基本统计信息
-                stats = {}
+                group_stats = {'All': {}}
+                
                 if 'Age' in df.columns:
-                    stats['Age'] = {
-                        'mean': df['Age'].mean(),
-                        'min': df['Age'].min(),
-                        'max': df['Age'].max()
+                    group_stats['All']['Age'] = {
+                        'mean': float(df['Age'].mean()),
+                        'min': float(df['Age'].min()),
+                        'max': float(df['Age'].max())
                     }
+                
                 if 'Gender' in df.columns:
-                    stats['Gender'] = df['Gender'].value_counts().to_dict()
-                    
-                group_stats = {'All': stats}
+                    gender_counts = df['Gender'].value_counts().to_dict()
+                    # 确保键是字符串
+                    group_stats['All']['Gender'] = {
+                        str(k): int(v) for k, v in gender_counts.items()
+                    }
             
-            return ParticipantInfo(
-                total_count=len(df),
-                group_stats=group_stats
-            )
+            # 返回字典，包含统计信息和完整的参与者列表
+            return {
+                "total_count": int(len(df)),
+                "group_stats": group_stats,
+                "participants": participants_list
+            }
         except Exception as e:
             raise ValueError(f"读取参与者信息失败: {str(e)}")
 

@@ -12,6 +12,7 @@ const datasetId = route.params.id;
 const dataset = ref(null);
 const subjects = ref([]);
 const participants = ref(null);
+const participantsMap = ref({});  // 新增：用于存储受试者ID到人口统计学信息的映射
 const loading = ref({
   dataset: false,
   subjects: false,
@@ -53,6 +54,20 @@ const fetchParticipantsInfo = async () => {
   try {
     const response = await datasetService.getParticipantsInfo(datasetId);
     participants.value = response.data;
+    
+    // 处理participants.tsv数据，创建ID到信息的映射
+    if (response.data && response.data.participants) {
+      const participantsData = response.data.participants;
+      participantsMap.value = participantsData.reduce((map, participant) => {
+        // 从participant_id中提取数字部分（例如从"sub-01"提取"01"）
+        const idMatch = participant.participant_id.match(/sub-(\d+)/);
+        if (idMatch) {
+          const id = idMatch[1];
+          map[id] = participant;
+        }
+        return map;
+      }, {});
+    }
   } catch (error) {
     console.error('获取参与者信息失败:', error);
     ElMessage.error('获取参与者信息失败');
@@ -145,6 +160,27 @@ onMounted(() => {
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="subject" label="受试者" />
             <el-table-column prop="format" label="格式" width="100" />
+            
+            <!-- 新增：年龄列 -->
+            <el-table-column label="年龄" width="80">
+              <template #default="{ row }">
+                <span v-if="participantsMap[row.id] && participantsMap[row.id].Age">
+                  {{ participantsMap[row.id].Age }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            
+            <!-- 新增：性别列 -->
+            <el-table-column label="性别" width="80">
+              <template #default="{ row }">
+                <span v-if="participantsMap[row.id] && participantsMap[row.id].Gender">
+                  {{ participantsMap[row.id].Gender === 'M' ? '男' : participantsMap[row.id].Gender === 'F' ? '女' : participantsMap[row.id].Gender }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            
             <el-table-column label="操作" width="200">
               <template #default="{ row }">
                 <el-button size="small" @click="viewSubject(row.id)">查看</el-button>

@@ -29,21 +29,11 @@ const loading = ref(false);
 const showFilterPanel = ref(false);
 
 // 获取数据集列表
-const loadDatasets = async () => {
+const fetchDatasets = async (keyword = '') => {
   loading.value = true;
   try {
-    const response = await datasetService.getDatasets({
-      ...filterForm.value,
-      page: pagination.value.currentPage,
-      pageSize: pagination.value.pageSize
-    });
-    
-    console.log('API响应:', response); // 调试日志
-    
-    if (response && response.data) {
-      datasets.value = response.data;
-      pagination.value.total = datasets.value.length;
-    }
+    const response = await datasetService.getDatasets({ keyword });
+    datasets.value = response.data || [];
   } catch (error) {
     console.error('获取数据集列表失败:', error);
     ElMessage.error('获取数据集列表失败');
@@ -52,26 +42,34 @@ const loadDatasets = async () => {
   }
 };
 
-// 处理筛选条件变化
-const handleFilterChange = () => {
-  pagination.value.currentPage = 1;
-  loadDatasets();
+// 搜索数据集
+const searchDatasets = async (keyword) => {
+  await fetchDatasets(keyword);
 };
 
-// 处理分页变化
-const handlePageChange = (page) => {
+// 处理筛选条件变化
+const handleFilterChange = () => {
+  fetchDatasets();
+};
+
+// 处理页码变化
+const handleCurrentChange = (page) => {
   pagination.value.currentPage = page;
-  loadDatasets();
 };
 
 // 查看数据集详情
-const viewDataset = (id) => {
-  router.push(`/datasets/${id}`);
+const viewDataset = (datasetId) => {
+  router.push(`/datasets/${datasetId}`);
 };
 
 // 分析数据集
-const analyzeDataset = (id) => {
-  router.push(`/datasets/${id}/analyze`);
+const analyzeDataset = (datasetId) => {
+  router.push(`/datasets/${datasetId}/analyze`);
+};
+
+// 可视化数据集
+const visualizeDataset = (datasetId) => {
+  router.push(`/datasets/${datasetId}/visualize`);
 };
 
 // 切换筛选面板显示状态
@@ -92,8 +90,14 @@ const closeFilterPanel = (event) => {
 
 // 监听点击事件，用于关闭筛选面板
 onMounted(() => {
-  loadDatasets();
+  fetchDatasets();
   document.addEventListener('click', closeFilterPanel);
+});
+
+// 暴露方法给父组件
+defineExpose({
+  searchDatasets,
+  handleFilterChange
 });
 </script>
 
@@ -118,7 +122,7 @@ onMounted(() => {
             
             <div class="header-right">
               <!-- 刷新按钮 -->
-              <el-button @click="loadDatasets">
+              <el-button @click="fetchDatasets">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
               <el-button type="primary" @click="router.push('/upload')">上传数据集</el-button>
@@ -211,7 +215,10 @@ onMounted(() => {
         <div v-else class="dataset-list">
           <el-card v-for="dataset in datasets" :key="dataset.dataset_id" class="dataset-item">
             <div class="dataset-info">
-              <h3 class="dataset-name">{{ dataset.Name }}</h3>
+              <div class="dataset-header">
+                <h3 class="dataset-name">{{ dataset.Name }}</h3>
+                <span class="dataset-id">ID: {{ dataset.dataset_id }}</span>
+              </div>
               <p class="dataset-description">{{ dataset.BIDSVersion ? `BIDS版本: ${dataset.BIDSVersion}` : '' }}</p>
               
               <div class="dataset-meta">
@@ -231,6 +238,7 @@ onMounted(() => {
               <div class="dataset-actions">
                 <el-button @click="viewDataset(dataset.dataset_id)" size="small">查看</el-button>
                 <el-button type="primary" @click="analyzeDataset(dataset.dataset_id)" size="small">分析</el-button>
+                <el-button type="success" @click="visualizeDataset(dataset.dataset_id)" size="small">可视化</el-button>
               </div>
             </div>
           </el-card>
@@ -243,7 +251,7 @@ onMounted(() => {
             :page-size="pagination.pageSize"
             :total="pagination.total"
             layout="total, prev, pager, next"
-            @current-change="handlePageChange"
+            @current-change="handleCurrentChange"
           />
         </div>
       </el-card>
@@ -340,11 +348,31 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.dataset-name {
-  margin-top: 0;
+.dataset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dataset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
+}
+
+.dataset-id {
+  color: #909399;
+  font-size: 14px;
+}
+
+.dataset-name {
+  margin: 0;
   font-size: 18px;
   color: #303133;
+  flex: 1;
+  margin-right: 16px;
 }
 
 .dataset-description {

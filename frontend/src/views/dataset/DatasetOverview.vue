@@ -1,17 +1,18 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
+import { Search } from '@element-plus/icons-vue';
 import AppLayout from '@/components/AppLayout.vue';
 import DatasetList from '@/components/dataset/DatasetList.vue';
-import { Search } from '@element-plus/icons-vue';
+import datasetService from '@/services/dataset';
 
 const searchKeyword = ref('');
 const datasetListRef = ref(null);
 
-const handleSearch = () => {
-  // 触发DatasetList组件的搜索
+// 处理搜索
+const handleSearch = async () => {
   if (datasetListRef.value) {
-    datasetListRef.value.filterForm.keyword = searchKeyword.value;
-    datasetListRef.value.handleFilterChange();
+    // 调用DatasetList组件的搜索方法
+    await datasetListRef.value.searchDatasets(searchKeyword.value);
   }
 };
 </script>
@@ -22,61 +23,50 @@ const handleSearch = () => {
       <div class="search-container">
         <el-input
           v-model="searchKeyword"
-          placeholder="查找需要的数据集"
+          placeholder="请输入数据集名称或ID"
           class="search-input"
           :prefix-icon="Search"
           clearable
-          @input="handleSearch"
+          @keyup.enter="handleSearch"
+          size="large"
         >
           <template #append>
-            <el-button :icon="Search" />
+            <el-button :icon="Search" @click="handleSearch" size="large" />
           </template>
         </el-input>
       </div>
-      <DatasetList ref="datasetListRef" />
+      <DatasetList ref="datasetListRef" :initial-keyword="''" />
     </div>
   </AppLayout>
 </template>
 
 <style scoped>
 .dataset-overview {
-  padding: 0 20px;
+  padding: 20px;
 }
 
 .search-container {
-  margin-bottom: 24px;
-  max-width: 1200px;
-  margin: 0 auto 24px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 .search-input {
-  --el-input-height: 50px;
-  font-size: 16px;
-  border: 1px solid #000;
-  border-radius: 25px;
-}
-
-.search-input :deep(.el-input__wrapper) {
-  padding: 0 15px;
-  box-shadow: 0 2px 12px rgba(81, 50, 171, 0.1);
-  border-radius: 25px;
-}
-
-.search-input :deep(.el-input__inner) {
-  height: 50px;
+  width: 100%;
+  max-width: 600px;
   font-size: 16px;
 }
 
-.search-input :deep(.el-input-group__append) {
+:deep(.el-input__wrapper) {
+  padding: 4px 11px;
+}
+
+:deep(.el-input__inner) {
+  height: 40px;
+  font-size: 16px;
+}
+
+:deep(.el-input-group__append) {
   padding: 0 20px;
-  background-color: var(--el-color-primary);
-  border-color: var(--el-color-primary);
-  color: white;
-  border-radius: 0 25px 25px 0;
-}
-
-.search-input :deep(.el-input-group__append .el-button) {
-  color: white;
-  border: none;
 }
 </style> 

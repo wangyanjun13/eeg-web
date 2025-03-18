@@ -28,6 +28,7 @@ const fetchSubjectInfo = async () => {
   try {
     const response = await datasetService.getSubjectInfo(datasetId, subjectId);
     subjectInfo.value = response.data;
+    console.log('受试者信息:', subjectInfo.value);
   } catch (error) {
     console.error('获取受试者信息失败:', error);
     ElMessage.error('获取受试者信息失败');
@@ -78,6 +79,35 @@ const channelOptions = computed(() => {
   }));
 });
 
+// 格式化时长
+const formatDuration = (seconds) => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}分${remainingSeconds}秒`;
+};
+
+// 格式化标签名称
+const formatLabel = (key) => {
+  // 将snake_case转换为更友好的显示格式
+  return key
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// 计算额外的人口统计学信息（排除已显示的基本字段）
+const additionalInfo = computed(() => {
+  if (!subjectInfo.value) return {};
+  
+  const basicFields = ['subject_id', 'dataset_id', 'n_channels', 'sampling_rate', 
+                       'duration', 'channels', 'age', 'sex'];
+  
+  return Object.fromEntries(
+    Object.entries(subjectInfo.value)
+      .filter(([key]) => !basicFields.includes(key))
+  );
+});
+
 onMounted(() => {
   fetchSubjectInfo();
   fetchEEGData();
@@ -98,17 +128,28 @@ onMounted(() => {
       <el-card v-loading="loading.info" class="subject-info-card">
         <template #header>
           <div class="card-header">
-            <h2 v-if="subjectInfo">受试者: {{ subjectInfo.subject }}</h2>
+            <h2 v-if="subjectInfo">受试者: {{ subjectInfo.subject_id }}</h2>
             <el-skeleton v-else :rows="1" animated />
           </div>
         </template>
 
         <div v-if="subjectInfo" class="subject-info">
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="ID">{{ subjectInfo.id }}</el-descriptions-item>
-            <el-descriptions-item label="文件名">{{ subjectInfo.name }}</el-descriptions-item>
-            <el-descriptions-item label="格式">{{ subjectInfo.format }}</el-descriptions-item>
             <el-descriptions-item label="数据集">{{ subjectInfo.dataset_id }}</el-descriptions-item>
+            <el-descriptions-item label="通道数">{{ subjectInfo.n_channels }}</el-descriptions-item>
+            <el-descriptions-item label="采样率">{{ subjectInfo.sampling_rate }} Hz</el-descriptions-item>
+            <el-descriptions-item label="时长">{{ formatDuration(subjectInfo.duration) }}</el-descriptions-item>
+            
+            <!-- 添加人口统计学信息（如果有） -->
+            <el-descriptions-item v-if="subjectInfo.age" label="年龄">{{ subjectInfo.age }}</el-descriptions-item>
+            <el-descriptions-item v-if="subjectInfo.sex" label="性别">
+              {{ subjectInfo.sex === 'M' ? '男' : subjectInfo.sex === 'F' ? '女' : subjectInfo.sex }}
+            </el-descriptions-item>
+            
+            <!-- 显示其他可能的人口统计学信息 -->
+            <template v-for="(value, key) in additionalInfo" :key="key">
+              <el-descriptions-item :label="formatLabel(key)">{{ value }}</el-descriptions-item>
+            </template>
           </el-descriptions>
         </div>
         <el-skeleton v-else :rows="4" animated />
