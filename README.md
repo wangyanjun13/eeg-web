@@ -1,9 +1,9 @@
-##### Vue 3 + Vite前端
-##### Fastapi  python后端
-##### mongodb  元数据存储
-##### redis celery缓存
-##### docker 容器启动和联调
-##### dataset from :https://openneuro.org/
+#### Vue 3 + Vite前端
+#### Fastapi  python后端
+#### mongodb  元数据存储
+#### redis celery缓存
+#### docker 容器启动和联调
+#### dataset from :https://openneuro.org/
 
 This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
 
