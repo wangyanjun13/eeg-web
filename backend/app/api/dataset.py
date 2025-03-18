@@ -22,7 +22,7 @@ async def list_datasets():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{dataset_id}/info", response_model=APIResponse)
+@router.get("/{dataset_id}", response_model=APIResponse)
 async def get_dataset_info(dataset_id: str):
     """获取数据集详细信息"""
     try:
@@ -34,11 +34,35 @@ async def get_dataset_info(dataset_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{dataset_id}/raw", response_model=APIResponse)
-async def get_dataset_data(dataset_id: str, start_time: float = 0, duration: float = 10):
-    """获取原始EEG数据"""
+@router.get("/{dataset_id}/subjects", response_model=APIResponse)
+async def get_dataset_subjects(dataset_id: str):
+    """获取数据集中的所有受试者"""
     try:
-        data = dataset_service.get_dataset_data(dataset_id, start_time, duration)
+        subjects = dataset_service.get_dataset_subjects(dataset_id)
+        return APIResponse(
+            message="获取受试者列表成功",
+            data=subjects
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{dataset_id}/subjects/{subject_id}/info", response_model=APIResponse)
+async def get_subject_info(dataset_id: str, subject_id: str):
+    """获取受试者详细信息"""
+    try:
+        info = dataset_service.get_subject_info(dataset_id, subject_id)
+        return APIResponse(
+            message="获取受试者信息成功",
+            data=info
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{dataset_id}/subjects/{subject_id}/raw", response_model=APIResponse)
+async def get_subject_data(dataset_id: str, subject_id: str, start_time: float = 0, duration: float = 10):
+    """获取受试者原始EEG数据"""
+    try:
+        data = dataset_service.get_subject_data(dataset_id, subject_id, start_time, duration)
         return APIResponse(
             message="获取原始数据成功",
             data=data
@@ -46,13 +70,13 @@ async def get_dataset_data(dataset_id: str, start_time: float = 0, duration: flo
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/participants", response_model=APIResponse)
-async def get_participants_info():
-    """获取受试者信息"""
+@router.get("/{dataset_id}/participants", response_model=APIResponse)
+async def get_participants_info(dataset_id: str):
+    """获取数据集参与者信息"""
     try:
-        participants = dataset_service.get_participants_info()
+        participants = dataset_service.get_participants_info(dataset_id)
         return APIResponse(
-            message="获取受试者信息成功",
+            message="获取参与者信息成功",
             data=participants
         )
     except Exception as e:

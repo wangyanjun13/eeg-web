@@ -12,12 +12,12 @@ visual_service = VisualService(dataset_service)
 
 router = APIRouter(prefix="/api/visualization")
 
-@router.get("/{dataset_id}/plot", response_model=APIResponse)
-async def get_eeg_plot(dataset_id: str, start_time: float = 0, duration: float = 10):
+@router.get("/{dataset_id}/subjects/{subject_id}/plot", response_model=APIResponse)
+async def get_eeg_plot(dataset_id: str, subject_id: str, start_time: float = 0, duration: float = 10):
     """获取EEG图表数据"""
     try:
         params = TimeSeriesParams(start_time=start_time, duration=duration)
-        plot_data = visual_service.create_time_series(dataset_id, params)
+        plot_data = visual_service.create_time_series(dataset_id, subject_id, params)
         return APIResponse(
             message="获取EEG图表成功",
             data=plot_data

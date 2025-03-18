@@ -24,20 +24,23 @@ async def get_basic_info(dataset_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{dataset_id}/time_freq", response_model=APIResponse)
-async def compute_time_frequency(
-    dataset_id: str,
-    start_time: float = 0,
-    duration: float = 10,
-    method: str = "multitaper"
-):
+@router.post("/{dataset_id}/subjects/{subject_id}/erp", response_model=APIResponse)
+async def compute_erp(dataset_id: str, subject_id: str, params: ERPParams):
+    """计算ERP分析"""
+    try:
+        result = analysis_service.compute_erp(dataset_id, subject_id, params)
+        return APIResponse(
+            message="ERP分析完成",
+            data=result
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{dataset_id}/subjects/{subject_id}/time_freq", response_model=APIResponse)
+async def compute_time_frequency(dataset_id: str, subject_id: str, params: TimeFreqParams):
     """计算时频分析"""
     try:
-        params = TimeFreqParams(
-            freqs=list(range(6, 36)),
-            method=method
-        )
-        result = analysis_service.compute_time_freq(dataset_id, params)
+        result = analysis_service.compute_time_freq(dataset_id, subject_id, params)
         return APIResponse(
             message="时频分析完成",
             data=result

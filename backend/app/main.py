@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from pathlib import Path
 
 # 直接导入路由器
@@ -13,6 +14,21 @@ app = FastAPI(
     description="EEG数据分析平台",
     version="1.0.0"
 )
+
+# 自定义OpenAPI文档
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="EEG数据分析平台API",
+        version="1.0.0",
+        description="EEG数据分析平台的API文档",
+        routes=app.routes,
+    )
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # 配置CORS
 app.add_middleware(
