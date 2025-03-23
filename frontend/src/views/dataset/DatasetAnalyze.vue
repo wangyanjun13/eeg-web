@@ -65,33 +65,29 @@ function analyzeData() {
           <h3>分析选项</h3>
           
           <div class="form-group">
-            <label>选择分析方法:</label>
-            <select v-model="selectedMethod">
-              <option 
-                v-for="method in availableMethods" 
-                :key="method.value" 
-                :value="method.value"
-              >
+            <label for="method">分析方法</label>
+            <select id="method" v-model="selectedMethod">
+              <option v-for="method in availableMethods" :key="method.value" :value="method.value">
                 {{ method.label }}
               </option>
             </select>
           </div>
           
           <div class="form-group">
-            <label>时间范围:</label>
+            <label>时间范围</label>
             <div class="range-inputs">
-              <input type="number" placeholder="开始 (秒)" min="0" step="0.1">
-              <span>至</span>
-              <input type="number" placeholder="结束 (秒)" min="0" step="0.1">
+              <input type="number" min="0" max="60" step="1" value="0"> <span>至</span>
+              <input type="number" min="0" max="60" step="1" value="10"> <span>秒</span>
             </div>
           </div>
           
           <div class="form-group">
-            <label>选择通道:</label>
+            <label>选择通道</label>
             <div class="channel-selection">
-              <button class="channel-btn">全选</button>
-              <button class="channel-btn">反选</button>
+              <button class="channel-btn">全部</button>
               <button class="channel-btn">前额叶</button>
+              <button class="channel-btn">顶叶</button>
+              <button class="channel-btn">枕叶</button>
               <button class="channel-btn">颞叶</button>
             </div>
           </div>
@@ -204,7 +200,6 @@ select, input {
   padding: 10px;
   border: 1px solid #dcdfe6;
   border-radius: 4px;
-  font-size: 14px;
 }
 
 .range-inputs {

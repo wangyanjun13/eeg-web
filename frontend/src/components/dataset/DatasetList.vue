@@ -103,13 +103,14 @@ defineExpose({
 
 <template>
   <div class="dataset-container">
-    <!-- 数据集列表 -->
+    <!-- 数据集列表容器 -->
     <div class="dataset-list-container">
       <el-card class="list-card">
+        <!-- 卡片头部 -->
         <template #header>
           <div class="list-header">
+            <!-- 左侧标题和筛选按钮 -->
             <div class="header-left">
-              <!-- 筛选按钮 -->
               <el-button 
                 class="filter-button" 
                 type="primary" 
@@ -120,8 +121,8 @@ defineExpose({
               <h2>数据集列表</h2>
             </div>
             
+            <!-- 右侧操作按钮 -->
             <div class="header-right">
-              <!-- 刷新按钮 -->
               <el-button @click="fetchDatasets">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
@@ -130,7 +131,7 @@ defineExpose({
           </div>
         </template>
         
-        <!-- 悬浮筛选面板 -->
+        <!-- 筛选面板 -->
         <div class="filter-panel-container" v-if="showFilterPanel">
           <div class="filter-panel">
             <h3>筛选选项</h3>
@@ -205,36 +206,44 @@ defineExpose({
           </div>
         </div>
         
+        <!-- 加载状态 -->
         <div v-if="loading" class="loading-container">
           <el-skeleton :rows="3" animated />
           <el-skeleton :rows="3" animated />
         </div>
         
+        <!-- 空数据提示 -->
         <el-empty v-else-if="datasets.length === 0" description="暂无数据集" />
         
+        <!-- 数据集列表 -->
         <div v-else class="dataset-list">
+          <!-- 单个数据集卡片 -->
           <el-card v-for="dataset in datasets" :key="dataset.dataset_id" class="dataset-item">
             <div class="dataset-info">
+              <!-- 数据集标题和ID -->
               <div class="dataset-header">
                 <h3 class="dataset-name">{{ dataset.Name }}</h3>
                 <span class="dataset-id">ID: {{ dataset.dataset_id }}</span>
               </div>
-              <p class="dataset-description">{{ dataset.BIDSVersion ? `BIDS版本: ${dataset.BIDSVersion}` : '' }}</p>
               
-              <div class="dataset-meta">
-                <div class="tags">
-                  <el-tag v-if="dataset.License" size="small" class="meta-tag">
-                    许可证: {{ dataset.License }}
-                  </el-tag>
-                  <el-tag v-if="dataset.subject_count" size="small" class="meta-tag" type="success">
-                    受试者: {{ dataset.subject_count }}
-                  </el-tag>
-                </div>
-                <span class="authors" v-if="dataset.Authors && dataset.Authors.length">
+              <!-- 作者信息 -->
+              <div class="dataset-author">
+                <span v-if="dataset.Authors && dataset.Authors.length">
                   作者: {{ dataset.Authors.join(', ') }}
                 </span>
               </div>
               
+              <!-- 数据集详细信息 -->
+              <div class="dataset-details">
+                <span v-if="dataset.subject_count" class="detail-item">
+                  <el-tag size="small" type="success">受试者: {{ dataset.subject_count }}</el-tag>
+                </span>
+                <span v-if="dataset.BIDSVersion" class="detail-item">
+                  <el-tag size="small" type="info">BIDS版本: {{ dataset.BIDSVersion }}</el-tag>
+                </span>
+              </div>
+              
+              <!-- 操作按钮 -->
               <div class="dataset-actions">
                 <el-button @click="viewDataset(dataset.dataset_id)" size="small">查看</el-button>
                 <el-button type="primary" @click="analyzeDataset(dataset.dataset_id)" size="small">分析</el-button>
@@ -244,7 +253,7 @@ defineExpose({
           </el-card>
         </div>
         
-        <!-- 分页 -->
+        <!-- 分页控件 -->
         <div class="pagination" v-if="datasets.length > 0">
           <el-pagination
             v-model:current-page="pagination.currentPage"
@@ -260,160 +269,129 @@ defineExpose({
 </template>
 
 <style scoped>
+/* 整体容器 */
 .dataset-container {
   display: flex;
-  min-height: calc(100vh - 100px);
-  padding: 0;
+  min-height: calc(100vh - 100px); /* 最小高度 */
+  padding: 0; /* 移除内边距以充分利用空间 */
 }
 
+/* 列表容器 */
 .dataset-list-container {
-  flex: 1;
-  padding-right: 20px;
-  width: 100%;
+  flex: 1; /* 占满可用空间 */
+  padding-right: 20px; /* 右侧内边距 */
+  width: 100%; /* 宽度占满 */
 }
 
+/* 列表头部 */
 .list-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: space-between; /* 两端对齐 */
+  align-items: center; /* 垂直居中 */
 }
 
+/* 头部左侧 */
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 12px; /* 元素间距 */
 }
 
+/* 头部标题 */
 .header-left h2 {
-  margin: 0;
+  margin: 0; /* 移除默认外边距 */
 }
 
+/* 头部右侧 */
 .header-right {
   display: flex;
-  gap: 10px;
+  gap: 10px; /* 按钮间距 */
 }
 
-.filter-panel-container {
-  position: relative;
-  z-index: 100;
-}
-
-.filter-panel {
-  position: absolute;
-  top: 10px;
-  left: 0;
-  width: 300px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  padding: 20px;
-  z-index: 1000;
-}
-
-.filter-panel h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 16px;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.sort-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.loading-container {
-  padding: 20px 0;
-}
-
+/* 数据集列表 */
 .dataset-list {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  flex-direction: column; /* 垂直排列 */
+  gap: 16px; /* 卡片间距 */
+  max-width: 100%; /* 最大宽度 */
+  margin: 0 auto; /* 水平居中 */
 }
 
+/* 数据集卡片 */
 .dataset-item {
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s; /* 悬停动画 */
 }
 
+/* 卡片悬停效果 */
 .dataset-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px); /* 上移效果 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 阴影增强 */
 }
 
+/* 数据集信息容器 */
 .dataset-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 8px; /* 元素间距 */
 }
 
+/* 数据集标题行 */
 .dataset-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px; /* 下方间距 */
 }
 
+/* 数据集ID样式 */
 .dataset-id {
-  color: #909399;
-  font-size: 14px;
+  color: #909399; /* 灰色文字 */
+  font-size: 14px; /* 字体大小 */
 }
 
+/* 数据集名称样式 */
 .dataset-name {
   margin: 0;
-  font-size: 18px;
-  color: #303133;
-  flex: 1;
-  margin-right: 16px;
+  font-size: 18px; /* 字体大小 */
+  color: #303133; /* 文字颜色 */
+  text-align: left; /* 左对齐 */
+  flex: 1; /* 占满剩余空间 */
+  margin-right: 16px; /* 右侧间距 */
 }
 
-.dataset-description {
-  margin-bottom: 16px;
-  color: #606266;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* 作者信息样式 */
+.dataset-author {
+  font-size: 12px; /* 小字体 */
+  color: #606266; /* 灰色文字 */
+  text-align: left; /* 左对齐 */
+  margin-bottom: 8px; /* 下方间距 */
 }
 
-.dataset-meta {
+/* 详细信息容器 */
+.dataset-details {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  flex-wrap: wrap; /* 允许换行 */
+  gap: 8px; /* 标签间距 */
+  margin-bottom: 12px; /* 下方间距 */
 }
 
-.tags {
-  display: flex;
-  gap: 8px;
+/* 详细信息项 */
+.detail-item {
+  margin-right: 8px; /* 右侧间距 */
 }
 
-.meta-tag {
-  margin: 0;
-}
-
-.authors {
-  font-size: 12px;
-  color: #606266;
-}
-
+/* 操作按钮容器 */
 .dataset-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: flex-start; /* 左对齐 */
+  gap: 10px; /* 按钮间距 */
+  margin-top: 8px; /* 上方间距 */
 }
 
+/* 分页控件 */
 .pagination {
-  margin-top: 20px;
+  margin-top: 20px; /* 上方间距 */
   display: flex;
-  justify-content: center;
+  justify-content: center; /* 居中显示 */
 }
 </style> 

@@ -19,11 +19,18 @@ const props = defineProps({
 
 const emit = defineEmits(['update:timeRange', 'update:selectedChannels'])
 
-// Chart references
+// 图表引用和状态
 const chartRef = ref(null)
 let chart = null
 const isFullScreen = ref(false)
 const themeStyle = ref('light')
+const channelSelectVisible = ref(false)
+const localSelectedChannels = ref([])
+
+// 初始化本地选中通道
+watch(() => props.selectedChannels, (newVal) => {
+  localSelectedChannels.value = [...newVal]
+}, { immediate: true })
 
 // 初始化图表
 const initChart = () => {
@@ -63,63 +70,69 @@ const updateChart = () => {
     legend: {
       data: props.selectedChannels,
       type: 'scroll',
-      bottom: 0
+      orient: 'horizontal',
+      top: 30
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
     },
     toolbox: {
       feature: {
-        dataZoom: {
-          yAxisIndex: 'none'
-        },
-        saveAsImage: {}
+        saveAsImage: { title: '保存为图片' },
+        dataZoom: { title: { zoom: '区域缩放', back: '还原缩放' } },
+        restore: { title: '还原' }
       }
     },
     dataZoom: [
       {
         type: 'slider',
-        xAxisIndex: 0,
-        start: (props.timeRange[0] / props.data.duration) * 100,
-        end: (props.timeRange[1] / props.data.duration) * 100
+        show: true,
+        xAxisIndex: [0],
+        start: 0,
+        end: 100
       },
       {
         type: 'inside',
-        xAxisIndex: 0,
+        xAxisIndex: [0],
         start: 0,
         end: 100
       }
     ],
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '15%',
-      containLabel: true
-    },
     xAxis: {
       type: 'value',
-      name: '时间 (秒)',
+      name: '时间 (s)',
+      nameLocation: 'middle',
+      nameGap: 30,
       min: props.timeRange[0],
       max: props.timeRange[1]
     },
     yAxis: {
       type: 'value',
       name: '振幅 (μV)',
-      scale: true
+      nameLocation: 'middle',
+      nameGap: 40
     },
     series: props.selectedChannels.map(channel => {
       const channelData = props.data.data[channel]
+      const times = props.data.times
       
       // 根据时间范围筛选数据点
-      const timeStart = props.timeRange[0] * props.data.sampling_rate
-      const timeEnd = props.timeRange[1] * props.data.sampling_rate
-      const filteredData = channelData.filter((_, idx) => idx >= timeStart && idx <= timeEnd)
+      const filteredData = []
+      const filteredTimes = []
       
-      // 时间点
-      const timePoints = Array.from(
-        { length: filteredData.length },
-        (_, i) => props.timeRange[0] + (i / props.data.sampling_rate)
-      )
+      // 筛选在时间范围内的数据点
+      for (let i = 0; i < times.length; i++) {
+        if (times[i] >= props.timeRange[0] && times[i] <= props.timeRange[1]) {
+          filteredData.push(channelData[i])
+          filteredTimes.push(times[i])
+        }
+      }
       
       // 组合数据
-      const data = timePoints.map((time, idx) => [time, filteredData[idx]])
+      const data = filteredTimes.map((time, idx) => [time, filteredData[idx]])
       
       return {
         name: channel,
@@ -138,12 +151,23 @@ const updateChart = () => {
     if (params.batch) {
       const { start, end } = params.batch[0]
       const newTimeRange = [
-        (start / 100) * props.data.duration,
-        (end / 100) * props.data.duration
+        props.timeRange[0] + (start / 100) * (props.timeRange[1] - props.timeRange[0]),
+        props.timeRange[0] + (end / 100) * (props.timeRange[1] - props.timeRange[0])
       ]
       emit('update:timeRange', newTimeRange)
     }
   })
+}
+
+// 切换通道选择对话框
+const toggleChannelSelect = () => {
+  channelSelectVisible.value = !channelSelectVisible.value
+}
+
+// 确认通道选择
+const confirmChannelSelect = () => {
+  emit('update:selectedChannels', localSelectedChannels.value)
+  channelSelectVisible.value = false
 }
 
 // 切换全屏
@@ -151,6 +175,7 @@ const toggleFullScreen = () => {
   isFullScreen.value = !isFullScreen.value
   
   if (isFullScreen.value) {
+    // 全屏样式
     chartRef.value.style.position = 'fixed'
     chartRef.value.style.top = '0'
     chartRef.value.style.left = '0'
@@ -159,6 +184,7 @@ const toggleFullScreen = () => {
     chartRef.value.style.zIndex = '9999'
     chartRef.value.style.background = themeStyle.value === 'dark' ? '#333' : '#fff'
   } else {
+    // 恢复正常样式
     chartRef.value.style.position = 'relative'
     chartRef.value.style.top = 'auto'
     chartRef.value.style.left = 'auto'
@@ -204,8 +230,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="eeg-viewer">
+    <!-- 图表控制按钮 -->
     <div class="chart-controls">
       <el-button-group>
+        <el-button size="small" @click="toggleChannelSelect">
+          选择通道
+        </el-button>
         <el-button size="small" @click="toggleTheme">
           切换主题
         </el-button>
@@ -215,7 +245,31 @@ onBeforeUnmount(() => {
       </el-button-group>
     </div>
     
+    <!-- 图表容器 -->
     <div ref="chartRef" class="chart-container"></div>
+    
+    <!-- 通道选择对话框 -->
+    <el-dialog
+      v-model="channelSelectVisible"
+      title="选择要显示的通道"
+      width="30%"
+    >
+      <el-checkbox-group v-model="localSelectedChannels">
+        <el-checkbox 
+          v-for="channel in props.data?.channels" 
+          :key="channel" 
+          :label="channel"
+        >
+          {{ channel }}
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="channelSelectVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmChannelSelect">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -228,16 +282,30 @@ onBeforeUnmount(() => {
 
 .chart-controls {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-end; /* 控制按钮右对齐 */
   margin-bottom: 16px;
 }
 
 .chart-container {
-  height: 500px;
+  height: 500px; /* 图表默认高度 */
   width: 100%;
   border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1); /* 阴影效果 */
+  transition: all 0.3s ease; /* 平滑过渡效果 */
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+:deep(.el-checkbox-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 </style>

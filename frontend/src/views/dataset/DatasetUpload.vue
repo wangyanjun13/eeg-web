@@ -4,8 +4,11 @@ import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import datasetService from '@/services/dataset';
 import AppLayout from '@/components/AppLayout.vue';
+import { UploadFilled } from '@element-plus/icons-vue';
 
 const router = useRouter();
+
+// 表单数据
 const uploadForm = reactive({
   name: '',
   description: '',
@@ -260,62 +263,67 @@ const cancelUpload = () => {
 
 <style scoped>
 .upload-container {
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
+  padding: 20px; /* 容器内边距 */
+  max-width: 800px; /* 最大宽度 */
+  margin: 0 auto; /* 居中显示 */
 }
 
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 24px; /* 页头下方间距 */
 }
 
 .page-header h1 {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 8px;
+  font-size: 24px; /* 标题字体大小 */
+  font-weight: 600; /* 标题字体粗细 */
+  margin-bottom: 8px; /* 标题下方间距 */
 }
 
 .description {
-  color: #606266;
-  font-size: 14px;
+  color: #606266; /* 描述文字颜色 */
+  font-size: 14px; /* 描述文字大小 */
 }
 
 .upload-card {
-  margin-bottom: 24px;
+  border-radius: 8px; /* 卡片圆角 */
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1); /* 卡片阴影 */
 }
 
 .section-title {
-  font-size: 18px;
-  font-weight: 500;
-  margin: 24px 0 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #ebeef5;
+  font-size: 18px; /* 分节标题字体大小 */
+  font-weight: 600; /* 分节标题字体粗细 */
+  margin: 24px 0 16px 0; /* 分节标题上下间距 */
+  color: #303133; /* 分节标题颜色 */
 }
 
 .author-input, .tag-input {
-  margin-bottom: 16px;
+  margin-bottom: 16px; /* 输入框下方间距 */
 }
 
 .tags-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  flex-wrap: wrap; /* 允许标签换行 */
+  gap: 8px; /* 标签间距 */
+  margin-bottom: 24px; /* 标签容器下方间距 */
 }
 
 .author-tag, .tag-item {
-  margin-right: 8px;
-  margin-bottom: 8px;
+  margin-right: 8px; /* 标签右侧间距 */
+  margin-bottom: 8px; /* 标签下方间距 */
 }
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 24px;
-  gap: 12px;
+  justify-content: flex-end; /* 按钮右对齐 */
+  margin-top: 32px; /* 按钮上方间距 */
+  gap: 16px; /* 按钮间距 */
 }
 
 .upload-demo {
-  width: 100%;
+  margin-top: 16px; /* 上传区域上方间距 */
+}
+
+.el-upload__tip {
+  line-height: 1.5; /* 提示文字行高 */
+  margin-top: 8px; /* 提示文字上方间距 */
 }
 </style> 

@@ -11,10 +11,12 @@ import {
 const router = useRouter();
 const route = useRoute();
 
+// 计算当前活动菜单项
 const activeMenu = computed(() => {
   return route.path.split('/')[1] || 'datasets';
 });
 
+// 导航函数
 function navigateTo(path) {
   router.push(path);
 }
@@ -58,26 +60,26 @@ function navigateTo(path) {
         </el-tooltip>
 
         <el-tooltip
-          content="可视化工具"
+          content="可视化"
           placement="right"
           :show-after="200"
           effect="dark"
         >
           <el-menu-item index="visualization" @click="navigateTo('/visualization')">
             <el-icon><PieChart /></el-icon>
-            <template #title>可视化工具</template>
+            <template #title>可视化</template>
           </el-menu-item>
         </el-tooltip>
 
         <el-tooltip
-          content="上传数据"
+          content="上传数据集"
           placement="right"
           :show-after="200"
           effect="dark"
         >
           <el-menu-item index="upload" @click="navigateTo('/upload')">
             <el-icon><Upload /></el-icon>
-            <template #title>上传数据</template>
+            <template #title>上传数据集</template>
           </el-menu-item>
         </el-tooltip>
       </el-menu>
@@ -86,14 +88,14 @@ function navigateTo(path) {
     <!-- 顶部导航栏 -->
     <header class="app-header">
       <div class="logo">
-        <img src="@/assets/vue.svg" alt="Logo" height="30" />
-        <h1>EEG数据分析平台</h1>
+        <h1>EEG数据分析交互展示平台</h1>
       </div>
       
+      <!-- 用户信息下拉菜单 -->
       <div class="user-info">
         <el-dropdown>
           <span class="user-dropdown-link">
-            用户中心 <el-icon><arrow-down /></el-icon>
+            用户名 <el-icon class="el-icon--right"><arrow-down /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
@@ -117,13 +119,13 @@ function navigateTo(path) {
 
 <style scoped>
 .app-layout {
-  min-height: 100vh;
+  min-height: 100vh; /* 最小高度为视口高度 */
   display: flex;
   flex-direction: column;
 }
 
 .side-nav {
-  position: fixed;
+  position: fixed; /* 固定位置 */
   left: 0;
   top: 0; /* 侧边导航栏延伸到顶部 */
   bottom: 0;
@@ -136,9 +138,9 @@ function navigateTo(path) {
 }
 
 .app-header {
-  height: 60px;
+  height: 60px; /* 头部高度 */
   background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 阴影效果 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -164,7 +166,7 @@ function navigateTo(path) {
 }
 
 .user-info {
-  margin-left: auto;
+  margin-left: auto; /* 推到右侧 */
 }
 
 .user-dropdown-link {
@@ -178,14 +180,14 @@ function navigateTo(path) {
 .main-container {
   display: flex;
   flex: 1;
-  margin-top: 60px;
+  margin-top: 60px; /* 为顶部导航栏留出空间 */
 }
 
 .main-content {
   flex: 1;
   margin-left: 64px; /* 左侧留出侧边导航栏的宽度 */
   padding: 20px 20px 20px 0;
-  background-color: #f0f2f5;
+  background-color: #f0f2f5; /* 内容区背景色 */
   min-height: calc(100vh - 60px);
 }
 </style> 
