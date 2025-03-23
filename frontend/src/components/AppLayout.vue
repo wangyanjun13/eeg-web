@@ -5,7 +5,8 @@ import {
   Document, 
   DataAnalysis, 
   PieChart, 
-  Upload
+  Upload,
+  ArrowDown
 } from '@element-plus/icons-vue';
 
 const router = useRouter();
@@ -87,15 +88,15 @@ function navigateTo(path) {
 
     <!-- 顶部导航栏 -->
     <header class="app-header">
-      <div class="logo">
-        <h1>EEG数据分析交互展示平台</h1>
+      <div class="header-left">
+        <img src="@/assets/vue.svg" alt="Logo" class="header-logo" @click="navigateTo('/')" />
+        <h1 class="header-title">EEG数据分析交互展示平台</h1>
       </div>
-      
       <!-- 用户信息下拉菜单 -->
-      <div class="user-info">
+      <div class="header-right">
         <el-dropdown>
           <span class="user-dropdown-link">
-            用户名 <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            用户名 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
@@ -119,54 +120,70 @@ function navigateTo(path) {
 
 <style scoped>
 .app-layout {
-  min-height: 100vh; /* 最小高度为视口高度 */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
 .side-nav {
-  position: fixed; /* 固定位置 */
+  position: fixed;
   left: 0;
-  top: 0; /* 侧边导航栏延伸到顶部 */
+  top: 0;
   bottom: 0;
   z-index: 1000;
-  background-color: #001529; /* 侧边导航栏背景颜色 */
+  background-color: #001529;
+  display: flex;
+  flex-direction: column;
+  width: 64px;
 }
 
 .side-menu {
-  border-right: none; /* 移除右侧边框 */
+  border-right: none;
+  flex: 1;
 }
 
 .app-header {
-  height: 60px; /* 头部高度 */
+  height: 60px;
   background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
   position: fixed;
   top: 0;
-  left: 64px; /* 左侧留出侧边导航栏的宽度 */
+  left: 64px;
   right: 0;
   z-index: 1001;
 }
 
-.logo {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: 20px; /* 向右移动 logo 和标题 */
 }
 
-.logo h1 {
+.header-logo {
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: transform 0.3s;
+  margin-right: 16px;
+}
+
+.header-logo:hover {
+  transform: scale(1.1);
+}
+
+.header-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
   color: #303133;
+  font-weight: 500;
+  font-weight:bold;
 }
 
-.user-info {
-  margin-left: auto; /* 推到右侧 */
+.header-right {
+  margin-left: auto;
 }
 
 .user-dropdown-link {
@@ -180,14 +197,14 @@ function navigateTo(path) {
 .main-container {
   display: flex;
   flex: 1;
-  margin-top: 60px; /* 为顶部导航栏留出空间 */
+  margin-top: 60px;
 }
 
 .main-content {
   flex: 1;
-  margin-left: 64px; /* 左侧留出侧边导航栏的宽度 */
-  padding: 20px 20px 20px 0;
-  background-color: #f0f2f5; /* 内容区背景色 */
+  margin-left: 64px;
+  padding: 20px;
+  background-color: #f0f2f5;
   min-height: calc(100vh - 60px);
 }
 </style> 
