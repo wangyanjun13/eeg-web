@@ -77,6 +77,7 @@ const updateTimeRange = (newRange) => {
 // 更新选中的通道
 const updateSelectedChannels = (channels) => {
   selectedChannels.value = channels;
+  fetchEEGData(); // 当通道选择变化时重新获取数据
 };
 
 // 页面加载时获取数据

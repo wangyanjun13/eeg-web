@@ -6,6 +6,7 @@ from typing import List, Optional, Dict
 import pandas as pd
 from app.models.data_dataset import DatasetInfo, RawDataInfo, RawEEGData, ParticipantInfo
 import numpy as np
+import asyncio
 
 class DatasetService:
     def __init__(self, data_dir: Path):
@@ -187,19 +188,63 @@ class DatasetService:
         except Exception as e:
             raise ValueError(f"获取受试者信息失败: {str(e)}")
 
-    def get_subject_data(self, dataset_id: str, subject_id: str, start_time: float = 0, duration: float = 10) -> RawEEGData:
-        """获取受试者EEG数据片段"""
-        raw = self._read_eeg_file(dataset_id, subject_id)
-        data, times = self._get_time_slice(raw, start_time, duration)
-        return RawEEGData(
-            data={ch: d.tolist() for ch, d in zip(raw.ch_names, data)},
-            times=times.tolist(),
-            channels=raw.ch_names,
-            duration=raw.times[-1],
-            sampling_rate=raw.info['sfreq'],
-            dataset_id=dataset_id,
-            subject_id=subject_id
-        )
+    def get_subject_data(self, dataset_id: str, subject_id: str, start_time: float = 0, 
+                        duration: float = 10, channels: list = None, 
+                        cancel_event: asyncio.Event = None) -> RawEEGData:
+        raw = None
+        try:
+            raw = self._read_eeg_file(dataset_id, subject_id)
+            
+            # 处理数据时定期检查取消事件
+            def should_cancel():
+                return cancel_event and cancel_event.is_set()
+            
+            # 在数据处理的关键点检查是否应该取消
+            if should_cancel():
+                return RawEEGData.error("请求已取消")
+            
+            # 验证时间范围
+            max_time = raw.times[-1]
+            if start_time >= max_time:
+                return RawEEGData.error("请求的时间范围超出数据限制")
+            
+            # 调整持续时间
+            if start_time + duration > max_time:
+                duration = max_time - start_time
+            
+            # 通道筛选
+            if channels:
+                valid_channels = [ch for ch in channels if ch in raw.ch_names]
+                if not valid_channels:
+                    return RawEEGData.error("未找到有效的通道")
+                raw.pick_channels(valid_channels)
+            
+            # 自动降采样
+            if duration > 60:
+                target_sfreq = min(raw.info['sfreq'], max(100, raw.info['sfreq'] / 2))
+                if target_sfreq < raw.info['sfreq']:
+                    raw.resample(target_sfreq)
+            
+            data, times = self._get_time_slice(raw, start_time, duration)
+            
+            return RawEEGData(
+                data={ch: d.tolist() for ch, d in zip(raw.ch_names, data)},
+                times=times.tolist(),
+                channels=raw.ch_names,
+                duration=raw.times[-1],
+                sampling_rate=raw.info['sfreq'],
+                dataset_id=dataset_id,
+                subject_id=subject_id
+            )
+            
+        except MemoryError:
+            return RawEEGData.error("系统资源不足，请缩小时间范围或减少通道数量")
+        except Exception as e:
+            return RawEEGData.error("数据处理失败，请稍后重试")
+        finally:
+            # 确保释放内存
+            if raw is not None:
+                del raw
 
     def _read_eeg_file(self, dataset_id: str, subject_id: str) -> mne.io.Raw:
         """读取EEG文件"""

@@ -18,11 +18,10 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 5173,
       proxy: {
-        // 开发环境下的代理配置
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:8000',
+          target: 'http://backend:8000', // 使用Docker容器名称
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '')
+          secure: false,
         }
       }
     },

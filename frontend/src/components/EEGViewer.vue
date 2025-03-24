@@ -52,6 +52,20 @@ const initChart = () => {
 const updateChart = () => {
   if (!chart || !props.data || !props.data.data) return
   
+  // 对于大数据集，考虑数据抽样以提高性能
+  const maxDataPoints = 5000 // 最大显示点数
+  let skipFactor = 1
+  
+  // 计算当前数据点数
+  const times = props.data.times
+  const dataPointCount = times.length
+  
+  // 如果数据点过多，进行抽样
+  if (dataPointCount > maxDataPoints) {
+    skipFactor = Math.ceil(dataPointCount / maxDataPoints)
+    console.log(`数据点过多(${dataPointCount})，每${skipFactor}个点取样一次`)
+  }
+  
   const option = {
     title: {
       text: 'EEG数据可视化',
@@ -117,14 +131,13 @@ const updateChart = () => {
     },
     series: props.selectedChannels.map(channel => {
       const channelData = props.data.data[channel]
-      const times = props.data.times
       
-      // 根据时间范围筛选数据点
+      // 在筛选数据时应用抽样
       const filteredData = []
       const filteredTimes = []
       
-      // 筛选在时间范围内的数据点
-      for (let i = 0; i < times.length; i++) {
+      // 在筛选数据时应用抽样
+      for (let i = 0; i < times.length; i += skipFactor) {
         if (times[i] >= props.timeRange[0] && times[i] <= props.timeRange[1]) {
           filteredData.push(channelData[i])
           filteredTimes.push(times[i])
@@ -166,6 +179,7 @@ const toggleChannelSelect = () => {
 
 // 确认通道选择
 const confirmChannelSelect = () => {
+  // 发出事件通知父组件更新选中的通道
   emit('update:selectedChannels', localSelectedChannels.value)
   channelSelectVisible.value = false
 }
