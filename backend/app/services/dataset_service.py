@@ -263,6 +263,10 @@ class DatasetService:
         start_idx = int(start_time * raw.info['sfreq'])
         end_idx = int((start_time + duration) * raw.info['sfreq'])
         data = raw.get_data()[:, start_idx:end_idx]
+        
+        # 将电压单位从 V 转换为 μV (1V = 1,000,000μV)
+        data = data * 1e6
+        
         times = raw.times[start_idx:end_idx]
         return data, times
 

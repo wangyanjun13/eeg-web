@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount, computed } from 'vue'
 import * as echarts from 'echarts'
 
 const props = defineProps({
@@ -19,17 +19,18 @@ const props = defineProps({
 
 const emit = defineEmits(['update:timeRange', 'update:selectedChannels'])
 
-// 图表引用和状态
+// 图表状态
 const chartRef = ref(null)
 let chart = null
 const isFullScreen = ref(false)
 const themeStyle = ref('light')
 const channelSelectVisible = ref(false)
 const localSelectedChannels = ref([])
+const channelCompareVisible = ref(false)
 
 // 初始化本地选中通道
 watch(() => props.selectedChannels, (newVal) => {
-  localSelectedChannels.value = [...newVal]
+  localSelectedChannels.value = newVal.length ? [...newVal] : props.data.channels?.slice(0, 5) || []
 }, { immediate: true })
 
 // 初始化图表
@@ -52,40 +53,52 @@ const initChart = () => {
 const updateChart = () => {
   if (!chart || !props.data || !props.data.data) return
   
-  // 对于大数据集，考虑数据抽样以提高性能
-  const maxDataPoints = 5000 // 最大显示点数
-  let skipFactor = 1
-  
-  // 计算当前数据点数
-  const times = props.data.times
-  const dataPointCount = times.length
-  
-  // 如果数据点过多，进行抽样
-  if (dataPointCount > maxDataPoints) {
-    skipFactor = Math.ceil(dataPointCount / maxDataPoints)
-    console.log(`数据点过多(${dataPointCount})，每${skipFactor}个点取样一次`)
-  }
-  
-  const option = {
-    title: {
-      text: 'EEG数据可视化',
-      subtext: `采样率: ${props.data.sampling_rate}Hz`
+  const series = props.selectedChannels.map((channel, index) => ({
+    name: channel,
+    type: 'line',
+    showSymbol: true,
+    symbolSize: 5,     // 增大数据点以便于交互
+    symbol: 'circle',  // 使用圆形数据点
+    sampling: 'lttb',  // 使用LTTB采样提高性能
+    data: props.data.data[channel]?.map((value, index) => [
+      props.data.times[index],
+      value
+    ]).filter(point => 
+      point[0] >= props.timeRange[0] && 
+      point[0] <= props.timeRange[1]
+    ) || [],
+    animationDuration: 0,
+    emphasis: {
+      focus: 'none'  // 不淡化其他序列
+    },
+    itemStyle: {
+      color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
+      opacity: 0  // 默认不可见
     },
     tooltip: {
-      trigger: 'axis',
       formatter: (params) => {
-        const param = params[0]
-        return `
-          <div>时间: ${param.axisValue.toFixed(3)}s</div>
-          ${params.map(p => `<div>${p.seriesName}: ${p.value.toFixed(2)}μV</div>`).join('')}
-        `
+        const time = params.data[0]?.toFixed(3) || params.data[0]
+        const value = params.data[1]?.toFixed(3) || params.data[1]
+        return `<span style="color: ${params.color}">${params.seriesName}</span><br/>时间: ${time} s<br/>振幅: ${value} μV`
       }
-    },
-    legend: {
-      data: props.selectedChannels,
-      type: 'scroll',
-      orient: 'horizontal',
-      top: 30
+    }
+  }))
+
+  const option = {
+    tooltip: {
+      show: true,
+      trigger: 'item',  // 只在数据点上触发
+      axisPointer: {
+        type: 'cross',
+        snap: true,
+        label: {
+          show: true  // 显示坐标轴标签
+        }
+      },
+      showContent: false,  // 默认不显示内容
+      position: function (pos, params, el, elRect, size) {
+        return [pos[0] + 10, pos[1] - 10]  // 位于鼠标右上方
+      }
     },
     grid: {
       left: '3%',
@@ -93,93 +106,108 @@ const updateChart = () => {
       bottom: '3%',
       containLabel: true
     },
-    toolbox: {
-      feature: {
-        saveAsImage: { title: '保存为图片' },
-        dataZoom: { title: { zoom: '区域缩放', back: '还原缩放' } },
-        restore: { title: '还原' }
-      }
-    },
-    dataZoom: [
-      {
-        type: 'slider',
-        show: true,
-        xAxisIndex: [0],
-        start: 0,
-        end: 100
-      },
-      {
-        type: 'inside',
-        xAxisIndex: [0],
-        start: 0,
-        end: 100
-      }
-    ],
     xAxis: {
       type: 'value',
       name: '时间 (s)',
-      nameLocation: 'middle',
-      nameGap: 30,
       min: props.timeRange[0],
       max: props.timeRange[1]
     },
     yAxis: {
       type: 'value',
-      name: '振幅 (μV)',
-      nameLocation: 'middle',
-      nameGap: 40
+      name: '振幅 (μV)'
     },
-    series: props.selectedChannels.map(channel => {
-      const channelData = props.data.data[channel]
-      
-      // 在筛选数据时应用抽样
-      const filteredData = []
-      const filteredTimes = []
-      
-      // 在筛选数据时应用抽样
-      for (let i = 0; i < times.length; i += skipFactor) {
-        if (times[i] >= props.timeRange[0] && times[i] <= props.timeRange[1]) {
-          filteredData.push(channelData[i])
-          filteredTimes.push(times[i])
-        }
-      }
-      
-      // 组合数据
-      const data = filteredTimes.map((time, idx) => [time, filteredData[idx]])
-      
-      return {
-        name: channel,
-        type: 'line',
-        showSymbol: false,
-        data: data,
-        animationDuration: 0
-      }
-    })
+    dataZoom: [{
+      type: 'inside',
+      start: 0,
+      end: 100
+    }],
+    series
   }
-  
+
   chart.setOption(option)
   
-  // 监听数据区域缩放事件，更新timeRange
-  chart.on('dataZoom', (params) => {
-    if (params.batch) {
-      const { start, end } = params.batch[0]
-      const newTimeRange = [
-        props.timeRange[0] + (start / 100) * (props.timeRange[1] - props.timeRange[0]),
-        props.timeRange[0] + (end / 100) * (props.timeRange[1] - props.timeRange[0])
-      ]
-      emit('update:timeRange', newTimeRange)
+  // 添加事件处理
+  chart.off('mouseover')
+  chart.off('mouseout')
+  
+  chart.on('mouseover', 'series', (params) => {
+    if (params.componentType === 'series') {
+      chart.setOption({
+        tooltip: {
+          showContent: true,
+          formatter: (p) => {
+            const time = p.data[0]?.toFixed(3) || p.data[0]
+            const value = p.data[1]?.toFixed(3) || p.data[1]
+            return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>振幅: ${value} μV`
+          }
+        }
+      })
     }
   })
+  
+  chart.on('mouseout', 'series', () => {
+    chart.setOption({
+      tooltip: {
+        showContent: false
+      }
+    })
+  })
 }
+
+// 获取当前时间点
+const getCurrentTime = () => {
+  if (!chart || !props.data?.times) return 0
+  
+  // 获取当前鼠标位置对应的时间
+  const axisPointer = chart.getOption().axisPointer
+  if (axisPointer && axisPointer[0]?.value) {
+    return axisPointer[0].value.toFixed(3)
+  }
+  
+  // 如果没有轴指针位置，则使用当前显示范围的中点
+  const xAxis = chart.getOption().xAxis[0]
+  if (xAxis) {
+    const min = xAxis.min || props.timeRange[0]
+    const max = xAxis.max || props.timeRange[1]
+    return ((min + max) / 2).toFixed(3)
+  }
+  
+  return props.timeRange[0].toFixed(3)
+}
+
+// 通道数据对比窗口内容
+const channelCompareContent = computed(() => {
+  if (!props.data || !props.selectedChannels.length) return []
+  
+  const currentTime = getCurrentTime()
+  // 找到最接近当前时间的数据点索引
+  const timeIndex = props.data.times.findIndex(t => t >= currentTime) || 0
+  
+  return props.selectedChannels.map((channel, index) => {
+    const value = props.data.data[channel]?.[timeIndex]?.toFixed(3) || 0
+    const color = chart?.getOption().series[index]?.itemStyle?.color || '#000'
+    return {
+      channel,
+      value,
+      color
+    }
+  })
+})
 
 // 切换通道选择对话框
 const toggleChannelSelect = () => {
   channelSelectVisible.value = !channelSelectVisible.value
 }
 
+// 通道数据对比窗口
+const showChannelCompare = (event) => {
+  if (event.detail === 2) { // 双击事件
+    channelCompareVisible.value = true
+  }
+}
+
 // 确认通道选择
 const confirmChannelSelect = () => {
-  // 发出事件通知父组件更新选中的通道
   emit('update:selectedChannels', localSelectedChannels.value)
   channelSelectVisible.value = false
 }
@@ -219,6 +247,9 @@ const toggleTheme = () => {
   initChart()
 }
 
+// 添加点击事件控制状态
+const isShowingAllChannels = ref(false)
+
 // 监听props变化
 watch(() => props.data, initChart, { deep: true })
 watch(() => props.timeRange, updateChart, { deep: true })
@@ -228,12 +259,20 @@ watch(() => props.selectedChannels, updateChart, { deep: true })
 onMounted(() => {
   if (props.data) {
     initChart()
+    
+    // 添加双击事件监听
+    chartRef.value.addEventListener('click', showChannelCompare)
   }
+  
+  chart.on('click', () => {
+    isShowingAllChannels.value = !isShowingAllChannels.value
+  })
 })
 
 onBeforeUnmount(() => {
   if (chart) {
     chart.dispose()
+    chartRef.value?.removeEventListener('click', showChannelCompare)
     chart = null
   }
   window.removeEventListener('resize', () => {
@@ -283,6 +322,26 @@ onBeforeUnmount(() => {
           <el-button type="primary" @click="confirmChannelSelect">确认</el-button>
         </span>
       </template>
+    </el-dialog>  
+    
+    <!-- 通道对比窗口 -->
+    <el-dialog
+      v-model="channelCompareVisible"
+      title="通道数据对比"
+      width="30%"
+      :modal-append-to-body="true"
+      :append-to-body="true"
+    >
+      <div class="channel-compare">
+        <div class="time-info">当前时间: {{ getCurrentTime() }} s</div>
+        <div 
+          v-for="item in channelCompareContent" 
+          :key="item.channel"
+          class="channel-item"
+        >
+          <span :style="{ color: item.color }">{{ item.channel }}</span>: {{ item.value }} μV
+        </div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -321,5 +380,19 @@ onBeforeUnmount(() => {
   gap: 10px;
   max-height: 300px;
   overflow-y: auto;
+}
+
+.channel-compare {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.time-info {
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.channel-item {
+  margin: 5px 0;
 }
 </style>
