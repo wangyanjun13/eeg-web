@@ -1,19 +1,25 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Search } from '@element-plus/icons-vue';
 import AppLayout from '@/components/AppLayout.vue';
 import DatasetList from '@/components/dataset/DatasetList.vue';
 import datasetService from '@/services/dataset';
+import { useDebounce } from '@/composables/useDebounce';
 
 const searchKeyword = ref('');
 const datasetListRef = ref(null);
+const debouncedKeyword = useDebounce('', 300);
+
+// 监听防抖关键词变化
+watch(debouncedKeyword, (newKeyword) => {
+  if (datasetListRef.value) {
+    datasetListRef.value.searchDatasets(newKeyword);
+  }
+});
 
 // 处理搜索
-const handleSearch = async () => {
-  if (datasetListRef.value) {
-    // 调用DatasetList组件的搜索方法
-    await datasetListRef.value.searchDatasets(searchKeyword.value);
-  }
+const handleSearch = () => {
+  debouncedKeyword.value = searchKeyword.value;
 };
 </script>
 

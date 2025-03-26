@@ -2,11 +2,12 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import AppLayout from '@/components/AppLayout.vue';
+import { useLoading } from '@/composables/useLoading';
 
 const route = useRoute();
 const datasetId = ref(route.params.id);
 const dataset = ref(null);
-const loading = ref(true);
+const { isLoading: loading, withLoading } = useLoading(true);
 const selectedMethod = ref('fft');
 const availableMethods = [
   { value: 'fft', label: '快速傅里叶变换 (FFT)' },
@@ -18,18 +19,19 @@ const availableMethods = [
 onMounted(async () => {
   try {
     // 模拟API调用
-    setTimeout(() => {
-      dataset.value = {
-        id: datasetId.value,
-        name: '示例数据集 ' + datasetId.value,
-        channels: 64,
-        sampling_rate: 256
-      };
-      loading.value = false;
-    }, 500);
+    await withLoading(new Promise(resolve => {
+      setTimeout(() => {
+        dataset.value = {
+          id: datasetId.value,
+          name: '示例数据集 ' + datasetId.value,
+          channels: 64,
+          sampling_rate: 256
+        };
+        resolve();
+      }, 500);
+    }));
   } catch (error) {
     console.error('获取数据集信息失败:', error);
-    loading.value = false;
   }
 });
 

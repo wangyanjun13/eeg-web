@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import datasetService from '@/services/dataset';
 import AppLayout from '@/components/AppLayout.vue';
+import { useLoading } from '@/composables/useLoading';
 
 const route = useRoute();
 const router = useRouter();
@@ -14,46 +15,51 @@ const dataset = ref(null);
 const subjects = ref([]);
 const participants = ref(null);
 const participantsMap = ref({});  // 用于存储受试者ID到人口统计学信息的映射
-const loading = ref({
+
+// 使用组合式API管理加载状态
+const { isLoading: loading, withLoading } = useLoading({
   dataset: false,
   subjects: false,
   participants: false
 });
+
 const activeTab = ref('subjects'); // 当前活动标签页
 
 // 获取数据集详情
 const fetchDatasetInfo = async () => {
-  loading.value.dataset = true;
   try {
-    const response = await datasetService.getDatasetById(datasetId);
+    const response = await withLoading(
+      datasetService.getDatasetById(datasetId),
+      'dataset'
+    );
     dataset.value = response.data;
   } catch (error) {
     console.error('获取数据集详情失败:', error);
     ElMessage.error('获取数据集详情失败');
-  } finally {
-    loading.value.dataset = false;
   }
 };
 
 // 获取受试者列表
 const fetchSubjects = async () => {
-  loading.value.subjects = true;
   try {
-    const response = await datasetService.getDatasetSubjects(datasetId);
+    const response = await withLoading(
+      datasetService.getDatasetSubjects(datasetId),
+      'subjects'
+    );
     subjects.value = response.data || [];
   } catch (error) {
     console.error('获取受试者列表失败:', error);
     ElMessage.error('获取受试者列表失败');
-  } finally {
-    loading.value.subjects = false;
   }
 };
 
 // 获取参与者信息
 const fetchParticipantsInfo = async () => {
-  loading.value.participants = true;
   try {
-    const response = await datasetService.getParticipantsInfo(datasetId);
+    const response = await withLoading(
+      datasetService.getParticipantsInfo(datasetId),
+      'participants'
+    );
     participants.value = response.data;
     
     // 处理participants.tsv数据，创建ID到信息的映射
@@ -73,8 +79,6 @@ const fetchParticipantsInfo = async () => {
   } catch (error) {
     console.error('获取参与者信息失败:', error);
     ElMessage.error('获取参与者信息失败');
-  } finally {
-    loading.value.participants = false;
   }
 };
 

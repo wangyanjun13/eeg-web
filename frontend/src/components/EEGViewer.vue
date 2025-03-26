@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, onBeforeUnmount, computed, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+import { useDebounce, useDebounceFn } from '@/composables/useDebounce'
 /*作用：EEG数据可视化组件
   参数：
     data: 包含EEG数据的对象
@@ -128,11 +129,11 @@ const getChartOption = (series, legendStatus) => ({
   series
 })
 
-// 更新图表
-const updateChart = () => {
-  if (!chart || !props.data?.data) return
+// 使用防抖函数优化图表更新
+const debouncedUpdateChart = useDebounceFn(() => {
+  if (!chart || !props.data) return
   
-  // 生成数据序列
+  // 原updateChart函数的内容
   const series = props.selectedChannels.map((channel, index) => ({
     name: channel,
     type: 'line',
@@ -165,6 +166,11 @@ const updateChart = () => {
   
   // 设置图表选项
   chart.setOption(getChartOption(series, legendStatus), true)
+}, 100)
+
+// 替换原来的updateChart函数调用为防抖版本
+const updateChart = () => {
+  debouncedUpdateChart()
 }
 
 // 切换纵坐标方向
@@ -215,7 +221,7 @@ const confirmChannelSelect = () => {
   nextTick(updateChart)
 }
 
-// 全屏切换
+// 全屏切换 - 简化版本，仅切换状态
 const toggleFullScreen = () => {
   isFullScreen.value = !isFullScreen.value
   setTimeout(() => chart?.resize(), 100)

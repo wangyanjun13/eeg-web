@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus';
 import datasetService from '@/services/dataset';
 import AppLayout from '@/components/AppLayout.vue';
 import EEGViewer from '@/components/EEGViewer.vue';
+import { useLoading } from '@/composables/useLoading';
 
 const route = useRoute();
 const router = useRouter();
@@ -14,7 +15,7 @@ const subjectId = route.params.subjectId;
 // 数据状态
 const subjectInfo = ref(null);
 const eegData = ref(null);
-const loading = ref({
+const { isLoading: loading, withLoading } = useLoading({
   info: false,
   data: false
 });
@@ -25,9 +26,11 @@ const selectedChannels = ref([]);
 
 // 获取受试者信息
 const fetchSubjectInfo = async () => {
-  loading.value.info = true;
   try {
-    const response = await datasetService.getSubjectInfo(datasetId, subjectId);
+    const response = await withLoading(
+      datasetService.getSubjectInfo(datasetId, subjectId),
+      'info'
+    );
     subjectInfo.value = response.data;
     console.log('受试者信息:', subjectInfo.value);
     
@@ -38,28 +41,26 @@ const fetchSubjectInfo = async () => {
   } catch (error) {
     console.error('获取受试者信息失败:', error);
     ElMessage.error('获取受试者信息失败');
-  } finally {
-    loading.value.info = false;
   }
 };
 
 // 获取EEG数据
 const fetchEEGData = async () => {
-  loading.value.data = true;
   try {
-    const response = await datasetService.getSubjectData(
-      datasetId, 
-      subjectId,
-      timeRange.value[0],
-      timeRange.value[1] - timeRange.value[0]
+    const response = await withLoading(
+      datasetService.getSubjectData(
+        datasetId, 
+        subjectId,
+        timeRange.value[0],
+        timeRange.value[1] - timeRange.value[0]
+      ),
+      'data'
     );
     eegData.value = response.data;
     console.log('EEG数据:', eegData.value);
   } catch (error) {
     console.error('获取EEG数据失败:', error);
     ElMessage.error('获取EEG数据失败');
-  } finally {
-    loading.value.data = false;
   }
 };
 

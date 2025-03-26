@@ -1,23 +1,26 @@
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import datasetService from '@/services/dataset';
 import AppLayout from '@/components/AppLayout.vue';
 import { UploadFilled } from '@element-plus/icons-vue';
+import { useFormState } from '@/composables/useFormState';
+import { useLoading } from '@/composables/useLoading';
 
 const router = useRouter();
 
-// 表单数据
-const uploadForm = reactive({
+// 使用表单状态管理
+const { formState: uploadForm, resetForm, clearSaved } = useFormState('dataset-upload-form', {
   name: '',
   description: '',
   license: 'CC0',
   authors: [],
   tags: []
 });
+
 const fileList = ref([]);
-const loading = ref(false);
+const { isLoading: loading, withLoading } = useLoading(false);
 const newAuthor = ref('');
 const newTag = ref('');
 
@@ -91,16 +94,14 @@ const handleError = (error) => {
 // 提交表单
 const submitForm = async () => {
   if (!uploadForm.name) {
-    ElMessage.warning('请输入数据集名称');
+    ElMessage.warning('请输入数据集名称!');
     return;
   }
   
   if (fileList.value.length === 0) {
-    ElMessage.warning('请选择要上传的文件');
+    ElMessage.warning('请选择要上传的文件!');
     return;
   }
-  
-  loading.value = true;
   
   try {
     const formData = new FormData();
@@ -111,16 +112,21 @@ const submitForm = async () => {
     formData.append('authors', JSON.stringify(uploadForm.authors));
     formData.append('tags', JSON.stringify(uploadForm.tags));
     
-    const response = await datasetService.uploadDataset(formData);
+    await withLoading(datasetService.uploadDataset(formData));
     
     ElMessage.success('数据集上传成功!');
+    clearSaved(); // 清除保存的表单数据
     router.push('/datasets');
   } catch (error) {
     console.error('上传失败:', error);
     ElMessage.error('数据集上传失败，请重试!');
-  } finally {
-    loading.value = false;
   }
+};
+
+// 重置表单
+const resetUploadForm = () => {
+  resetForm();
+  fileList.value = [];
 };
 
 // 取消上传

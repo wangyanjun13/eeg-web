@@ -1,8 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import datasetService from '@/services/dataset';
+import { useDebounce, useDebounceFn } from '@/composables/useDebounce';
+import { useLoading } from '@/composables/useLoading';
 
 const router = useRouter();
 
@@ -15,6 +17,9 @@ const filterForm = ref({
   sortOrder: 'desc'
 });
 
+// 使用防抖的关键词
+const debouncedKeyword = useDebounce('', 300);
+
 // 分页
 const pagination = ref({
   currentPage: 1,
@@ -24,32 +29,34 @@ const pagination = ref({
 
 // 数据集列表
 const datasets = ref([]);
-const loading = ref(false);
+const { isLoading: loading, withLoading } = useLoading(false);
 // 控制筛选面板的显示/隐藏
 const showFilterPanel = ref(false);
 
-// 获取数据集列表
-const fetchDatasets = async (keyword = '') => {
-  loading.value = true;
+// 防抖的获取数据集函数
+const debouncedFetchDatasets = useDebounceFn(async (keyword = '') => {
   try {
-    const response = await datasetService.getDatasets({ keyword });
+    const response = await withLoading(datasetService.getDatasets({ keyword }));
     datasets.value = response.data || [];
   } catch (error) {
     console.error('获取数据集列表失败:', error);
     ElMessage.error('获取数据集列表失败');
-  } finally {
-    loading.value = false;
   }
-};
+}, 300);
+
+// 监听防抖关键词变化
+watch(debouncedKeyword, (newKeyword) => {
+  debouncedFetchDatasets(newKeyword);
+});
 
 // 搜索数据集
 const searchDatasets = async (keyword) => {
-  await fetchDatasets(keyword);
+  debouncedKeyword.value = keyword;
 };
 
 // 处理筛选条件变化
 const handleFilterChange = () => {
-  fetchDatasets();
+  debouncedFetchDatasets();
 };
 
 // 处理页码变化
@@ -90,7 +97,7 @@ const closeFilterPanel = (event) => {
 
 // 监听点击事件，用于关闭筛选面板
 onMounted(() => {
-  fetchDatasets();
+  debouncedFetchDatasets();
   document.addEventListener('click', closeFilterPanel);
 });
 
@@ -123,7 +130,7 @@ defineExpose({
             
             <!-- 右侧操作按钮 -->
             <div class="header-right">
-              <el-button @click="fetchDatasets">
+              <el-button @click="debouncedFetchDatasets">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
               <el-button type="primary" @click="router.push('/upload')">上传数据集</el-button>

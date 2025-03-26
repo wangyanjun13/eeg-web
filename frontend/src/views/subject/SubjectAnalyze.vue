@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import datasetService from '@/services/dataset';
 import AppLayout from '@/components/AppLayout.vue';
+import { useLoading } from '@/composables/useLoading';
+import { useFormState } from '@/composables/useFormState';
 
 const route = useRoute();
 const router = useRouter();
@@ -12,14 +14,15 @@ const subjectId = route.params.subjectId;
 
 // 数据状态
 const subjectInfo = ref(null);
-const loading = ref({
+const { isLoading: loading, withLoading } = useLoading({
   info: false,
   analysis: false
 });
 const analysisResult = ref(null);
 
-// 分析选项
-const analysisOptions = reactive({
+// 使用表单状态管理分析选项
+const storageKey = `analysis-options-${datasetId}-${subjectId}`;
+const { formState: analysisOptions, resetForm } = useFormState(storageKey, {
   method: 'psd',  // 默认分析方法：功率谱密度
   timeRange: [0, 10],  // 默认时间范围
   channels: [],  // 选择的通道
@@ -31,62 +34,55 @@ const analysisOptions = reactive({
 
 // 获取受试者信息
 const fetchSubjectInfo = async () => {
-  loading.value.info = true;
   try {
-    const response = await datasetService.getSubjectInfo(datasetId, subjectId);
+    const response = await withLoading(
+      datasetService.getSubjectInfo(datasetId, subjectId),
+      'info'
+    );
     subjectInfo.value = response.data;
     
     // 默认选择前5个通道
-    if (subjectInfo.value && subjectInfo.value.channels) {
+    if (subjectInfo.value && subjectInfo.value.channels && analysisOptions.channels.length === 0) {
       analysisOptions.channels = subjectInfo.value.channels.slice(0, 5);
     }
   } catch (error) {
     console.error('获取受试者信息失败:', error);
     ElMessage.error('获取受试者信息失败');
-  } finally {
-    loading.value.info = false;
   }
 };
 
 // 执行分析
 const runAnalysis = async () => {
-  loading.value.analysis = true;
   try {
-    const response = await datasetService.analyzeEEGData(datasetId, subjectId, {
-      method: analysisOptions.method,
-      start_time: analysisOptions.timeRange[0],
-      duration: analysisOptions.timeRange[1] - analysisOptions.timeRange[0],
-      channels: analysisOptions.channels,
-      bands: analysisOptions.bands,
-      window_size: analysisOptions.windowSize,
-      overlap: analysisOptions.overlap,
-      normalize: analysisOptions.normalize
-    });
+    const response = await withLoading(
+      datasetService.analyzeEEGData(datasetId, subjectId, {
+        method: analysisOptions.method,
+        start_time: analysisOptions.timeRange[0],
+        duration: analysisOptions.timeRange[1] - analysisOptions.timeRange[0],
+        channels: analysisOptions.channels,
+        bands: analysisOptions.bands,
+        window_size: analysisOptions.windowSize,
+        overlap: analysisOptions.overlap,
+        normalize: analysisOptions.normalize
+      }),
+      'analysis'
+    );
     
     analysisResult.value = response.data;
     ElMessage.success('分析完成');
   } catch (error) {
     console.error('分析失败:', error);
     ElMessage.error('分析失败: ' + (error.response?.data?.detail || error.message));
-  } finally {
-    loading.value.analysis = false;
   }
 };
 
 // 重置分析选项
 const resetOptions = () => {
-  analysisOptions.method = 'psd';
-  analysisOptions.timeRange = [0, 10];
-  analysisOptions.bands = ['delta', 'theta', 'alpha', 'beta', 'gamma'];
-  analysisOptions.windowSize = 2;
-  analysisOptions.overlap = 0.5;
-  analysisOptions.normalize = true;
+  resetForm();
   
   // 重置通道选择（选择前5个）
   if (subjectInfo.value && subjectInfo.value.channels) {
     analysisOptions.channels = subjectInfo.value.channels.slice(0, 5);
-  } else {
-    analysisOptions.channels = [];
   }
 };
 
