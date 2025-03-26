@@ -30,6 +30,7 @@ const localSelectedChannels = ref([])
 const channelCompareVisible = ref(false)
 const isSelectAll = ref(false)
 const legendSelected = ref({}) // 存储图例选中状态
+const isYAxisInverted = ref(false) // 纵坐标是否反转
 
 // 图表初始化和更新
 const initChart = () => {
@@ -104,7 +105,11 @@ const getChartOption = (series, legendStatus) => ({
   },
   yAxis: {
     type: 'value',
-    name: '振幅 (μV)'
+    name: '振幅 (μV)',
+    nameLocation: 'middle',
+    nameGap: 40,
+    nameRotate: 90,
+    inverse: isYAxisInverted.value
   },
   dataZoom: [{
     type: 'inside',
@@ -151,6 +156,12 @@ const updateChart = () => {
   
   // 设置图表选项
   chart.setOption(getChartOption(series, legendStatus), true)
+}
+
+// 切换纵坐标方向
+const toggleYAxisDirection = () => {
+  isYAxisInverted.value = !isYAxisInverted.value
+  updateChart()
 }
 
 // 获取当前时间点
@@ -314,6 +325,20 @@ onBeforeUnmount(() => {
       </el-button-group>
     </div>
     
+    <div class="coordinate-controls">
+      <el-tooltip content="反转纵坐标轴（负值向上显示）" placement="top">
+        <el-button 
+          type="primary" 
+          :plain="!isYAxisInverted" 
+          size="small" 
+          @click="toggleYAxisDirection"
+          class="invert-button"
+        >
+          {{ isYAxisInverted ? '恢复' : '坐标反转' }}
+        </el-button>
+      </el-tooltip>
+    </div>
+    
     <div ref="chartRef" class="chart-container"></div>
     
     <el-dialog v-model="channelSelectVisible" title="选择要显示的通道" width="50%" @open="initChannelSelect">
@@ -357,6 +382,18 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
+}
+/* 坐标轴反转按钮样式 */
+.coordinate-controls {
+  display: flex;
+  justify-content: left;
+  margin-bottom: 10px;
+  padding-left: 10px;
+}
+/* 坐标轴反转按钮样式 */
+.invert-button {
+  padding: 6px 15px;
+  font-size: 12px;
 }
 
 .chart-container {
