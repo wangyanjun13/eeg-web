@@ -28,7 +28,10 @@ const themeStyle = ref('light')
 const channelSelectVisible = ref(false)
 const localSelectedChannels = ref([])
 const channelCompareVisible = ref(false)
-const isSelectAll = ref(false)
+const isSelectAll = computed(() => {
+  return props.data?.channels && 
+         localSelectedChannels.value.length === props.data.channels.length
+})
 const legendSelected = ref({}) // 存储图例选中状态
 const isYAxisInverted = ref(false) // 纵坐标是否反转
 
@@ -173,28 +176,6 @@ const getCurrentTime = () => {
   return xAxis ? ((xAxis.min || props.timeRange[0]) + (xAxis.max || props.timeRange[1])) / 2 : props.timeRange[0]
 }
 
-// 通道选择状态管理
-const updateSelectAllState = () => {
-  isSelectAll.value = props.data?.channels && 
-                      localSelectedChannels.value.length === props.data.channels.length &&
-                      props.data.channels.every(ch => localSelectedChannels.value.includes(ch))
-}
-
-// 全选或清空通道
-const toggleSelectAll = () => {
-  // 更新选择状态
-  localSelectedChannels.value = isSelectAll.value 
-    ? [] 
-    : (props.data?.channels ? [...props.data.channels] : [])
-  
-  // 如果是全选，将所有通道的图例设为显示
-  if (!isSelectAll.value && props.data?.channels?.length) {
-    props.data.channels.forEach(ch => legendSelected.value[ch] = true)
-  }
-  
-  isSelectAll.value = !isSelectAll.value
-}
-
 // 双击显示通道数据比较
 const showChannelCompare = (event) => {
   if (event.detail === 2) {
@@ -206,6 +187,16 @@ const showChannelCompare = (event) => {
   }
 }
 
+// 打开通道选择对话框
+const toggleChannelSelect = () => channelSelectVisible.value = true
+
+// 全选或清空通道
+const toggleSelectAll = () => {
+  localSelectedChannels.value = isSelectAll.value 
+    ? [] 
+    : (props.data?.channels ? [...props.data.channels] : [])
+}
+
 // 确认通道选择
 const confirmChannelSelect = () => {
   if (localSelectedChannels.value.length === 0) {
@@ -214,37 +205,8 @@ const confirmChannelSelect = () => {
   }
   
   channelSelectVisible.value = false
-  
-  // 更新选中通道
-  const newSelectedChannels = [...localSelectedChannels.value]
-  
-  // 清理不再需要的图例状态，保留已选通道的状态
-  legendSelected.value = Object.keys(legendSelected.value).reduce((result, key) => {
-    if (newSelectedChannels.includes(key)) {
-      result[key] = legendSelected.value[key]
-    }
-    return result
-  }, {})
-  
-  // 为新选择的通道设置默认显示状态
-  newSelectedChannels.forEach(ch => {
-    if (legendSelected.value[ch] === undefined) {
-      legendSelected.value[ch] = true
-    }
-  })
-  
-  // 更新父组件状态
-  emit('update:selectedChannels', newSelectedChannels)
+  emit('update:selectedChannels', [...localSelectedChannels.value])
   nextTick(updateChart)
-}
-
-// 打开通道选择对话框
-const toggleChannelSelect = () => channelSelectVisible.value = true
-
-// 初始化通道选择状态
-const initChannelSelect = () => {
-  localSelectedChannels.value = [...props.selectedChannels]
-  updateSelectAllState()
 }
 
 // 全屏切换
@@ -276,17 +238,11 @@ const channelCompareContent = computed(() => {
 // 监听状态变化
 watch(() => props.selectedChannels, (newVal) => {
   localSelectedChannels.value = [...newVal]
-  if (channelSelectVisible.value) updateSelectAllState()
 }, { immediate: true })
-
-watch(() => localSelectedChannels.value, () => {
-  if (channelSelectVisible.value && props.data?.channels) updateSelectAllState()
-}, { deep: true })
 
 watch(() => channelSelectVisible.value, (newVal) => {
   if (!newVal) {
     localSelectedChannels.value = [...props.selectedChannels]
-    updateSelectAllState()
   }
 })
 
@@ -341,14 +297,14 @@ onBeforeUnmount(() => {
     
     <div ref="chartRef" class="chart-container"></div>
     
-    <el-dialog v-model="channelSelectVisible" title="选择要显示的通道" width="50%" @open="initChannelSelect">
+    <el-dialog v-model="channelSelectVisible" title="选择要显示的通道" width="50%">
       <div class="channel-select-header">
         <el-button size="small" type="primary" @click="toggleSelectAll">
           {{ isSelectAll ? '清空' : '全选' }}
         </el-button>
       </div>
       <el-checkbox-group v-model="localSelectedChannels" class="channel-grid">
-        <el-checkbox v-for="channel in props.data?.channels" :key="channel" :label="channel">
+        <el-checkbox v-for="channel in props.data?.channels" :key="channel" :value="channel">
           {{ channel }}
         </el-checkbox>
       </el-checkbox-group>
