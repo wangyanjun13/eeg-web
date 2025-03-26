@@ -29,12 +29,19 @@ const channelSelectVisible = ref(false)
 const localSelectedChannels = ref([])
 const channelCompareVisible = ref(false)
 const isSelectAll = ref(false)
+const legendSelected = ref({}) // 存储图例选中状态
 
 // 图表初始化和更新
 const initChart = () => {
   if (chart) chart.dispose()
   chart = echarts.init(chartRef.value, themeStyle.value)
   window.addEventListener('resize', () => chart?.resize())
+  
+  // 添加图例点击事件
+  chart.on('legendselectchanged', (params) => {
+    legendSelected.value = {...legendSelected.value, ...params.selected}
+  })
+  
   updateChart()
 }
 
@@ -64,7 +71,35 @@ const updateChart = () => {
     }
   }))
 
+  // 准备图例选中状态
+  const legendSelStatus = {}
+  props.selectedChannels.forEach(channel => {
+    // 如果之前有状态，使用之前的状态，否则默认为显示
+    legendSelStatus[channel] = legendSelected.value[channel] !== undefined 
+      ? legendSelected.value[channel] 
+      : true
+  })
+  
   chart.setOption({
+    legend: {
+      type: 'scroll',
+      orient: 'horizontal',
+      top: 0,
+      left: 'center',
+      width: '90%',
+      data: props.selectedChannels,
+      textStyle: {
+        fontSize: 12
+      },
+      pageButtonItemGap: 5,
+      pageButtonPosition: 'end',
+      pageIconSize: 12,
+      tooltip: {
+        show: true
+      },
+      selectedMode: true,
+      selected: legendSelStatus
+    },
     tooltip: {
       show: true,
       trigger: 'item',
@@ -80,6 +115,7 @@ const updateChart = () => {
       left: '3%',
       right: '4%',
       bottom: '3%',
+      top: '50px', // 增加顶部空间给图例
       containLabel: true
     },
     xAxis: {
@@ -141,7 +177,23 @@ const updateSelectAllState = () => {
 
 // 全选或清空
 const toggleSelectAll = () => {
-  localSelectedChannels.value = isSelectAll.value ? [] : (props.data?.channels ? [...props.data.channels] : [])
+  if (isSelectAll.value) {
+    // 清空选择
+    localSelectedChannels.value = []
+  } else {
+    // 全选并初始化图例状态
+    localSelectedChannels.value = props.data?.channels ? [...props.data.channels] : []
+    
+    // 如果是全选操作，将所有通道的图例状态设为显示
+    if (props.data?.channels && props.data.channels.length > 0) {
+      const newLegendStatus = {}
+      props.data.channels.forEach(channel => {
+        newLegendStatus[channel] = true
+      })
+      // 合并现有状态
+      legendSelected.value = {...legendSelected.value, ...newLegendStatus}
+    }
+  }
   isSelectAll.value = !isSelectAll.value
 }
 
@@ -163,10 +215,34 @@ const confirmChannelSelect = () => {
     return
   }
   
+  // 先关闭对话框
   channelSelectVisible.value = false
-  emit('update:selectedChannels', [...localSelectedChannels.value])
   
-  // 确保图表更新
+  // 确保更新父组件的选中通道
+  const newSelectedChannels = [...localSelectedChannels.value]
+  
+  // 清理不再需要的图例状态
+  const newLegendSelected = {}
+  Object.keys(legendSelected.value).forEach(key => {
+    if (newSelectedChannels.includes(key)) {
+      newLegendSelected[key] = legendSelected.value[key]
+    }
+  })
+  
+  // 对于新选的通道，默认显示
+  newSelectedChannels.forEach(channel => {
+    if (newLegendSelected[channel] === undefined) {
+      newLegendSelected[channel] = true
+    }
+  })
+  
+  // 更新图例状态
+  legendSelected.value = newLegendSelected
+  
+  // 更新选中通道
+  emit('update:selectedChannels', newSelectedChannels)
+  
+  // 强制刷新图表
   nextTick(updateChart)
 }
 
