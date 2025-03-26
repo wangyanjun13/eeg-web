@@ -124,7 +124,7 @@ function navigateTo(path) {
   display: flex;
   flex-direction: column;
 }
-
+/*左侧导航栏*/
 .side-nav {
   position: fixed;
   left: 0;
@@ -136,12 +136,12 @@ function navigateTo(path) {
   flex-direction: column;
   width: 64px;
 }
-
+/*左侧导航栏*/
 .side-menu {
   border-right: none;
   flex: 1;
 }
-
+/*顶部导航栏*/
 .app-header {
   height: 60px;
   background-color: white;
@@ -199,7 +199,7 @@ function navigateTo(path) {
   flex: 1;
   margin-top: 60px;
 }
-
+/*主要内容区域*/
 .main-content {
   flex: 1;
   margin-left: 64px;

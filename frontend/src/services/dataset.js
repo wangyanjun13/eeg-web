@@ -1,5 +1,7 @@
 import api from './api';
 
+// 封装与数据集相关的API请求
+
 export const datasetService = {
   // 获取数据集列表
   getDatasets(params = {}) {

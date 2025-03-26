@@ -2,6 +2,12 @@
 import { ref, onMounted, watch, onBeforeUnmount, computed, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+/*作用：EEG数据可视化组件
+  参数：
+    data: 包含EEG数据的对象
+    timeRange: 时间范围，默认[0, 10]
+    selectedChannels: 选中的通道，默认[]
+*/
 
 const props = defineProps({
   data: {

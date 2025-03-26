@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 从环境变量获取 API 基础 URL，如果不存在则使用默认值
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
+// 创建 Axios 实例
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
@@ -26,7 +26,7 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器
+// 响应拦截器，处理响应数据和常见http错误
 api.interceptors.response.use(
   (response) => {
     console.log(`收到响应: ${response.config.url}`, response.data);

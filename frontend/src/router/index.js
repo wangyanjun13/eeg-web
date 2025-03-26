@@ -1,5 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import * as Views from '../views';
+
+// 直接导入需要的组件
+import DatasetOverview from '../views/dataset/DatasetOverview.vue';
+import DatasetDetail from '../views/dataset/DatasetDetail.vue';
+import DatasetUpload from '../views/dataset/DatasetUpload.vue';
+import SubjectDetail from '../views/subject/SubjectDetail.vue';
+import SubjectAnalyze from '../views/subject/SubjectAnalyze.vue';
+import NotFound from '../views/NotFound.vue';
 
 // 路由配置
 const routes = [
@@ -10,7 +17,7 @@ const routes = [
   {
     path: '/datasets',
     name: 'Datasets',
-    component: Views.DatasetOverview,
+    component: DatasetOverview,
     meta: {
       title: '数据集浏览 - EEG数据分析平台'
     }
@@ -18,7 +25,7 @@ const routes = [
   {
     path: '/datasets/:id',
     name: 'DatasetDetail',
-    component: Views.DatasetDetail,
+    component: DatasetDetail,
     meta: {
       title: '数据集详情 - EEG数据分析平台'
     }
@@ -26,7 +33,7 @@ const routes = [
   {
     path: '/datasets/:datasetId/subjects/:subjectId',
     name: 'SubjectDetail',
-    component: Views.SubjectDetail,
+    component: SubjectDetail,
     meta: {
       title: '受试者详情 - EEG数据分析平台'
     }
@@ -34,7 +41,7 @@ const routes = [
   {
     path: '/datasets/:datasetId/subjects/:subjectId/analyze',
     name: 'SubjectAnalyze',
-    component: Views.SubjectAnalyze,
+    component: SubjectAnalyze,
     meta: {
       title: '数据分析 - EEG数据分析平台'
     }
@@ -58,7 +65,7 @@ const routes = [
   {
     path: '/upload',
     name: 'DatasetUpload',
-    component: Views.DatasetUpload,
+    component: DatasetUpload,
     meta: {
       title: '上传数据 - EEG数据分析平台'
     }
@@ -82,7 +89,7 @@ const routes = [
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    component: () => import('../views/NotFound.vue'),
+    component: NotFound,
     meta: {
       title: '页面未找到 - EEG数据分析平台'
     }
