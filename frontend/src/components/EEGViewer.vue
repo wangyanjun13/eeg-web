@@ -35,20 +35,90 @@ const legendSelected = ref({}) // 存储图例选中状态
 const initChart = () => {
   if (chart) chart.dispose()
   chart = echarts.init(chartRef.value, themeStyle.value)
+  
+  // 事件监听统一设置
+  chart.on('legendselectchanged', ({selected}) => legendSelected.value = {...legendSelected.value, ...selected})
+  chart.on('mouseover', 'series', handleSeriesMouseover)
+  chart.on('mouseout', 'series', () => chart.setOption({tooltip: {showContent: false}}))
+  
   window.addEventListener('resize', () => chart?.resize())
-  
-  // 添加图例点击事件
-  chart.on('legendselectchanged', (params) => {
-    legendSelected.value = {...legendSelected.value, ...params.selected}
-  })
-  
   updateChart()
 }
+
+// 鼠标悬停处理
+const handleSeriesMouseover = (params) => {
+  if (params.componentType === 'series') {
+    chart.setOption({
+      tooltip: {
+        showContent: true,
+        formatter: (p) => {
+          const time = p.data[0]?.toFixed(3) || p.data[0]
+          const value = p.data[1]?.toFixed(3) || p.data[1]
+          return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>振幅: ${value} μV`
+        }
+      }
+    })
+  }
+}
+
+// 生成图表配置
+const getChartOption = (series, legendStatus) => ({
+  legend: {
+    type: 'scroll',
+    orient: 'horizontal',
+    top: 0,
+    left: 'center',
+    width: '90%',
+    data: props.selectedChannels,
+    textStyle: { fontSize: 12 },
+    pageButtonItemGap: 5,
+    pageButtonPosition: 'end',
+    pageIconSize: 12,
+    tooltip: { show: true },
+    selectedMode: true,
+    selected: legendStatus
+  },
+  tooltip: {
+    show: true,
+    trigger: 'item',
+    axisPointer: {
+      type: 'cross',
+      snap: true,
+      label: { show: true }
+    },
+    showContent: false,
+    position: (pos) => [pos[0] + 10, pos[1] - 10]
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    top: '50px',
+    containLabel: true
+  },
+  xAxis: {
+    type: 'value',
+    name: '时间 (s)',
+    min: props.timeRange[0],
+    max: props.timeRange[1]
+  },
+  yAxis: {
+    type: 'value',
+    name: '振幅 (μV)'
+  },
+  dataZoom: [{
+    type: 'inside',
+    start: 0,
+    end: 100
+  }],
+  series
+})
 
 // 更新图表
 const updateChart = () => {
   if (!chart || !props.data?.data) return
   
+  // 生成数据序列
   const series = props.selectedChannels.map((channel, index) => ({
     name: channel,
     type: 'line',
@@ -56,8 +126,8 @@ const updateChart = () => {
     symbolSize: 5,
     symbol: 'circle',
     sampling: 'lttb',
-    data: props.data.data[channel]?.map((value, index) => [
-      props.data.times[index],
+    data: props.data.data[channel]?.map((value, idx) => [
+      props.data.times[idx],
       value
     ]).filter(point => 
       point[0] >= props.timeRange[0] && 
@@ -71,92 +141,16 @@ const updateChart = () => {
     }
   }))
 
-  // 准备图例选中状态
-  const legendSelStatus = {}
-  props.selectedChannels.forEach(channel => {
-    // 如果之前有状态，使用之前的状态，否则默认为显示
-    legendSelStatus[channel] = legendSelected.value[channel] !== undefined 
+  // 准备图例状态，使用现有状态或默认为显示
+  const legendStatus = props.selectedChannels.reduce((status, channel) => {
+    status[channel] = legendSelected.value[channel] !== undefined 
       ? legendSelected.value[channel] 
       : true
-  })
+    return status
+  }, {})
   
-  chart.setOption({
-    legend: {
-      type: 'scroll',
-      orient: 'horizontal',
-      top: 0,
-      left: 'center',
-      width: '90%',
-      data: props.selectedChannels,
-      textStyle: {
-        fontSize: 12
-      },
-      pageButtonItemGap: 5,
-      pageButtonPosition: 'end',
-      pageIconSize: 12,
-      tooltip: {
-        show: true
-      },
-      selectedMode: true,
-      selected: legendSelStatus
-    },
-    tooltip: {
-      show: true,
-      trigger: 'item',
-      axisPointer: {
-        type: 'cross',
-        snap: true,
-        label: { show: true }
-      },
-      showContent: false,
-      position: (pos) => [pos[0] + 10, pos[1] - 10]
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '50px', // 增加顶部空间给图例
-      containLabel: true
-    },
-    xAxis: {
-      type: 'value',
-      name: '时间 (s)',
-      min: props.timeRange[0],
-      max: props.timeRange[1]
-    },
-    yAxis: {
-      type: 'value',
-      name: '振幅 (μV)'
-    },
-    dataZoom: [{
-      type: 'inside',
-      start: 0,
-      end: 100
-    }],
-    series
-  }, true) // 强制不合并
-
-  // 事件处理
-  chart.off('mouseover').off('mouseout')
-  
-  chart.on('mouseover', 'series', (params) => {
-    if (params.componentType === 'series') {
-      chart.setOption({
-        tooltip: {
-          showContent: true,
-          formatter: (p) => {
-            const time = p.data[0]?.toFixed(3) || p.data[0]
-            const value = p.data[1]?.toFixed(3) || p.data[1]
-            return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>振幅: ${value} μV`
-          }
-        }
-      })
-    }
-  })
-  
-  chart.on('mouseout', 'series', () => {
-    chart.setOption({ tooltip: { showContent: false } })
-  })
+  // 设置图表选项
+  chart.setOption(getChartOption(series, legendStatus), true)
 }
 
 // 获取当前时间点
@@ -168,32 +162,25 @@ const getCurrentTime = () => {
   return xAxis ? ((xAxis.min || props.timeRange[0]) + (xAxis.max || props.timeRange[1])) / 2 : props.timeRange[0]
 }
 
-// 通道选择相关功能
+// 通道选择状态管理
 const updateSelectAllState = () => {
   isSelectAll.value = props.data?.channels && 
                       localSelectedChannels.value.length === props.data.channels.length &&
                       props.data.channels.every(ch => localSelectedChannels.value.includes(ch))
 }
 
-// 全选或清空
+// 全选或清空通道
 const toggleSelectAll = () => {
-  if (isSelectAll.value) {
-    // 清空选择
-    localSelectedChannels.value = []
-  } else {
-    // 全选并初始化图例状态
-    localSelectedChannels.value = props.data?.channels ? [...props.data.channels] : []
-    
-    // 如果是全选操作，将所有通道的图例状态设为显示
-    if (props.data?.channels && props.data.channels.length > 0) {
-      const newLegendStatus = {}
-      props.data.channels.forEach(channel => {
-        newLegendStatus[channel] = true
-      })
-      // 合并现有状态
-      legendSelected.value = {...legendSelected.value, ...newLegendStatus}
-    }
+  // 更新选择状态
+  localSelectedChannels.value = isSelectAll.value 
+    ? [] 
+    : (props.data?.channels ? [...props.data.channels] : [])
+  
+  // 如果是全选，将所有通道的图例设为显示
+  if (!isSelectAll.value && props.data?.channels?.length) {
+    props.data.channels.forEach(ch => legendSelected.value[ch] = true)
   }
+  
   isSelectAll.value = !isSelectAll.value
 }
 
@@ -215,43 +202,35 @@ const confirmChannelSelect = () => {
     return
   }
   
-  // 先关闭对话框
   channelSelectVisible.value = false
   
-  // 确保更新父组件的选中通道
+  // 更新选中通道
   const newSelectedChannels = [...localSelectedChannels.value]
   
-  // 清理不再需要的图例状态
-  const newLegendSelected = {}
-  Object.keys(legendSelected.value).forEach(key => {
+  // 清理不再需要的图例状态，保留已选通道的状态
+  legendSelected.value = Object.keys(legendSelected.value).reduce((result, key) => {
     if (newSelectedChannels.includes(key)) {
-      newLegendSelected[key] = legendSelected.value[key]
+      result[key] = legendSelected.value[key]
+    }
+    return result
+  }, {})
+  
+  // 为新选择的通道设置默认显示状态
+  newSelectedChannels.forEach(ch => {
+    if (legendSelected.value[ch] === undefined) {
+      legendSelected.value[ch] = true
     }
   })
   
-  // 对于新选的通道，默认显示
-  newSelectedChannels.forEach(channel => {
-    if (newLegendSelected[channel] === undefined) {
-      newLegendSelected[channel] = true
-    }
-  })
-  
-  // 更新图例状态
-  legendSelected.value = newLegendSelected
-  
-  // 更新选中通道
+  // 更新父组件状态
   emit('update:selectedChannels', newSelectedChannels)
-  
-  // 强制刷新图表
   nextTick(updateChart)
 }
 
 // 打开通道选择对话框
-const toggleChannelSelect = () => {
-  channelSelectVisible.value = true
-}
+const toggleChannelSelect = () => channelSelectVisible.value = true
 
-// 打开对话框时初始化选择状态
+// 初始化通道选择状态
 const initChannelSelect = () => {
   localSelectedChannels.value = [...props.selectedChannels]
   updateSelectAllState()
@@ -276,32 +255,23 @@ const channelCompareContent = computed(() => {
   const currentTime = getCurrentTime()
   const timeIndex = props.data.times.findIndex(t => t >= currentTime)
   
-  return props.selectedChannels.map((channel, index) => {
-    const value = props.data.data[channel]?.[timeIndex]?.toFixed(3) || 0
-    return {
-      channel,
-      value,
-      color: chart?.getOption()?.series?.[index]?.itemStyle?.color || '#000'
-    }
-  })
+  return props.selectedChannels.map((channel, index) => ({
+    channel,
+    value: props.data.data[channel]?.[timeIndex]?.toFixed(3) || 0,
+    color: chart?.getOption()?.series?.[index]?.itemStyle?.color || '#000'
+  }))
 })
 
-// 监听
+// 监听状态变化
 watch(() => props.selectedChannels, (newVal) => {
   localSelectedChannels.value = [...newVal]
-  if (channelSelectVisible.value) {
-    updateSelectAllState()
-  }
+  if (channelSelectVisible.value) updateSelectAllState()
 }, { immediate: true })
 
-// 监听本地选择通道变化
 watch(() => localSelectedChannels.value, () => {
-  if (channelSelectVisible.value && props.data?.channels) {
-    updateSelectAllState()
-  }
+  if (channelSelectVisible.value && props.data?.channels) updateSelectAllState()
 }, { deep: true })
 
-// 监听对话框关闭
 watch(() => channelSelectVisible.value, (newVal) => {
   if (!newVal) {
     localSelectedChannels.value = [...props.selectedChannels]
@@ -309,7 +279,7 @@ watch(() => channelSelectVisible.value, (newVal) => {
   }
 })
 
-// 图表相关监听
+// 合并数据变化监听
 watch([() => props.data, () => props.timeRange, () => props.selectedChannels], () => {
   if (chart) updateChart()
 }, { deep: true })
