@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router';
-import AppLayout from '../components/AppLayout.vue';
+import AppLayout from '../components/layout/AppLayout.vue';
 
 const router = useRouter();
 

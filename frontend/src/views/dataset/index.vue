@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { Search } from '@element-plus/icons-vue';
-import AppLayout from '@/components/AppLayout.vue';
+import AppLayout from '@/components/layout/AppLayout.vue';
 import DatasetList from '@/components/dataset/DatasetList.vue';
 import datasetService from '@/services/dataset';
 import { useDebounce } from '@/composables/useDebounce';

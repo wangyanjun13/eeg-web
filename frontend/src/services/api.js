@@ -2,6 +2,7 @@ import axios from 'axios';
 
 // 从环境变量获取 API 基础 URL，如果不存在则使用默认值
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 // 创建 Axios 实例
 const api = axios.create({
   baseURL: API_BASE_URL,

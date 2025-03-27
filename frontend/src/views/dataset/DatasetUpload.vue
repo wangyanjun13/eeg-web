@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import datasetService from '@/services/dataset';
-import AppLayout from '@/components/AppLayout.vue';
+import AppLayout from '@/components/layout/AppLayout.vue';
 import { UploadFilled } from '@element-plus/icons-vue';
 import { useFormState } from '@/composables/useFormState';
 import { useLoading } from '@/composables/useLoading';

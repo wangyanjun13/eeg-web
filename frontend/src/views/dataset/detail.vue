@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import datasetService from '@/services/dataset';
-import AppLayout from '@/components/AppLayout.vue';
+import AppLayout from '@/components/layout/AppLayout.vue';
 import { useLoading } from '@/composables/useLoading';
 
 const route = useRoute();

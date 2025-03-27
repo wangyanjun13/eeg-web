@@ -3,8 +3,8 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import datasetService from '@/services/dataset';
-import AppLayout from '@/components/AppLayout.vue';
-import EEGViewer from '@/components/EEGViewer.vue';
+import AppLayout from '@/components/layout/AppLayout.vue';
+import EEGViewer from '@/components/analysis/EEGViewer.vue';
 import { useLoading } from '@/composables/useLoading';
 
 const route = useRoute();

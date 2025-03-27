@@ -1,18 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router';
-
-// 直接导入需要的组件
-import DatasetOverview from '../views/dataset/DatasetOverview.vue';
-import DatasetDetail from '../views/dataset/DatasetDetail.vue';
+import DatasetOverview from '../views/dataset/index.vue';
+import DatasetDetail from '../views/dataset/detail.vue';
 import DatasetUpload from '../views/dataset/DatasetUpload.vue';
-import SubjectDetail from '../views/subject/SubjectDetail.vue';
-import SubjectAnalyze from '../views/subject/SubjectAnalyze.vue';
+import SubjectDetail from '../views/subject/detail.vue';
 import NotFound from '../views/NotFound.vue';
 
 // 路由配置
 const routes = [
   {
     path: '/',
-    redirect: '/datasets'
+    redirect: '/datasets',
+    meta: {
+      title: 'EEG数据分析平台'
+    }
   },
   {
     path: '/datasets',
@@ -41,7 +41,7 @@ const routes = [
   {
     path: '/datasets/:datasetId/subjects/:subjectId/analyze',
     name: 'SubjectAnalyze',
-    component: SubjectAnalyze,
+    component: () => import('../views/analysis/preprocessing.vue'),
     meta: {
       title: '数据分析 - EEG数据分析平台'
     }
@@ -49,17 +49,49 @@ const routes = [
   {
     path: '/analysis',
     name: 'Analysis',
-    component: () => import('../views/Analysis.vue'),
+    component: () => import('../views/analysis/preprocessing.vue'),
     meta: {
       title: '数据分析工具 - EEG数据分析平台'
     }
   },
   {
-    path: '/visualization',
-    name: 'Visualization',
-    component: () => import('../views/Visualization.vue'),
+    path: '/analysis/preprocessing',
+    name: 'Preprocessing',
+    component: () => import('../views/analysis/preprocessing.vue'),
     meta: {
-      title: '可视化工具 - EEG数据分析平台'
+      title: '数据预处理 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/time-analysis',
+    name: 'TimeAnalysis',
+    component: () => import('../views/analysis/timeAnalysis.vue'),
+    meta: {
+      title: '时域分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/frequency-analysis',
+    name: 'FrequencyAnalysis',
+    component: () => import('../views/analysis/frequencyAnalysis.vue'),
+    meta: {
+      title: '频域分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/spatial-analysis',
+    name: 'SpatialAnalysis',
+    component: () => import('../views/analysis/spatialAnalysis.vue'),
+    meta: {
+      title: '空间分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/advanced-analysis',
+    name: 'AdvancedAnalysis',
+    component: () => import('../views/analysis/advancedAnalysis.vue'),
+    meta: {
+      title: '高级分析 - EEG数据分析平台'
     }
   },
   {
