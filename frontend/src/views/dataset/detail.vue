@@ -48,8 +48,8 @@ const fetchSubjects = async () => {
     );
     subjects.value = response.data || [];
   } catch (error) {
-    console.error('获取受试者列表失败:', error);
-    ElMessage.error('获取受试者列表失败');
+    console.error('获取被试列表失败:', error);
+    ElMessage.error('获取被试列表失败');
   }
 };
 
@@ -123,7 +123,7 @@ onMounted(() => {
             <h3>基本信息</h3>
             <el-descriptions :column="2" border>
               <el-descriptions-item label="数据集ID">{{ dataset.dataset_id }}</el-descriptions-item>
-              <el-descriptions-item label="受试者数量">{{ dataset.subject_count }}</el-descriptions-item>
+              <el-descriptions-item label="被试数量">{{ dataset.subject_count }}</el-descriptions-item>
               <el-descriptions-item label="BIDS版本">{{ dataset.BIDSVersion }}</el-descriptions-item>
               <el-descriptions-item label="许可证">{{ dataset.License }}</el-descriptions-item>
               <el-descriptions-item label="DOI" :span="2">{{ dataset.DatasetDOI }}</el-descriptions-item>
@@ -162,9 +162,9 @@ onMounted(() => {
       <el-card class="subjects-card">
         <template #header>
           <div class="card-header">
-            <h3>受试者信息</h3>
+            <h3>被试信息</h3>
             <el-tabs v-model="activeTab">
-              <el-tab-pane label="受试者列表" name="subjects"></el-tab-pane>
+              <el-tab-pane label="被试列表" name="subjects"></el-tab-pane>
               <el-tab-pane label="参与者统计" name="participants"></el-tab-pane>
             </el-tabs>
           </div>
@@ -176,7 +176,7 @@ onMounted(() => {
           
           <el-table v-else :data="subjects" style="width: 100%" border stripe>
             <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="subject" label="受试者" />
+            <el-table-column prop="subject" label="被试" />
             <el-table-column prop="format" label="格式" width="100" />
             
             <!-- 年龄列 -->

@@ -11,6 +11,28 @@ export function useAnalysis(options = {}) {
   const isLoading = ref(false);
   const results = ref(null);
   const error = ref(null);
+  const preprocessParams = ref(null);
+
+  /**
+   * 加载预处理模板
+   * @param {string} templateName 模板名称
+   */
+  async function loadPreprocessTemplate(templateName) {
+    isLoading.value = true;
+    error.value = null;
+    
+    try {
+      const response = await analysisService.getPreprocessTemplate(templateName);
+      preprocessParams.value = response;
+      return response;
+    } catch (err) {
+      error.value = err;
+      ElMessage.error(`加载模板失败: ${err.message}`);
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   /**
    * 执行分析
@@ -48,9 +70,9 @@ export function useAnalysis(options = {}) {
           throw new Error(`未知的分析类型: ${type}`);
       }
       
-      results.value = response.data;
+      results.value = response;
       ElMessage.success('分析完成');
-      return response.data;
+      return response;
     } catch (err) {
       error.value = err;
       ElMessage.error(`分析失败: ${err.message}`);
@@ -64,6 +86,8 @@ export function useAnalysis(options = {}) {
     isLoading,
     results,
     error,
+    preprocessParams,
+    loadPreprocessTemplate,
     runAnalysis
   };
 } 

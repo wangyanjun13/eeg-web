@@ -5,11 +5,20 @@ export default {
    * 获取预处理数据
    * @param {string} datasetId 数据集ID
    * @param {string} subjectId 受试者ID
-   * @param {Object} options 预处理选项
+   * @param {Object} options 预处理选项 
    * @returns {Promise} 请求结果
    */
   preprocessData(datasetId, subjectId, options) {
     return api.post(`/api/datasets/${datasetId}/subjects/${subjectId}/preprocess`, options);
+  },
+
+  /**
+   * 获取预处理模板
+   * @param {string} templateName 模板名称
+   * @returns {Promise} 请求结果
+   */
+  getPreprocessTemplate(templateName) {
+    return api.get(`/api/preprocess/templates/${templateName}`);
   },
 
   /**

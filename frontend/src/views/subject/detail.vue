@@ -32,15 +32,15 @@ const fetchSubjectInfo = async () => {
       'info'
     );
     subjectInfo.value = response.data;
-    console.log('受试者信息:', subjectInfo.value);
+    console.log('被试信息:', subjectInfo.value);
     
     // 如果有通道信息，默认选择前5个通道
     if (subjectInfo.value && subjectInfo.value.channels) {
       selectedChannels.value = subjectInfo.value.channels.slice(0, 5);
     }
   } catch (error) {
-    console.error('获取受试者信息失败:', error);
-    ElMessage.error('获取受试者信息失败');
+    console.error('获取被试信息失败:', error);
+    ElMessage.error('获取被试信息失败');
   }
 };
 
@@ -111,7 +111,7 @@ onMounted(() => {
 
         <div v-if="subjectInfo">
           <el-descriptions :column="3" border>
-            <el-descriptions-item label="受试者ID">{{ subjectInfo.subject_id }}</el-descriptions-item>
+            <el-descriptions-item label="被试ID">{{ subjectInfo.subject_id }}</el-descriptions-item>
             <el-descriptions-item label="数据集">{{ subjectInfo.dataset_id }}</el-descriptions-item>
             <el-descriptions-item label="采样率">{{ subjectInfo.sampling_rate }} Hz</el-descriptions-item>
             <el-descriptions-item label="通道数">{{ subjectInfo.n_channels }}</el-descriptions-item>

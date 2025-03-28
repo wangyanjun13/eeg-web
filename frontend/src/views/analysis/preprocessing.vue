@@ -1,327 +1,238 @@
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import AppLayout from '@/components/layout/AppLayout.vue';
-import EEGViewer from '@/components/analysis/EEGViewer.vue';
-import analysisService from '@/services/analysisService';
-import datasetService from '@/services/dataset';
+import { useAnalysis } from '@/composables/useAnalysis';
+import { useFormState } from '@/composables/useFormState';
 
 const route = useRoute();
+const datasetId = computed(() => route.params.datasetId);
+const subjectId = computed(() => route.params.subjectId);
 
-// 数据状态
-const rawData = ref(null);
-const processedData = ref(null);
-const activeTab = ref('raw'); // 'raw' 或 'processed'
-const selectedChannels = ref([]);
-const timeRange = ref([0, 10]);
-const isLoading = ref({
-  rawData: false,
-  applying: false
-});
+// 使用分析钩子
+const { isLoading, results, error, preprocessParams, loadPreprocessTemplate, runAnalysis } = useAnalysis();
 
-// 预处理选项
-const preprocessingOptions = reactive({
-  filtering: {
-    highpass: 0.1,
-    lowpass: 40,
-    notch: true
+// 预处理模板
+const templateOptions = ref([
+  { value: 'default', label: '默认设置', description: '适用于大多数EEG数据' },
+  { value: 'minimal', label: '最小处理', description: '仅应用基本滤波和重参考' },
+  { value: 'ds002218', label: 'DS002218设置', description: '适用于听觉/视觉节奏省略范式' }
+]);
+
+// 当前选择的模板
+const selectedTemplate = ref('default');
+
+// 使用表单状态管理
+const { formState, resetForm } = useFormState('eeg-preprocess-params', {
+  filter: {
+    highpass_filter: true,
+    highpass: 1.0,
+    lowpass_filter: true,
+    lowpass: 40.0,
+    notch_filter: true,
+    line_freqs: [50.0, 60.0]
   },
-  artifacts: {
-    method: 'ica',
-    autoDetect: true
+  resample: {
+    resample: true,
+    resample_freq: 250.0
+  },
+  reference: {
+    reference: "average",
+    custom_ref_channels: []
+  },
+  ica: {
+    run_ica: true,
+    ica_method: "fastica",
+    n_components: null,
+    auto_detect_artifacts: true
+  },
+  bad_channels: {
+    detect_bad_channels: true,
+    bad_channel_method: "correlation"
   }
 });
 
-// 在组件挂载时加载数据
+// 加载模板参数
+const loadTemplate = async (templateName) => {
+  try {
+    const template = await loadPreprocessTemplate(templateName);
+    if (template) {
+      resetForm(template);
+    }
+  } catch (error) {
+    console.error('加载模板错误:', error);
+  }
+};
+
+// 执行预处理
+const processResult = ref(null);
+
+const runPreprocessing = async () => {
+  try {
+    const result = await runAnalysis('preprocess', {
+      datasetId: datasetId.value,
+      subjectId: subjectId.value,
+      options: formState
+    });
+    processResult.value = result;
+    ElMessage.success('预处理完成');
+  } catch (error) {
+    console.error('预处理错误:', error);
+  }
+};
+
+// 初始化
 onMounted(() => {
-  console.log('组件已挂载，路由参数:', route.params);
-  loadData();
+  // 加载默认模板
+  loadTemplate(selectedTemplate.value);
 });
-
-// 直接使用 datasetService 加载数据
-async function loadData() {
-  try {
-    console.log(`尝试加载数据集 ${route.params.datasetId} 受试者 ${route.params.subjectId} 的数据`);
-    
-    // 设置加载状态
-    isLoading.rawData = true;
-    
-    // 调用API获取数据
-    console.log('调用 datasetService.getSubjectData');
-    const response = await datasetService.getSubjectData(
-      route.params.datasetId,
-      route.params.subjectId,
-      { start_time: 0, duration: 10 }
-    );
-    
-    console.log('API响应:', response);
-    
-    if (response.status !== 'success' || !response.data) {
-      throw new Error(response.error || '获取数据失败');
-    }
-    
-    console.log('原始数据格式:', JSON.stringify(response.data).substring(0, 500) + '...');
-    
-    // 修复这里：正确处理返回的数据格式
-    const channelData = response.data.data;
-    
-    if (!channelData || typeof channelData !== 'object') {
-      throw new Error('数据格式错误: 未找到通道数据');
-    }
-    
-    // 提取通道名称和对应的数据
-    const channels = Object.keys(channelData);
-    const sampleRate = response.data.sampleRate || 256; // 默认采样率
-    const dataLength = channels.length > 0 ? channelData[channels[0]].length : 0;
-    
-    // 生成时间点数组
-    const times = Array.from({ length: dataLength }, (_, i) => i / sampleRate);
-    
-    // 构建符合 EEGViewer 期望的数据格式
-    rawData.value = {
-      data: channelData,
-      times: times,
-      channels: channels
-    };
-    
-    // 设置时间范围
-    timeRange.value = [0, dataLength / sampleRate];
-    
-    // 更新状态
-    isLoading.rawData = false;
-    ElMessage.success('数据加载成功');
-    
-    // 初始化处理后的数据（先使用原始数据）
-    processedData.value = rawData.value;
-    
-    // 选择前5个通道进行显示
-    selectedChannels.value = channels.slice(0, 5);
-  } catch (error) {
-    console.error('加载数据失败:', error);
-    ElMessage.error(`加载数据失败: ${error.message || '未知错误'}`);
-    isLoading.rawData = false;
-  }
-}
-
-// 应用预处理
-async function applyPreprocessing() {
-  const dataset_id = route.params.datasetId;
-  const subject_id = route.params.subjectId;
-  
-  if (!dataset_id || !subject_id) {
-    ElMessage.error('无法应用预处理：缺少数据集ID或受试者ID');
-    return;
-  }
-  
-  try {
-    isLoading.applying = true;
-    
-    // 构造滤波参数
-    const filterParams = {
-      low_freq: preprocessingOptions.filtering.highpass,
-      high_freq: preprocessingOptions.filtering.lowpass,
-      notch: preprocessingOptions.filtering.notch,
-      notch_freq: 50.0
-    };
-    
-    console.log('发送滤波请求:', filterParams);
-    
-    // 调用滤波API
-    const response = await analysisService.applyFilter(
-      dataset_id,
-      subject_id,
-      filterParams
-    );
-    
-    console.log('获取到处理后数据:', response);
-    
-    if (response && response.data) {
-      // 确保处理后的数据格式与 EEGViewer 期望的格式一致
-      processedData.value = {
-        data: response.data.data,
-        channels: response.data.channels || Object.keys(response.data.data),
-        times: response.data.times || Array.from(
-          { length: Object.values(response.data.data)[0]?.length || 0 }, 
-          (_, i) => i / (response.data.sampling_rate || 256)
-        )
-      };
-      
-      activeTab.value = 'processed';
-      ElMessage.success('预处理应用成功');
-    } else {
-      throw new Error('API返回的数据格式不正确');
-    }
-  } catch (error) {
-    console.error('应用预处理失败:', error);
-    ElMessage.error(`应用预处理失败: ${error.message || '未知错误'}`);
-  } finally {
-    isLoading.applying = false;
-  }
-}
-
-// 重置选项
-function resetOptions() {
-  preprocessingOptions.filtering.highpass = 0.1;
-  preprocessingOptions.filtering.lowpass = 40;
-  preprocessingOptions.filtering.notch = true;
-  preprocessingOptions.artifacts.method = 'ica';
-  preprocessingOptions.artifacts.autoDetect = true;
-  ElMessage.success('已重置预处理选项');
-}
 </script>
 
 <template>
-  <AppLayout>
-    <div class="preprocessing-container">
-      <h1 class="page-title">数据预处理</h1>
-      
-      <div class="preprocessing-layout">
-        <!-- 左侧：预处理选项 -->
-        <div class="preprocessing-options">
-          <h2>预处理选项</h2>
-          
-          <!-- 数据视图切换 -->
-          <div class="option-section">
-            <el-tabs v-model="activeTab">
-              <el-tab-pane label="原始数据" name="raw"></el-tab-pane>
-              <el-tab-pane label="预处理后数据" name="processed"></el-tab-pane>
-            </el-tabs>
-          </div>
-          
-          <!-- 选择通道 -->
-          <div class="option-section">
-            <h3>选择通道</h3>
-            <el-select
-              v-model="selectedChannels"
-              multiple
-              collapse-tags
-              placeholder="选择通道"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="channel in rawData?.channels"
-                :key="channel"
-                :label="channel"
-                :value="channel"
-              />
-            </el-select>
-          </div>
-          
-          <!-- 时间范围 -->
-          <div class="option-section">
-            <h3>时间范围 (秒)</h3>
-            <el-slider
-              v-model="timeRange"
-              range
-              :min="0"
+  <div class="preprocessing-container">
+    <h2>EEG数据预处理</h2>
+    
+    <!-- 模板选择 -->
+    <div class="template-selection">
+      <el-form-item label="预处理模板">
+        <el-select v-model="selectedTemplate" @change="loadTemplate(selectedTemplate)">
+          <el-option 
+            v-for="option in templateOptions" 
+            :key="option.value"
+            :label="option.label" 
+            :value="option.value">
+            <div>{{ option.label }}</div>
+            <small>{{ option.description }}</small>
+          </el-option>
+        </el-select>
+      </el-form-item>
+    </div>
+    
+    <el-form :model="formState" label-width="120px">
+      <el-collapse>
+        <!-- 重采样参数 -->
+        <el-collapse-item title="重采样参数" name="resample">
+          <el-form-item label="启用重采样">
+            <el-switch v-model="formState.resample.resample" />
+          </el-form-item>
+          <el-form-item v-if="formState.resample.resample" label="采样频率">
+            <el-input-number 
+              v-model="formState.resample.resample_freq" 
+              :min="100" 
+              :max="1000"
+              :step="1"
+            />
+            <span>Hz</span>
+          </el-form-item>
+        </el-collapse-item>
+        
+        <!-- 滤波参数 -->
+        <el-collapse-item title="滤波参数" name="filter">
+          <el-form-item label="高通滤波">
+            <el-switch v-model="formState.filter.highpass_filter" />
+          </el-form-item>
+          <el-form-item v-if="formState.filter.highpass_filter" label="高通频率">
+            <el-input-number 
+              v-model="formState.filter.highpass" 
+              :min="0.1" 
               :max="10"
               :step="0.1"
             />
-            <div class="time-range-display">
-              {{ timeRange[0].toFixed(1) }}s - {{ timeRange[1].toFixed(1) }}s
-            </div>
-          </div>
+            <span>Hz</span>
+          </el-form-item>
           
-          <!-- 滤波设置 -->
-          <div class="option-section">
-            <h3>滤波设置</h3>
-            <div class="filter-option">
-              <span>高通滤波 (Hz)</span>
-              <el-input-number
-                v-model="preprocessingOptions.filtering.highpass"
-                :min="0.1"
-                :max="30"
-                :step="0.1"
-                size="small"
-              />
-            </div>
-            
-            <div class="filter-option">
-              <span>低通滤波 (Hz)</span>
-              <el-input-number
-                v-model="preprocessingOptions.filtering.lowpass"
-                :min="1"
-                :max="100"
-                :step="1"
-                size="small"
-              />
-            </div>
-            
-            <div class="filter-option">
-              <el-checkbox v-model="preprocessingOptions.filtering.notch">
-                应用50Hz陷波滤波器
-              </el-checkbox>
-            </div>
-          </div>
+          <el-form-item label="低通滤波">
+            <el-switch v-model="formState.filter.lowpass_filter" />
+          </el-form-item>
+          <el-form-item v-if="formState.filter.lowpass_filter" label="低通频率">
+            <el-input-number 
+              v-model="formState.filter.lowpass" 
+              :min="20" 
+              :max="100"
+              :step="1"
+            />
+            <span>Hz</span>
+          </el-form-item>
           
-          <!-- 去伪迹设置 -->
-          <div class="option-section">
-            <h3>去伪迹</h3>
-            <div class="artifact-option">
-              <span>去伪迹方法</span>
-              <el-select
-                v-model="preprocessingOptions.artifacts.method"
-                placeholder="选择方法"
-                size="small"
-                style="width: 100%"
-              >
-                <el-option label="独立成分分析 (ICA)" value="ica" />
-                <el-option label="阈值检测" value="threshold" />
-              </el-select>
-            </div>
-            
-            <div class="artifact-option">
-              <el-checkbox v-model="preprocessingOptions.artifacts.autoDetect">
-                自动检测伪迹成分
-              </el-checkbox>
-            </div>
-          </div>
-          
-          <!-- 操作按钮 -->
-          <div class="option-section">
-            <el-button 
-              type="primary" 
-              @click="applyPreprocessing" 
-              :loading="isLoading.applying"
-              :disabled="!rawData"
+          <el-form-item label="陷波滤波">
+            <el-switch v-model="formState.filter.notch_filter" />
+          </el-form-item>
+          <el-form-item v-if="formState.filter.notch_filter" label="陷波频率">
+            <el-tag 
+              v-for="(freq, index) in formState.filter.line_freqs" 
+              :key="index"
+              closable
+              @close="formState.filter.line_freqs.splice(index, 1)"
             >
-              应用预处理
+              {{ freq }}Hz
+            </el-tag>
+            <el-button size="small" @click="formState.filter.line_freqs.push(50)">
+              + 添加频率
             </el-button>
-            <el-button @click="resetOptions">重置选项</el-button>
-          </div>
-        </div>
+          </el-form-item>
+        </el-collapse-item>
         
-        <!-- 右侧：数据可视化 -->
-        <div class="preprocessing-visualization">
-          <div v-if="isLoading.rawData" class="loading-container">
-            <el-skeleton :rows="10" animated />
-          </div>
-          
-          <template v-else>
-            <!-- 根据当前选择的标签页显示不同的数据 -->
-            <EEGViewer 
-              v-if="activeTab === 'raw' && rawData" 
-              :data="rawData"
-              v-model:selectedChannels="selectedChannels"
-              v-model:timeRange="timeRange"
-            />
-            
-            <EEGViewer 
-              v-else-if="activeTab === 'processed' && processedData" 
-              :data="processedData"
-              v-model:selectedChannels="selectedChannels"
-              v-model:timeRange="timeRange"
-            />
-            
-            <div v-else class="no-data-message">
-              <el-empty description="暂无数据" />
-            </div>
-          </template>
-        </div>
+        <!-- 重参考参数 -->
+        <el-collapse-item title="重参考参数" name="reference">
+          <el-form-item label="参考方式">
+            <el-radio-group v-model="formState.reference.reference">
+              <el-radio label="average">平均参考</el-radio>
+              <el-radio label="mastoids">双侧乳突</el-radio>
+              <el-radio label="custom">自定义</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-collapse-item>
+        
+        <!-- ICA参数 -->
+        <el-collapse-item title="ICA参数" name="ica">
+          <el-form-item label="运行ICA">
+            <el-switch v-model="formState.ica.run_ica" />
+          </el-form-item>
+          <el-form-item v-if="formState.ica.run_ica" label="ICA方法">
+            <el-select v-model="formState.ica.ica_method">
+              <el-option label="FastICA" value="fastica" />
+              <el-option label="Extended Infomax" value="infomax" />
+              <el-option label="Picard" value="picard" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="formState.ica.run_ica" label="自动检测伪迹">
+            <el-switch v-model="formState.ica.auto_detect_artifacts" />
+          </el-form-item>
+        </el-collapse-item>
+        
+        <!-- 坏通道检测 -->
+        <el-collapse-item title="坏通道检测" name="bad_channels">
+          <el-form-item label="检测坏通道">
+            <el-switch v-model="formState.bad_channels.detect_bad_channels" />
+          </el-form-item>
+          <el-form-item v-if="formState.bad_channels.detect_bad_channels" label="检测方法">
+            <el-select v-model="formState.bad_channels.bad_channel_method">
+              <el-option label="相关性" value="correlation" />
+              <el-option label="方差" value="variance" />
+              <el-option label="频谱" value="spectrum" />
+            </el-select>
+          </el-form-item>
+        </el-collapse-item>
+      </el-collapse>
+      
+      <!-- 执行按钮 -->
+      <div class="action-buttons">
+        <el-button type="primary" @click="runPreprocessing" :loading="isLoading">
+          执行预处理
+        </el-button>
       </div>
+    </el-form>
+    
+    <!-- 处理结果展示 -->
+    <div v-if="processResult" class="process-result">
+      <h3>预处理结果</h3>
+      <el-card>
+        <div v-for="(method, index) in processResult.applied_methods" :key="index">
+          {{ method }}
+        </div>
+      </el-card>
     </div>
-  </AppLayout>
+  </div>
 </template>
 
 <style scoped>
@@ -329,69 +240,16 @@ function resetOptions() {
   padding: 20px;
 }
 
-.page-title {
-  margin-bottom: 20px;
-  font-size: 24px;
-  color: #333;
-}
-
-.preprocessing-layout {
-  display: flex;
-  gap: 20px;
-}
-
-.preprocessing-options {
-  width: 300px;
-  flex-shrink: 0;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-  padding: 15px;
-}
-
-.preprocessing-options h2 {
-  margin-bottom: 15px;
-  font-size: 18px;
-  color: #409EFF;
-}
-
-.preprocessing-visualization {
-  flex-grow: 1;
-  background-color: #fff;
-  border-radius: 4px;
-  padding: 15px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-.option-section {
+.template-selection {
   margin-bottom: 20px;
 }
 
-.option-section h3 {
-  margin-bottom: 10px;
-  font-size: 16px;
-  color: #333;
-}
-
-.filter-option,
-.artifact-option {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.time-range-display {
+.action-buttons {
+  margin-top: 20px;
   text-align: center;
-  margin-top: 5px;
-  color: #606266;
 }
 
-.loading-container,
-.no-data-message {
-  padding: 20px;
-  min-height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.process-result {
+  margin-top: 30px;
 }
 </style> 

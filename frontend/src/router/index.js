@@ -35,7 +35,7 @@ const routes = [
     name: 'SubjectDetail',
     component: SubjectDetail,
     meta: {
-      title: '受试者详情 - EEG数据分析平台'
+      title: '被试详情 - EEG数据分析平台'
     }
   },
   {

@@ -249,7 +249,7 @@ defineExpose({
               <!-- 数据集详细信息 -->
               <div class="dataset-details">
                 <span v-if="dataset.subject_count" class="detail-item">
-                  <el-tag size="small" type="success">受试者: {{ dataset.subject_count }}</el-tag>
+                  <el-tag size="small" type="success">被试: {{ dataset.subject_count }}</el-tag>
                 </span>
                 <span v-if="dataset.BIDSVersion" class="detail-item">
                   <el-tag size="small" type="info">BIDS版本: {{ dataset.BIDSVersion }}</el-tag>
