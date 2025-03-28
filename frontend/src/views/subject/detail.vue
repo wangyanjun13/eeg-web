@@ -98,11 +98,11 @@ onMounted(() => {
         </el-button>
       </div>
 
-      <!-- 受试者信息卡片 -->
+      <!-- 被试信息卡片 -->
       <el-card v-loading="loading.info" class="subject-info-card">
         <template #header>
           <div class="card-header">
-            <h2>受试者信息</h2>
+            <h2>被试信息</h2>
             <div class="action-buttons">
               <el-button type="primary" @click="analyzeSubject">分析数据</el-button>
             </div>
