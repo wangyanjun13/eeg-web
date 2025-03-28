@@ -225,7 +225,13 @@ defineExpose({
         <!-- 数据集列表 -->
         <div v-else class="dataset-list">
           <!-- 单个数据集卡片 -->
-          <el-card v-for="dataset in datasets" :key="dataset.dataset_id" class="dataset-item">
+          <el-card 
+            v-for="dataset in datasets" 
+            :key="dataset.dataset_id" 
+            class="dataset-item"
+            @click="viewDataset(dataset.dataset_id)"
+            style="cursor: pointer;"
+          >
             <div class="dataset-info">
               <!-- 数据集标题和ID -->
               <div class="dataset-header">
@@ -248,13 +254,6 @@ defineExpose({
                 <span v-if="dataset.BIDSVersion" class="detail-item">
                   <el-tag size="small" type="info">BIDS版本: {{ dataset.BIDSVersion }}</el-tag>
                 </span>
-              </div>
-              
-              <!-- 操作按钮 -->
-              <div class="dataset-actions">
-                <el-button @click="viewDataset(dataset.dataset_id)" size="small">查看</el-button>
-                <el-button type="primary" @click="analyzeDataset(dataset.dataset_id)" size="small">分析</el-button>
-                <el-button type="success" @click="visualizeDataset(dataset.dataset_id)" size="small">可视化</el-button>
               </div>
             </div>
           </el-card>
