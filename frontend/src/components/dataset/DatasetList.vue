@@ -38,6 +38,8 @@ const debouncedFetchDatasets = useDebounceFn(async (keyword = '') => {
   try {
     const response = await withLoading(datasetService.getDatasets({ keyword }));
     datasets.value = response.data || [];
+    // 更新分页信息
+    pagination.value.total = datasets.value.length;
   } catch (error) {
     console.error('获取数据集列表失败:', error);
     ElMessage.error('获取数据集列表失败');
