@@ -110,4 +110,16 @@ async def get_participants_info(dataset_id: str):
             data=participants
         )
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{dataset_id}/subjects/{subject_id}/electrodes", response_model=APIResponse)
+async def get_electrode_positions(dataset_id: str, subject_id: str):
+    """获取电极位置信息"""
+    try:
+        positions = dataset_service.get_electrode_positions(dataset_id, subject_id)
+        return APIResponse(
+            message="获取电极位置信息成功",
+            data=positions
+        )
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 

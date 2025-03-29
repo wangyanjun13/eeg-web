@@ -3,6 +3,7 @@ import { ref, onMounted, watch, onBeforeUnmount, computed, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { useDebounce, useDebounceFn } from '@/composables/useDebounce'
+import { useChannelPositions } from '@/composables/useChannelPositions' // 导入通道位置组合式函数
 /*作用：EEG数据可视化组件
   参数：
     data: 包含EEG数据的对象
@@ -41,6 +42,15 @@ const isSelectAll = computed(() => {
 })
 const legendSelected = ref({}) // 存储图例选中状态
 const isYAxisInverted = ref(false) // 纵坐标是否反转
+
+// 使用通道位置组合式函数
+const { 
+  fetchElectrodePositions, 
+  getChannelPosition, 
+  isLoading: positionsLoading,
+  error: positionsError,
+  positionSource
+} = useChannelPositions()
 
 // 图表初始化和更新
 const initChart = () => {
@@ -263,11 +273,19 @@ watch([() => props.data, () => props.timeRange, () => props.selectedChannels], (
   if (chart) updateChart()
 }, { deep: true })
 
+// 获取电极位置
+const loadElectrodePositions = async () => {
+  if (props.data?.dataset_id && props.data?.subject_id) {
+    await fetchElectrodePositions(props.data.dataset_id, props.data.subject_id)
+  }
+}
+
 // 生命周期
 onMounted(() => {
   if (props.data) {
     initChart()
     chartRef.value.addEventListener('click', showChannelCompare)
+    loadElectrodePositions() // 加载电极位置
   }
 })
 
@@ -315,11 +333,39 @@ onBeforeUnmount(() => {
           {{ isSelectAll ? '清空' : '全选' }}
         </el-button>
       </div>
-      <el-checkbox-group v-model="localSelectedChannels" class="channel-grid">
+      
+      <!-- 添加头部轮廓和电极位置显示 -->
+      <div v-if="positionSource !== 'none'" class="head-container">
+        <div class="head-circle"></div>
+        <div class="ear left-ear"></div>
+        <div class="ear right-ear"></div>
+        <div class="nose"></div>
+        
+        <!-- 使用小点标记电极位置 -->
+        <div 
+          v-for="(channel, index) in props.data?.channels" 
+          :key="channel" 
+          class="channel-marker"
+          :class="{ 'selected': localSelectedChannels.includes(channel) }"
+          :style="{
+            left: `${getChannelPosition(channel, index, props.data?.channels.length).x * 100}%`,
+            top: `${getChannelPosition(channel, index, props.data?.channels.length).y * 100}%`
+          }"
+          @click="localSelectedChannels.includes(channel) ? 
+                  localSelectedChannels = localSelectedChannels.filter(ch => ch !== channel) : 
+                  localSelectedChannels.push(channel)"
+        >
+          <span class="channel-label">{{ channel }}</span>
+        </div>
+      </div>
+      
+      <!-- 如果没有位置信息，显示常规复选框 -->
+      <el-checkbox-group v-else v-model="localSelectedChannels" class="channel-grid">
         <el-checkbox v-for="channel in props.data?.channels" :key="channel" :value="channel">
           {{ channel }}
         </el-checkbox>
       </el-checkbox-group>
+      
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="channelSelectVisible = false">取消</el-button>
@@ -403,5 +449,103 @@ onBeforeUnmount(() => {
 
 .channel-item {
   margin: 5px 0;
+}
+
+/* 头部容器样式 */
+.head-container {
+  position: relative;
+  width: 400px;
+  height: 400px;
+  margin: 0 auto 20px;
+}
+
+/* 头部轮廓 */
+.head-circle {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #ccc;
+  top: 0;
+  left: 0;
+}
+
+/* 耳朵 */
+.ear {
+  position: absolute;
+  width: 30px;
+  height: 60px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.left-ear {
+  left: -15px;
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.right-ear {
+  right: -15px;
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* 鼻子 */
+.nose {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* 通道标记样式 */
+.channel-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #409EFF;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 20;
+  transition: all 0.2s;
+}
+
+/* 选中的通道标记 */
+.channel-marker.selected {
+  background-color: #67C23A;
+  box-shadow: 0 0 8px rgba(103, 194, 58, 0.8);
+  width: 16px;
+  height: 16px;
+}
+
+/* 通道标签 - 悬停时显示 */
+.channel-label {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.channel-marker:hover .channel-label {
+  opacity: 1;
 }
 </style>

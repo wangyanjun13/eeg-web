@@ -59,6 +59,11 @@ export const datasetService = {
   // 获取参与者信息
   getParticipantsInfo(datasetId) {
     return api.get(`/api/datasets/${datasetId}/participants`);
+  },
+
+  // 获取电极位置信息
+  getElectrodePositions(datasetId, subjectId) {
+    return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/electrodes`);
   }
 };
 

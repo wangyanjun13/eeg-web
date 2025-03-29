@@ -348,4 +348,41 @@ class DatasetService:
         except Exception as e:
             raise ValueError(f"读取参与者信息失败: {str(e)}")
 
+    def get_electrode_positions(self, dataset_id: str, subject_id: str) -> Dict:
+        """获取电极位置信息"""
+        try:
+            # 从.set文件读取电极位置
+            raw = self._read_eeg_file(dataset_id, subject_id)
+            
+            # 提取通道位置信息
+            positions = {}
+            for i, ch_name in enumerate(raw.ch_names):
+                # 获取通道信息
+                ch_info = raw.info['chs'][i]
+                
+                # 检查是否有位置信息
+                if ch_info['loc'] is not None and any(ch_info['loc'][:3]):
+                    # 提取3D坐标 (x, y, z)
+                    x, y, z = ch_info['loc'][:3]
+                    positions[ch_name] = {
+                        'x': float(x),
+                        'y': float(y),
+                        'z': float(z)
+                    }
+                    # print(f"通道 {ch_name} 位置: x={x}, y={y}, z={z}")
+            
+            # 如果没有位置信息，返回空字典
+            if not positions:
+                print("未找到任何电极位置信息")
+                return {"positions": {}, "source": "none"}
+            
+            print(f"成功获取 {len(positions)} 个电极位置")
+            return {
+                "positions": positions,
+                "source": "set_file"
+            }
+        except Exception as e:
+            print(f"获取电极位置信息失败: {str(e)}")
+            return {"positions": {}, "source": "error", "error": str(e)}
+
     # ... 其他辅助方法 ... 
