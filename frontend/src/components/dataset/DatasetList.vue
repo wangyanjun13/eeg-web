@@ -318,7 +318,7 @@ defineExpose({
 .dataset-list {
   display: flex;
   flex-direction: column; /* 垂直排列 */
-  gap: 16px; /* 卡片间距 */
+  gap: 8px; /* 进一步减小卡片间距，原为12px */
   max-width: 100%; /* 最大宽度 */
   margin: 0 auto; /* 水平居中 */
 }
@@ -326,19 +326,32 @@ defineExpose({
 /* 数据集卡片 */
 .dataset-item {
   transition: transform 0.2s, box-shadow 0.2s; /* 悬停动画 */
+  border-left: 4px solid #abcff6; /* 左侧添加蓝色边框 */
+  border-radius: 4px; /* 减小圆角 */
+  overflow: hidden; /* 确保内容不超出边框 */
+  /* background-color: #5ea4d2; 更改为浅蓝色背景 */
+}
+
+/* 覆盖el-card的默认内边距 */
+.dataset-item :deep(.el-card__body) {
+  padding: 6px 10px !important; /* 进一步减小卡片内边距，*/
 }
 
 /* 卡片悬停效果 */
 .dataset-item:hover {
   transform: translateY(-2px); /* 上移效果 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 阴影增强 */
+  background-color: #abcff6; /* 悬停时背景色变为更深的浅蓝 */
+  border-left-color: #abcff6; /* 悬停时边框颜色变亮 */
 }
 
 /* 数据集信息容器 */
 .dataset-info {
   display: flex;
   flex-direction: column;
-  gap: 8px; /* 元素间距 */
+  gap: 2px; /* 进一步减小元素间距，原为4px */
+  background-color: transparent; /* 透明背景 */
+  padding: 0; /* 移除内边距 */
 }
 
 /* 数据集标题行 */
@@ -346,39 +359,43 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px; /* 下方间距 */
+  margin-bottom: 0; /* 移除下方间距 */
+  line-height: 1.2; /* 减小行高，使标题更紧凑 */
 }
 
 /* 数据集ID样式 */
 .dataset-id {
-  color: #909399; /* 灰色文字 */
-  font-size: 14px; /* 字体大小 */
+  color: #1b1b1c; /* 灰色文字909399 */
+  font-size: 13px; /* 进一步减小字体大小 */
 }
 
 /* 数据集名称样式 */
 .dataset-name {
   margin: 0;
-  font-size: 18px; /* 字体大小 */
+  font-size: 15px; /* 保持字体大小不变 */
   color: #303133; /* 文字颜色 */
   text-align: left; /* 左对齐 */
   flex: 1; /* 占满剩余空间 */
-  margin-right: 16px; /* 右侧间距 */
+  margin-right: 12px; /* 右侧间距 */
+  line-height: 1.2; /* 减小行高 */
 }
 
 /* 作者信息样式 */
 .dataset-author {
-  font-size: 12px; /* 小字体 */
+  font-size: 12px; /* 保持字体大小不变 */
   color: #606266; /* 灰色文字 */
   text-align: left; /* 左对齐 */
-  margin-bottom: 8px; /* 下方间距 */
+  margin-bottom: 2px; /* 减小下方间距，原为4px */
+  line-height: 1.2; /* 减小行高 */
 }
 
 /* 详细信息容器 */
 .dataset-details {
   display: flex;
   flex-wrap: wrap; /* 允许换行 */
-  gap: 8px; /* 标签间距 */
-  margin-bottom: 12px; /* 下方间距 */
+  gap: 4px; /* 标签间距 */
+  margin-bottom: 0; /* 移除下方间距 */
+  line-height: 1.2; /* 减小行高 */
 }
 
 /* 详细信息项 */
