@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import AppLayout from '@/components/layout/AppLayout.vue';
-import ERPChart from '@/components/analysis/ERPChart.vue';
+// import ERPChart from '@/components/analysis/ERPChart.vue';
 import TimeSeriesChart from '@/components/analysis/TimeSeriesChart.vue';
 import { useLoading } from '@/composables/useLoading';
 import { useFormState } from '@/composables/useFormState';
