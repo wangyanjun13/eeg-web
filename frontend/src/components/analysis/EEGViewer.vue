@@ -75,7 +75,7 @@ const handleSeriesMouseover = (params) => {
         formatter: (p) => {
           const time = p.data[0]?.toFixed(3) || p.data[0]
           const value = p.data[1]?.toFixed(3) || p.data[1]
-          return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>振幅: ${value} μV`
+          return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>电压: ${value} μV`
         }
       }
     })
@@ -125,7 +125,7 @@ const getChartOption = (series, legendStatus) => ({
   },
   yAxis: {
     type: 'value',
-    name: '振幅 (μV)',
+    name: '电压 (μV)',
     nameLocation: 'middle',
     nameGap: 40,
     nameRotate: 90,
