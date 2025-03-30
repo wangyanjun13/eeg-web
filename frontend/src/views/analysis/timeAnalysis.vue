@@ -280,11 +280,11 @@ onMounted(() => {
             <div v-loading="isLoading.data">
               <!-- ERP波形 -->
               <div v-if="activeTab === 'erp' && erpData">
-                <ERPChart 
+                <!-- ERPChart 
                   :data="erpData.erp" 
                   :events="erpData.events"
                   :timeWindow="analysisOptions.display.timeWindow"
-                />
+                /> -->
               </div>
               
               <!-- 单次试次 -->
