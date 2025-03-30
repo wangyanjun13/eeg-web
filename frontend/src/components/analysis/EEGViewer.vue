@@ -327,11 +327,16 @@ onBeforeUnmount(() => {
     
     <div ref="chartRef" class="chart-container"></div>
     
-    <el-dialog v-model="channelSelectVisible" title="选择要显示的通道" width="50%">
+    <el-dialog v-model="channelSelectVisible" title="选择要显示的通道" width="60%">
       <div class="channel-select-header">
         <el-button size="small" type="primary" @click="toggleSelectAll">
           {{ isSelectAll ? '清空' : '全选' }}
         </el-button>
+        
+        <!-- 添加已选通道数显示 -->
+        <div class="selected-count">
+          已选通道: {{ localSelectedChannels.length }}/{{ props.data?.channels?.length || 0 }}
+        </div>
       </div>
       
       <!-- 添加头部轮廓和电极位置显示 -->
@@ -428,7 +433,19 @@ onBeforeUnmount(() => {
 }
 
 .channel-select-header {
-  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+/* 已选通道数显示样式 */
+.selected-count {
+  background-color: #f0f9eb;
+  color: #739fc8;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-weight: bold;
+  border: 1px solid #e1f3d8;
 }
 
 .dialog-footer {
@@ -454,8 +471,8 @@ onBeforeUnmount(() => {
 /* 头部容器样式 */
 .head-container {
   position: relative;
-  width: 400px;
-  height: 400px;
+  width: 700px;
+  height: 600px;
   margin: 0 auto 20px;
 }
 
@@ -465,31 +482,31 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 2px solid #ccc;
+  border: 2px solid #0e0a0a;
   top: 0;
   left: 0;
 }
 
-/* 耳朵 */
+/* 耳朵样式 */
 .ear {
   position: absolute;
-  width: 30px;
-  height: 60px;
-  border: 2px solid #ccc;
+  width: 40px;
+  height: 80px;
+  border: 2px solid #060605;
   border-radius: 50%;
   top: 50%;
   transform: translateY(-50%);
 }
-
+/* 左耳 位置*/
 .left-ear {
-  left: -15px;
+  left: -20px;
   border-right: none;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
-
+/* 右耳 位置*/
 .right-ear {
-  right: -15px;
+  right: -20px;
   border-left: none;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -507,45 +524,40 @@ onBeforeUnmount(() => {
   transform: translate(-50%, -50%);
 }
 
-/* 通道标记样式 */
+/* 通道标记样式 - 黑色边框白色圆圈 */
 .channel-marker {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 10px; /* 进一步缩小圆圈尺寸 */
+  height: 10px; /* 进一步缩小圆圈尺寸 */
   border-radius: 50%;
-  background-color: #409EFF;
+  background-color: white;
+  border: 1px solid #333;
   transform: translate(-50%, -50%);
   cursor: pointer;
   z-index: 20;
   transition: all 0.2s;
 }
 
-/* 选中的通道标记 */
+/* 选中的通道标记 - 绿色 */
 .channel-marker.selected {
   background-color: #67C23A;
-  box-shadow: 0 0 8px rgba(103, 194, 58, 0.8);
-  width: 16px;
-  height: 16px;
+  border-color: #333;
+  box-shadow: 0 0 5px rgba(28, 167, 25, 0.8);
+  width: 13px; /* 选中时略微放大 */
+  height: 13px; /* 选中时略微放大 */
 }
 
-/* 通道标签 - 悬停时显示 */
+/* 通道标签 - 调整位置和样式 */
 .channel-label {
   position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-size: 12px;
+  color: #000; /* 更深的黑色文本 */
+  font-size: 11px; /* 稍微增大字体 */
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s;
   pointer-events: none;
-}
-
-.channel-marker:hover .channel-label {
-  opacity: 1;
+  z-index: 25;
+  left: 13px; /* 固定在右侧 */
+  top: 0; /* 调整垂直位置，使其在正右方 */
+  font-weight: 700; /* 加粗字体 */
+  text-shadow: 0px 0px 2px white; /* 添加白色文字阴影增加可读性 */
 }
 </style>

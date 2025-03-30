@@ -66,7 +66,7 @@ export function useChannelPositions() {
       const centerY = 0.5;
       
       // 使用更大的缩放因子，确保电极位置分散
-      const scaleFactor = 3.5; // 增大缩放因子，使电极分布更广
+      const scaleFactor = 4.0; // 增大缩放因子，进一步分散电极
       
       // 计算最终位置 - 简化坐标转换
       return { 
