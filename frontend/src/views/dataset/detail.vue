@@ -238,15 +238,17 @@ onMounted(() => {
 
 <style scoped>
 .dataset-detail-container {
-  padding: 20px; /* 容器内边距 */
+  padding: 0;
+  max-width: 100%;
 }
 
 .back-button {
-  margin-bottom: 20px; /* 返回按钮下方间距 */
+  margin-bottom: 20px;
 }
 
 .dataset-info-card {
-  margin-bottom: 20px; /* 信息卡片下方间距 */
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
 }
 
 .card-header {
@@ -263,11 +265,11 @@ onMounted(() => {
 .dataset-info {
   display: flex;
   flex-direction: column;
-  gap: 20px; /* 信息部分间距 */
+  gap: 20px;
 }
 
 .info-section {
-  margin-bottom: 20px; /* 信息部分下方间距 */
+  margin-bottom: 20px;
 }
 
 .info-section h3 {
@@ -278,26 +280,26 @@ onMounted(() => {
 }
 
 .author-tag {
-  margin-right: 8px; /* 作者标签右侧间距 */
-  margin-bottom: 8px; /* 作者标签下方间距 */
+  margin-right: 8px;
+  margin-bottom: 8px;
 }
 
 .subjects-card {
-  margin-bottom: 20px; /* 受试者卡片下方间距 */
+  margin-bottom: 20px;
 }
 
 .participants-info {
   display: flex;
   flex-direction: column;
-  gap: 20px; /* 参与者信息间距 */
+  gap: 20px;
 }
 
 .group-stats {
-  margin-top: 20px; /* 分组统计上方间距 */
+  margin-top: 20px;
 }
 
 .group-item {
-  margin-bottom: 20px; /* 分组项下方间距 */
+  margin-bottom: 20px;
 }
 
 .group-item h4 {
@@ -305,5 +307,46 @@ onMounted(() => {
   margin-bottom: 10px;
   font-size: 16px;
   color: #606266;
+}
+
+/* 响应式布局 */
+@media (max-width: 992px) {
+  :deep(.el-descriptions) {
+    width: 100%;
+  }
+  
+  :deep(.el-descriptions__body) {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .card-header h2 {
+    margin-bottom: 10px;
+  }
+  
+  :deep(.el-descriptions__cell) {
+    padding: 8px !important;
+  }
+  
+  :deep(.el-descriptions__label) {
+    width: 80px;
+  }
+}
+
+@media (max-width: 576px) {
+  :deep(.el-table) {
+    font-size: 12px;
+  }
+  
+  :deep(.el-button--small) {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
 }
 </style> 

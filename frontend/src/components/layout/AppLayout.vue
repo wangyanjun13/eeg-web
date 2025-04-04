@@ -2,20 +2,11 @@
 import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { 
-  Document, 
-  DataAnalysis, 
-  PieChart, 
-  Upload,
   ArrowDown
 } from '@element-plus/icons-vue';
 
 const router = useRouter();
 const route = useRoute();
-
-// 计算当前活动菜单项
-const activeMenu = computed(() => {
-  return route.path.split('/')[1] || 'datasets';
-});
 
 // 导航函数
 function navigateTo(path) {
@@ -25,67 +16,6 @@ function navigateTo(path) {
 
 <template>
   <div class="app-layout">
-    <!-- 侧边导航栏 -->
-    <div class="side-nav">
-      <el-menu
-        mode="vertical"
-        :default-active="activeMenu"
-        class="side-menu"
-        :collapse="true"
-        background-color="#001529"
-        text-color="#fff"
-        active-text-color="#409EFF"
-      >
-        <el-tooltip
-          content="数据集浏览"
-          placement="right"
-          :show-after="200"
-          effect="dark"
-        >
-          <el-menu-item index="datasets" @click="navigateTo('/datasets')">
-            <el-icon><Document /></el-icon>
-            <template #title>数据集浏览</template>
-          </el-menu-item>
-        </el-tooltip>
-
-        <el-tooltip
-          content="数据分析"
-          placement="right"
-          :show-after="200"
-          effect="dark"
-        >
-          <el-menu-item index="analysis" @click="navigateTo('/analysis')">
-            <el-icon><DataAnalysis /></el-icon>
-            <template #title>数据分析</template>
-          </el-menu-item>
-        </el-tooltip>
-
-        <el-tooltip
-          content="可视化"
-          placement="right"
-          :show-after="200"
-          effect="dark"
-        >
-          <el-menu-item index="visualization" @click="navigateTo('/visualization')">
-            <el-icon><PieChart /></el-icon>
-            <template #title>可视化</template>
-          </el-menu-item>
-        </el-tooltip>
-
-        <el-tooltip
-          content="上传数据集"
-          placement="right"
-          :show-after="200"
-          effect="dark"
-        >
-          <el-menu-item index="upload" @click="navigateTo('/upload')">
-            <el-icon><Upload /></el-icon>
-            <template #title>上传数据集</template>
-          </el-menu-item>
-        </el-tooltip>
-      </el-menu>
-    </div>
-
     <!-- 顶部导航栏 -->
     <header class="app-header">
       <div class="header-left">
@@ -124,23 +54,7 @@ function navigateTo(path) {
   display: flex;
   flex-direction: column;
 }
-/*左侧导航栏*/
-.side-nav {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 1000;
-  background-color: #001529;
-  display: flex;
-  flex-direction: column;
-  width: 64px;
-}
-/*左侧导航栏*/
-.side-menu {
-  border-right: none;
-  flex: 1;
-}
+
 /*顶部导航栏*/
 .app-header {
   height: 60px;
@@ -152,7 +66,7 @@ function navigateTo(path) {
   padding: 0 20px;
   position: fixed;
   top: 0;
-  left: 64px;
+  left: 0;
   right: 0;
   z-index: 1001;
 }
@@ -194,17 +108,50 @@ function navigateTo(path) {
   color: #409EFF;
 }
 
+/*主要内容区域*/
 .main-container {
-  display: flex;
   flex: 1;
   margin-top: 60px;
+  display: flex;
 }
-/*主要内容区域*/
+
 .main-content {
   flex: 1;
-  margin-left: 64px;
   padding: 20px;
-  background-color: #f0f2f5;
-  min-height: calc(100vh - 60px);
+  overflow-y: auto;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* 响应式布局 */
+@media (max-width: 1200px) {
+  .main-content {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-title {
+    font-size: 18px;
+  }
+  
+  .main-content {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 576px) {
+  .header-title {
+    font-size: 16px;
+  }
+  
+  .app-header {
+    padding: 0 10px;
+  }
+  
+  .main-content {
+    padding: 10px 5px;
+  }
 }
 </style> 
