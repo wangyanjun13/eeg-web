@@ -196,8 +196,7 @@ onMounted(() => {
             <!-- 操作列 -->
             <el-table-column label="操作" width="200">
               <template #default="scope">
-                <el-button size="small" @click="viewSubject(scope.row.id)">查看</el-button>
-                <el-button size="small" type="primary" @click="analyzeSubject(scope.row.id)">分析</el-button>
+                <el-button size="small" type="primary" @click="viewSubject(scope.row.id)">查看/分析</el-button>
               </template>
             </el-table-column>
           </el-table>
