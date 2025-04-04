@@ -55,15 +55,15 @@ const routes = [
     }
   },
   {
-    path: '/analysis/preprocessing',
+    path: '/analysis/preprocessing/:datasetId/:subjectId',
     name: 'Preprocessing',
     component: () => import('../views/analysis/preprocessing.vue'),
     meta: {
-      title: '数据预处理 - EEG数据分析平台'
+      title: '预处理 - EEG数据分析平台'
     }
   },
   {
-    path: '/analysis/time-analysis',
+    path: '/analysis/time-analysis/:datasetId/:subjectId',
     name: 'TimeAnalysis',
     component: () => import('../views/analysis/timeAnalysis.vue'),
     meta: {
@@ -71,7 +71,7 @@ const routes = [
     }
   },
   {
-    path: '/analysis/frequency-analysis',
+    path: '/analysis/frequency-analysis/:datasetId/:subjectId',
     name: 'FrequencyAnalysis',
     component: () => import('../views/analysis/frequencyAnalysis.vue'),
     meta: {
@@ -79,7 +79,7 @@ const routes = [
     }
   },
   {
-    path: '/analysis/spatial-analysis',
+    path: '/analysis/spatial-analysis/:datasetId/:subjectId',
     name: 'SpatialAnalysis',
     component: () => import('../views/analysis/spatialAnalysis.vue'),
     meta: {
@@ -87,7 +87,7 @@ const routes = [
     }
   },
   {
-    path: '/analysis/advanced-analysis',
+    path: '/analysis/advanced-analysis/:datasetId/:subjectId',
     name: 'AdvancedAnalysis',
     component: () => import('../views/analysis/advancedAnalysis.vue'),
     meta: {

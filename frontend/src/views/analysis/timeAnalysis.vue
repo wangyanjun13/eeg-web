@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import AppLayout from '@/components/layout/AppLayout.vue';
@@ -8,9 +8,14 @@ import TimeSeriesChart from '@/components/analysis/TimeSeriesChart.vue';
 import { useLoading } from '@/composables/useLoading';
 import { useFormState } from '@/composables/useFormState';
 import analysisService from '@/services/analysisService';
+import datasetService from '@/services/dataset';
+import { useChannelPositions } from '@/composables/useChannelPositions';
+import AnalysisWorkflow from '@/components/analysis/AnalysisWorkflow.vue';
 
 const route = useRoute();
 const router = useRouter();
+const datasetId = computed(() => route.params.datasetId);
+const subjectId = computed(() => route.params.subjectId);
 
 // 数据状态
 const erpData = ref(null);
@@ -41,70 +46,114 @@ const { formState: analysisOptions, resetForm } = useFormState('time-analysis-op
   },
   // 显示设置
   display: {
-    timeWindow: [-200, 800],
-    yScale: 'auto' // auto, fixed
+    showIndividual: false,
+    showStd: true,
+    colorByCondition: true
   }
 });
 
 // 当前活动标签页
 const activeTab = ref('erp');
 
-// 重置选项
-function resetOptions() {
-  resetForm();
-  ElMessage.success('已重置分析选项');
-}
+// 通道选择
+const { 
+  openChannelSelect, 
+  renderChannelSelectDialog 
+} = useChannelPositions();
 
-// 应用分析
-async function applyAnalysis() {
+// 加载受试者信息和可用通道
+const loadSubjectInfo = async () => {
   try {
-    await withLoading(async () => {
-      // 模拟API调用
-      const result = await analysisService.performTimeAnalysis({
-        channels: selectedChannels.value,
-        events: selectedEvents.value,
-        options: analysisOptions
-      });
-      
-      erpData.value = result.data;
-      ElMessage.success('时域分析完成');
-    }, 'applying');
+    const response = await datasetService.getSubjectInfo(datasetId.value, subjectId.value);
+    if (response.data && response.data.channels) {
+      availableChannels.value = response.data.channels;
+      // 默认选择前5个通道
+      selectedChannels.value = availableChannels.value.slice(0, 5);
+    }
+    
+    // 加载事件标记
+    if (response.data && response.data.events) {
+      availableEvents.value = response.data.events;
+      // 默认选择所有事件
+      selectedEvents.value = availableEvents.value.map(event => event.id);
+    }
   } catch (error) {
-    console.error('时域分析失败:', error);
+    ElMessage.error('加载受试者信息失败');
+    console.error(error);
+  }
+};
+
+// 运行时域分析
+const runTimeAnalysis = async () => {
+  if (selectedChannels.value.length === 0) {
+    ElMessage.warning('请至少选择一个通道');
+    return;
+  }
+  
+  if (selectedEvents.value.length === 0) {
+    ElMessage.warning('请至少选择一个事件');
+    return;
+  }
+  
+  try {
+    const params = {
+      datasetId: datasetId.value,
+      subjectId: subjectId.value,
+      channels: selectedChannels.value,
+      events: selectedEvents.value,
+      ...analysisOptions
+    };
+    
+    const response = await withLoading(
+      analysisService.performTimeAnalysis(params),
+      'applying'
+    );
+    
+    erpData.value = response.data;
+    ElMessage.success('时域分析完成');
+  } catch (error) {
     ElMessage.error('时域分析失败');
+    console.error(error);
   }
-}
+};
 
-// 加载示例数据
-async function loadExampleData() {
+// 选择通道
+const handleSelectChannels = () => {
+  openChannelSelect(
+    selectedChannels.value,
+    availableChannels.value,
+    (selected) => {
+      selectedChannels.value = selected;
+    }
+  );
+};
+
+// 加载示例数据（用于开发测试）
+const loadExampleData = async () => {
   try {
-    await withLoading(async () => {
-      // 模拟API调用
-      const result = await analysisService.getExampleTimeData();
-      
-      // 设置可用通道和事件
-      availableChannels.value = result.channels;
-      availableEvents.value = result.events;
-      
-      // 默认选择一些通道和事件
-      selectedChannels.value = availableChannels.value.slice(0, 3).map(ch => ch.id);
-      selectedEvents.value = availableEvents.value.slice(0, 2).map(ev => ev.id);
-      
-      // 设置ERP数据
-      erpData.value = result.data;
-      
-      ElMessage.success('示例数据加载完成');
-    }, 'data');
+    const response = await withLoading(
+      analysisService.getExampleTimeData(),
+      'data'
+    );
+    erpData.value = response.data;
+    ElMessage.success('加载示例数据成功');
   } catch (error) {
-    console.error('加载示例数据失败:', error);
     ElMessage.error('加载示例数据失败');
+    console.error(error);
   }
-}
+};
 
 // 生命周期钩子
 onMounted(() => {
-  loadExampleData();
+  loadSubjectInfo();
 });
+
+const workflowRef = ref(null);
+
+// 前往下一步
+function goToNextStep() {
+  workflowRef.value?.goToNextStep();
+}
 </script>
 
 <template>
@@ -118,149 +167,116 @@ onMounted(() => {
           <el-card class="control-panel">
             <template #header>
               <div class="card-header">
-                <h3>分析选项</h3>
+                <h3>时域分析设置</h3>
               </div>
             </template>
             
-            <el-form label-position="top">
-              <!-- 数据选择 -->
-              <el-divider>数据选择</el-divider>
-              
+            <el-form :model="analysisOptions" label-width="120px">
+              <!-- 通道选择 -->
               <el-form-item label="选择通道">
-                <el-select
-                  v-model="selectedChannels"
-                  multiple
-                  collapse-tags
-                  placeholder="选择通道"
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="channel in availableChannels"
-                    :key="channel.id"
-                    :label="channel.name"
-                    :value="channel.id"
-                  />
-                </el-select>
+                <div class="channel-selection">
+                  <el-button @click="handleSelectChannels" :disabled="isLoading.data">
+                    选择通道 ({{ selectedChannels.length }})
+                  </el-button>
+                  <div v-if="selectedChannels.length > 0" class="selected-channels">
+                    已选: {{ selectedChannels.slice(0, 3).join(', ') }}
+                    <span v-if="selectedChannels.length > 3">
+                      等{{ selectedChannels.length }}个通道
+                    </span>
+                  </div>
+                </div>
               </el-form-item>
               
               <!-- 事件选择 -->
               <el-form-item label="选择事件">
-                <el-select
-                  v-model="selectedEvents"
-                  multiple
-                  collapse-tags
+                <el-select 
+                  v-model="selectedEvents" 
+                  multiple 
                   placeholder="选择事件"
                   style="width: 100%"
                 >
-                  <el-option
-                    v-for="event in availableEvents"
-                    :key="event.id"
-                    :label="event.name"
+                  <el-option 
+                    v-for="event in availableEvents" 
+                    :key="event.id" 
+                    :label="event.name" 
                     :value="event.id"
                   />
                 </el-select>
               </el-form-item>
               
-              <!-- 基线校正设置 -->
-              <el-divider>基线校正</el-divider>
-              
-              <el-form-item>
-                <el-checkbox v-model="analysisOptions.baseline.enabled">
-                  启用基线校正
-                </el-checkbox>
+              <!-- 基线校正 -->
+              <el-form-item label="基线校正">
+                <el-switch v-model="analysisOptions.baseline.enabled" />
+                <div v-if="analysisOptions.baseline.enabled" class="baseline-range">
+                  <el-input-number 
+                    v-model="analysisOptions.baseline.start" 
+                    :min="-1000" 
+                    :max="0" 
+                    :step="50"
+                    size="small"
+                  />
+                  <span class="range-separator">至</span>
+                  <el-input-number 
+                    v-model="analysisOptions.baseline.end" 
+                    :min="-500" 
+                    :max="500" 
+                    :step="50"
+                    size="small"
+                  />
+                  <span class="time-unit">ms</span>
+                </div>
               </el-form-item>
               
-              <template v-if="analysisOptions.baseline.enabled">
-                <el-form-item label="基线时间窗口 (ms)">
-                  <el-input-number
-                    v-model="analysisOptions.baseline.start"
-                    :min="-1000"
-                    :max="0"
-                    :step="50"
-                    style="width: 45%"
-                  />
-                  <span style="margin: 0 5px;">至</span>
-                  <el-input-number
-                    v-model="analysisOptions.baseline.end"
-                    :min="analysisOptions.baseline.start"
-                    :max="500"
-                    :step="50"
-                    style="width: 45%"
-                  />
-                </el-form-item>
-              </template>
-              
-              <!-- 平均方式设置 -->
-              <el-divider>平均方式</el-divider>
-              
-              <el-form-item label="平均方法">
+              <!-- 平均方式 -->
+              <el-form-item label="平均方式">
                 <el-radio-group v-model="analysisOptions.averaging.method">
-                  <el-radio label="mean">算术平均</el-radio>
-                  <el-radio label="median">中位数平均</el-radio>
+                  <el-radio label="mean">均值</el-radio>
+                  <el-radio label="median">中位数</el-radio>
                 </el-radio-group>
-              </el-form-item>
-              
-              <el-form-item>
-                <el-checkbox v-model="analysisOptions.averaging.removeOutliers">
-                  移除离群值
-                </el-checkbox>
-              </el-form-item>
-              
-              <template v-if="analysisOptions.averaging.removeOutliers">
-                <el-form-item label="离群值阈值 (标准差)">
-                  <el-input-number
-                    v-model="analysisOptions.averaging.outlierThreshold"
-                    :min="1"
-                    :max="5"
-                    :step="0.5"
-                    style="width: 100%"
+                <div class="outlier-removal">
+                  <el-checkbox v-model="analysisOptions.averaging.removeOutliers">
+                    移除离群值
+                  </el-checkbox>
+                  <el-input-number 
+                    v-if="analysisOptions.averaging.removeOutliers"
+                    v-model="analysisOptions.averaging.outlierThreshold" 
+                    :min="1" 
+                    :max="5" 
+                    :step="0.1"
+                    size="small"
+                    style="width: 100px; margin-left: 10px;"
                   />
-                </el-form-item>
-              </template>
+                  <span v-if="analysisOptions.averaging.removeOutliers">
+                    标准差
+                  </span>
+                </div>
+              </el-form-item>
               
               <!-- 显示设置 -->
-              <el-divider>显示设置</el-divider>
-              
-              <el-form-item label="时间窗口 (ms)">
-                <el-input-number
-                  v-model="analysisOptions.display.timeWindow[0]"
-                  :min="-1000"
-                  :max="0"
-                  :step="100"
-                  style="width: 45%"
-                />
-                <span style="margin: 0 5px;">至</span>
-                <el-input-number
-                  v-model="analysisOptions.display.timeWindow[1]"
-                  :min="0"
-                  :max="2000"
-                  :step="100"
-                  style="width: 45%"
-                />
+              <el-form-item label="显示设置">
+                <el-checkbox v-model="analysisOptions.display.showIndividual">
+                  显示单次试次
+                </el-checkbox>
+                <el-checkbox v-model="analysisOptions.display.showStd">
+                  显示标准差
+                </el-checkbox>
+                <el-checkbox v-model="analysisOptions.display.colorByCondition">
+                  按条件着色
+                </el-checkbox>
               </el-form-item>
-              
-              <el-form-item label="Y轴缩放">
-                <el-select
-                  v-model="analysisOptions.display.yScale"
-                  style="width: 100%"
-                >
-                  <el-option label="自动" value="auto" />
-                  <el-option label="固定" value="fixed" />
-                </el-select>
-              </el-form-item>
-              
-              <!-- 操作按钮 -->
-              <div class="action-buttons">
-                <el-button @click="resetOptions">重置</el-button>
-                <el-button 
-                  type="primary" 
-                  @click="applyAnalysis" 
-                  :loading="isLoading.applying"
-                >
-                  应用分析
-                </el-button>
-              </div>
             </el-form>
+            
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+              <el-button @click="resetForm">重置</el-button>
+              <el-button type="primary" @click="runTimeAnalysis" :loading="isLoading.applying">
+                运行分析
+              </el-button>
+              <el-button @click="loadExampleData" :loading="isLoading.data">
+                加载示例数据
+              </el-button>
+              <el-button type="success" @click="goToNextStep">下一步</el-button>
+            </div>
           </el-card>
         </el-col>
         
@@ -307,14 +323,25 @@ onMounted(() => {
               
               <!-- 无数据提示 -->
               <div v-else class="no-data">
-                <el-empty description="暂无数据" />
+                <el-empty description="暂无分析数据，请运行分析或加载示例数据" />
               </div>
             </div>
           </el-card>
         </el-col>
       </el-row>
+      
+      <!-- 分析流程导航 -->
+      <AnalysisWorkflow 
+        ref="workflowRef"
+        current-step="time" 
+        :dataset-id="datasetId" 
+        :subject-id="subjectId" 
+      />
     </div>
   </AppLayout>
+  
+  <!-- 通道选择对话框 -->
+  <component :is="renderChannelSelectDialog()" />
 </template>
 
 <style scoped>
@@ -322,6 +349,7 @@ onMounted(() => {
   padding: 20px;
   max-width: 1600px;
   margin: 0 auto;
+  padding-bottom: 60px;
 }
 
 .control-panel {
@@ -338,6 +366,30 @@ onMounted(() => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+}
+
+.channel-selection, .selected-channels {
+  margin-top: 8px;
+}
+
+.selected-channels {
+  font-size: 12px;
+  color: #606266;
+  margin-top: 8px;
+}
+
+.baseline-range {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.range-separator, .time-unit {
+  margin: 0 8px;
+}
+
+.outlier-removal {
+  margin-top: 8px;
 }
 
 .action-buttons {

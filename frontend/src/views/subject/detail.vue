@@ -6,6 +6,7 @@ import datasetService from '@/services/dataset';
 import AppLayout from '@/components/layout/AppLayout.vue';
 import EEGViewer from '@/components/analysis/EEGViewer.vue';
 import { useLoading } from '@/composables/useLoading';
+import AnalysisWorkflow from '@/components/analysis/AnalysisWorkflow.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -86,11 +87,28 @@ onMounted(() => {
   fetchSubjectInfo();
   fetchEEGData();
 });
+
+const workflowRef = ref(null);
+
+// 前往下一步
+function goToNextStep() {
+  workflowRef.value?.goToNextStep();
+}
 </script>
 
 <template>
   <AppLayout>
     <div class="subject-detail-container">
+      <h2>被试数据详情</h2>
+      
+      <!-- 添加分析工作流导航 -->
+      <AnalysisWorkflow 
+        ref="workflowRef"
+        current-step="raw" 
+        :dataset-id="datasetId" 
+        :subject-id="subjectId" 
+      />
+      
       <!-- 返回按钮 -->
       <div class="back-button">
         <el-button @click="router.push(`/datasets/${datasetId}`)" icon="ArrowLeft">
@@ -104,7 +122,7 @@ onMounted(() => {
           <div class="card-header">
             <h2>被试信息</h2>
             <div class="action-buttons">
-              <el-button type="primary" @click="analyzeSubject">分析数据</el-button>
+              <el-button type="success" @click="goToNextStep">下一步</el-button>
             </div>
           </div>
         </template>
@@ -170,6 +188,7 @@ onMounted(() => {
 <style scoped>
 .subject-detail-container {
   padding: 20px; /* 容器内边距 */
+  padding-bottom: 60px;
 }
 
 .back-button {
