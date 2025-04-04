@@ -1,5 +1,6 @@
-import { ref, computed } from 'vue';
+import { ref, computed, h } from 'vue';
 import datasetService from '@/services/dataset';
+import { ElMessage, ElDialog, ElButton, ElCheckboxGroup, ElCheckbox } from 'element-plus';
 
 /**
  * 通道位置管理的组合式函数
@@ -10,6 +11,10 @@ export function useChannelPositions() {
   const isLoading = ref(false);
   const error = ref(null);
   const positionSource = ref('none'); // 'set_file', 'none', 'error'
+  
+  // 通道选择对话框状态
+  const channelSelectVisible = ref(false);
+  const localSelectedChannels = ref([]);
   
   /**
    * 从后端获取电极位置数据
@@ -85,6 +90,112 @@ export function useChannelPositions() {
     return { x, y };
   };
   
+  // 通道选择相关方法
+  const openChannelSelect = (currentChannels, allChannels, onConfirm) => {
+    localSelectedChannels.value = [...currentChannels];
+    channelSelectVisible.value = true;
+    
+    // 保存回调和数据
+    openChannelSelect._callback = onConfirm;
+    openChannelSelect._allChannels = allChannels;
+  };
+  
+  const isSelectAll = computed(() => {
+    const allChannels = openChannelSelect._allChannels || [];
+    return allChannels.length > 0 && localSelectedChannels.value.length === allChannels.length;
+  });
+  
+  const toggleSelectAll = () => {
+    const allChannels = openChannelSelect._allChannels || [];
+    localSelectedChannels.value = isSelectAll.value ? [] : [...allChannels];
+  };
+  
+  const confirmChannelSelect = () => {
+    if (localSelectedChannels.value.length === 0) {
+      ElMessage.warning('请至少选择一个通道');
+      return;
+    }
+    
+    channelSelectVisible.value = false;
+    if (openChannelSelect._callback) {
+      openChannelSelect._callback([...localSelectedChannels.value]);
+    }
+  };
+  
+  const cancelChannelSelect = () => {
+    channelSelectVisible.value = false;
+  };
+  
+  const toggleChannel = (channel) => {
+    const index = localSelectedChannels.value.indexOf(channel);
+    if (index > -1) {
+      localSelectedChannels.value.splice(index, 1);
+    } else {
+      localSelectedChannels.value.push(channel);
+    }
+  };
+  
+  // 渲染通道选择对话框
+  const renderChannelSelectDialog = () => {
+    const allChannels = openChannelSelect._allChannels || [];
+    
+    return h(ElDialog, {
+      modelValue: channelSelectVisible.value,
+      'onUpdate:modelValue': (val) => channelSelectVisible.value = val,
+      title: '选择要显示的通道',
+      width: '60%',
+      customClass: 'channel-select-dialog'
+    }, {
+      default: () => [
+        h('div', { class: 'channel-select-header' }, [
+          h(ElButton, {
+            size: 'small',
+            type: 'primary',
+            onClick: toggleSelectAll
+          }, () => isSelectAll.value ? '清空' : '全选'),
+          
+          h('div', { class: 'selected-count' }, 
+            `已选通道: ${localSelectedChannels.value.length}/${allChannels.length || 0}`)
+        ]),
+        
+        positionSource.value !== 'none' 
+          ? h('div', { class: 'head-container' }, [
+              h('div', { class: 'head-circle' }),
+              h('div', { class: 'ear left-ear' }),
+              h('div', { class: 'ear right-ear' }),
+              h('div', { class: 'nose' }),
+              
+              ...allChannels.map((channel, index) => 
+                h('div', {
+                  key: channel,
+                  class: ['channel-marker', { 'selected': localSelectedChannels.value.includes(channel) }],
+                  style: {
+                    left: `${getChannelPosition(channel, index, allChannels.length).x * 100}%`,
+                    top: `${getChannelPosition(channel, index, allChannels.length).y * 100}%`
+                  },
+                  onClick: () => toggleChannel(channel)
+                }, [
+                  h('span', { class: 'channel-label' }, channel)
+                ])
+              )
+            ])
+          : h(ElCheckboxGroup, {
+              modelValue: localSelectedChannels.value,
+              'onUpdate:modelValue': (val) => localSelectedChannels.value = val,
+              class: 'channel-grid'
+            }, () => 
+              allChannels.map(channel => 
+                h(ElCheckbox, { key: channel, label: channel }, () => channel)
+              )
+            )
+      ],
+      footer: () => h('span', { class: 'dialog-footer' }, [
+        h(ElButton, { onClick: cancelChannelSelect }, () => '取消'),
+        h(ElButton, { type: 'primary', onClick: confirmChannelSelect }, () => '确认')
+      ])
+    });
+  };
+  
   return {
     fetchElectrodePositions,
     resetPositions,
@@ -92,6 +203,16 @@ export function useChannelPositions() {
     isLoading,
     error,
     positionSource,
-    hasCustomPositions: computed(() => !!customPositions.value)
+    hasCustomPositions: computed(() => !!customPositions.value),
+    // 通道选择相关
+    channelSelectVisible,
+    localSelectedChannels,
+    openChannelSelect,
+    toggleSelectAll,
+    confirmChannelSelect,
+    cancelChannelSelect,
+    toggleChannel,
+    renderChannelSelectDialog,
+    isSelectAll
   };
 } 

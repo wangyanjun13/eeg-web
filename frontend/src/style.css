@@ -77,3 +77,129 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.channel-select-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+/* 已选通道数显示样式 */
+.selected-count {
+  background-color: #f0f9eb;
+  color: #739fc8;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-weight: bold;
+  border: 1px solid #e1f3d8;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+
+/* 头部容器样式 */
+.head-container {
+  position: relative;
+  width: 700px;
+  height: 600px;
+  margin: 0 auto 20px;
+}
+
+/* 头部轮廓 */
+.head-circle {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #0e0a0a;
+  top: 0;
+  left: 0;
+}
+
+/* 耳朵样式 */
+.ear {
+  position: absolute;
+  width: 40px;
+  height: 80px;
+  border: 2px solid #060605;
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* 左耳 位置*/
+.left-ear {
+  left: -20px;
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* 右耳 位置*/
+.right-ear {
+  right: -20px;
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* 鼻子 */
+.nose {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* 通道标记样式 - 黑色边框白色圆圈 */
+.channel-marker {
+  position: absolute;
+  width: 10px; /* 进一步缩小圆圈尺寸 */
+  height: 10px; /* 进一步缩小圆圈尺寸 */
+  border-radius: 50%;
+  background-color: white;
+  border: 1px solid #333;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 20;
+  transition: all 0.2s;
+}
+
+/* 选中的通道标记 - 绿色 */
+.channel-marker.selected {
+  background-color: #67C23A;
+  border-color: #333;
+  box-shadow: 0 0 5px rgba(28, 167, 25, 0.8);
+  width: 13px; /* 选中时略微放大 */
+  height: 13px; /* 选中时略微放大 */
+}
+
+/* 通道标签 - 调整位置和样式 */
+.channel-label {
+  position: absolute;
+  color: #000; /* 更深的黑色文本 */
+  font-size: 11px; /* 稍微增大字体 */
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 25;
+  left: 13px; /* 固定在右侧 */
+  top: 0; /* 调整垂直位置，使其在正右方 */
+  font-weight: 700; /* 加粗字体 */
+  text-shadow: 0px 0px 2px white; /* 添加白色文字阴影增加可读性 */
+}
+

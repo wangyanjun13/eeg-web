@@ -10,7 +10,6 @@ import { useChannelPositions } from '@/composables/useChannelPositions' // 导�
 //   timeRange: 时间范围，默认[0, 10]
 //   selectedChannels: 选中的通道，默认[]
 
-
 const props = defineProps({
   data: {
     type: Object,
@@ -33,13 +32,7 @@ const chartRef = ref(null)
 let chart = null
 const isFullScreen = ref(false)
 const themeStyle = ref('light')
-const channelSelectVisible = ref(false)
-const localSelectedChannels = ref([])
 const channelCompareVisible = ref(false)
-const isSelectAll = computed(() => {
-  return props.data?.channels && 
-         localSelectedChannels.value.length === props.data.channels.length
-})
 const legendSelected = ref({}) // 存储图例选中状态
 const isYAxisInverted = ref(false) // 纵坐标是否反转
 
@@ -49,7 +42,10 @@ const {
   getChannelPosition, 
   isLoading: positionsLoading,
   error: positionsError,
-  positionSource
+  positionSource,
+  // 通道选择相关
+  openChannelSelect,
+  renderChannelSelectDialog
 } = useChannelPositions()
 
 // 图表初始化和更新
@@ -210,37 +206,15 @@ const showChannelCompare = (event) => {
 }
 
 // 打开通道选择对话框
-const toggleChannelSelect = () => channelSelectVisible.value = true
-
-// 全选或清空通道
-const toggleSelectAll = () => {
-  localSelectedChannels.value = isSelectAll.value 
-    ? [] 
-    : (props.data?.channels ? [...props.data.channels] : [])
-}
-
-// 确认通道选择
-const confirmChannelSelect = () => {
-  if (localSelectedChannels.value.length === 0) {
-    ElMessage.warning('请至少选择一个通道')
-    return
-  }
-  
-  channelSelectVisible.value = false
-  emit('update:selectedChannels', [...localSelectedChannels.value])
-  nextTick(updateChart)
-}
-
-// 全屏切换 - 简化版本，仅切换状态
-const toggleFullScreen = () => {
-  isFullScreen.value = !isFullScreen.value
-  setTimeout(() => chart?.resize(), 100)
-}
-
-// 主题切换
-const toggleTheme = () => {
-  themeStyle.value = themeStyle.value === 'light' ? 'dark' : 'light'
-  initChart()
+const toggleChannelSelect = () => {
+  openChannelSelect(
+    props.selectedChannels, 
+    props.data?.channels || [], 
+    (selected) => {
+      emit('update:selectedChannels', selected)
+      nextTick(updateChart)
+    }
+  )
 }
 
 // 通道比较数据
@@ -257,21 +231,17 @@ const channelCompareContent = computed(() => {
   }))
 })
 
-// 监听状态变化
-watch(() => props.selectedChannels, (newVal) => {
-  localSelectedChannels.value = [...newVal]
-}, { immediate: true })
+// 全屏切换 - 简化版本，仅切换状态
+const toggleFullScreen = () => {
+  isFullScreen.value = !isFullScreen.value
+  setTimeout(() => chart?.resize(), 100)
+}
 
-watch(() => channelSelectVisible.value, (newVal) => {
-  if (!newVal) {
-    localSelectedChannels.value = [...props.selectedChannels]
-  }
-})
-
-// 合并数据变化监听
-watch([() => props.data, () => props.timeRange, () => props.selectedChannels], () => {
-  if (chart) updateChart()
-}, { deep: true })
+// 主题切换
+const toggleTheme = () => {
+  themeStyle.value = themeStyle.value === 'light' ? 'dark' : 'light'
+  initChart()
+}
 
 // 获取电极位置
 const loadElectrodePositions = async () => {
@@ -280,13 +250,11 @@ const loadElectrodePositions = async () => {
   }
 }
 
-// 生命周期
-onMounted(() => {
-  if (props.data) {
-    initChart()
-    chartRef.value.addEventListener('click', showChannelCompare)
-    loadElectrodePositions() // 加载电极位置
-  }
+// 生命周期钩子
+onMounted(async () => {
+  await loadElectrodePositions()
+  initChart()
+  chartRef.value?.addEventListener('click', showChannelCompare)
 })
 
 onBeforeUnmount(() => {
@@ -325,63 +293,19 @@ onBeforeUnmount(() => {
       </el-tooltip>
     </div>
     
-    <div ref="chartRef" class="chart-container"></div>
+    <div 
+      ref="chartRef" 
+      class="chart-container"
+      :style="{ height: isFullScreen ? 'calc(100vh - 120px)' : '500px' }"
+    ></div>
     
-    <el-dialog v-model="channelSelectVisible" title="选择要显示的通道" width="60%">
-      <div class="channel-select-header">
-        <el-button size="small" type="primary" @click="toggleSelectAll">
-          {{ isSelectAll ? '清空' : '全选' }}
-        </el-button>
-        
-        <!-- 添加已选通道数显示 -->
-        <div class="selected-count">
-          已选通道: {{ localSelectedChannels.length }}/{{ props.data?.channels?.length || 0 }}
-        </div>
-      </div>
-      
-      <!-- 添加头部轮廓和电极位置显示 -->
-      <div v-if="positionSource !== 'none'" class="head-container">
-        <div class="head-circle"></div>
-        <div class="ear left-ear"></div>
-        <div class="ear right-ear"></div>
-        <div class="nose"></div>
-        
-        <!-- 使用小点标记电极位置 -->
-        <div 
-          v-for="(channel, index) in props.data?.channels" 
-          :key="channel" 
-          class="channel-marker"
-          :class="{ 'selected': localSelectedChannels.includes(channel) }"
-          :style="{
-            left: `${getChannelPosition(channel, index, props.data?.channels.length).x * 100}%`,
-            top: `${getChannelPosition(channel, index, props.data?.channels.length).y * 100}%`
-          }"
-          @click="localSelectedChannels.includes(channel) ? 
-                  localSelectedChannels = localSelectedChannels.filter(ch => ch !== channel) : 
-                  localSelectedChannels.push(channel)"
-        >
-          <span class="channel-label">{{ channel }}</span>
-        </div>
-      </div>
-      
-      <!-- 如果没有位置信息，显示常规复选框 -->
-      <el-checkbox-group v-else v-model="localSelectedChannels" class="channel-grid">
-        <el-checkbox v-for="channel in props.data?.channels" :key="channel" :value="channel">
-          {{ channel }}
-        </el-checkbox>
-      </el-checkbox-group>
-      
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="channelSelectVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmChannelSelect">确认</el-button>
-        </span>
-      </template>
-    </el-dialog>
+    <!-- 通道选择对话框 -->
+    <component :is="renderChannelSelectDialog()" />
     
+    <!-- 通道数据比较对话框 -->
     <el-dialog v-model="channelCompareVisible" title="通道数据对比" width="30%">
       <div class="channel-compare">
-        <div class="time-info">当前时间: {{ getCurrentTime() }} s</div>
+        <div class="time-info">当前时间: {{ getCurrentTime().toFixed(3) }} s</div>
         <div v-for="item in channelCompareContent" :key="item.channel" class="channel-item">
           <span :style="{ color: item.color }">{{ item.channel }}</span>: {{ item.value }} μV
         </div>
@@ -416,42 +340,11 @@ onBeforeUnmount(() => {
 }
 
 .chart-container {
-  height: 500px;
   width: 100%;
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-}
-
-.channel-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.channel-select-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-/* 已选通道数显示样式 */
-.selected-count {
-  background-color: #f0f9eb;
-  color: #739fc8;
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-weight: bold;
-  border: 1px solid #e1f3d8;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 
 .channel-compare {
@@ -466,98 +359,5 @@ onBeforeUnmount(() => {
 
 .channel-item {
   margin: 5px 0;
-}
-
-/* 头部容器样式 */
-.head-container {
-  position: relative;
-  width: 700px;
-  height: 600px;
-  margin: 0 auto 20px;
-}
-
-/* 头部轮廓 */
-.head-circle {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 2px solid #0e0a0a;
-  top: 0;
-  left: 0;
-}
-
-/* 耳朵样式 */
-.ear {
-  position: absolute;
-  width: 40px;
-  height: 80px;
-  border: 2px solid #060605;
-  border-radius: 50%;
-  top: 50%;
-  transform: translateY(-50%);
-}
-/* 左耳 位置*/
-.left-ear {
-  left: -20px;
-  border-right: none;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-/* 右耳 位置*/
-.right-ear {
-  right: -20px;
-  border-left: none;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-/* 鼻子 */
-.nose {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border: 2px solid #ccc;
-  border-radius: 50%;
-  top: 0;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* 通道标记样式 - 黑色边框白色圆圈 */
-.channel-marker {
-  position: absolute;
-  width: 10px; /* 进一步缩小圆圈尺寸 */
-  height: 10px; /* 进一步缩小圆圈尺寸 */
-  border-radius: 50%;
-  background-color: white;
-  border: 1px solid #333;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  z-index: 20;
-  transition: all 0.2s;
-}
-
-/* 选中的通道标记 - 绿色 */
-.channel-marker.selected {
-  background-color: #67C23A;
-  border-color: #333;
-  box-shadow: 0 0 5px rgba(28, 167, 25, 0.8);
-  width: 13px; /* 选中时略微放大 */
-  height: 13px; /* 选中时略微放大 */
-}
-
-/* 通道标签 - 调整位置和样式 */
-.channel-label {
-  position: absolute;
-  color: #000; /* 更深的黑色文本 */
-  font-size: 11px; /* 稍微增大字体 */
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 25;
-  left: 13px; /* 固定在右侧 */
-  top: 0; /* 调整垂直位置，使其在正右方 */
-  font-weight: 700; /* 加粗字体 */
-  text-shadow: 0px 0px 2px white; /* 添加白色文字阴影增加可读性 */
 }
 </style>
