@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, provide } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import datasetService from '@/services/dataset';
@@ -65,11 +65,6 @@ const fetchEEGData = async () => {
   }
 };
 
-// 分析受试者数据
-const analyzeSubject = () => {
-  router.push(`/datasets/${datasetId}/subjects/${subjectId}/analyze`);
-};
-
 // 更新时间范围
 const updateTimeRange = (newRange) => {
   timeRange.value = newRange;
@@ -99,8 +94,6 @@ function goToNextStep() {
 <template>
   <AppLayout>
     <div class="subject-detail-container">
-      <h2>被试数据详情</h2>
-      
       <!-- 添加分析工作流导航 -->
       <AnalysisWorkflow 
         ref="workflowRef"
@@ -109,21 +102,11 @@ function goToNextStep() {
         :subject-id="subjectId" 
       />
       
-      <!-- 返回按钮 -->
-      <div class="back-button">
-        <el-button @click="router.push(`/datasets/${datasetId}`)" icon="ArrowLeft">
-          返回数据集详情
-        </el-button>
-      </div>
-
       <!-- 被试信息卡片 -->
       <el-card v-loading="loading.info" class="subject-info-card">
         <template #header>
           <div class="card-header">
             <h2>被试信息</h2>
-            <div class="action-buttons">
-              <el-button type="success" @click="goToNextStep">下一步</el-button>
-            </div>
           </div>
         </template>
 
@@ -146,7 +129,7 @@ function goToNextStep() {
       <el-card v-loading="loading.data" class="eeg-data-card">
         <template #header>
           <div class="card-header">
-            <h3>EEG数据可视化</h3>
+            <h3>EEG原始时间序列可视化</h3>
             <div class="data-controls">
               <el-input-number 
                 v-model="timeRange[0]" 
@@ -170,7 +153,7 @@ function goToNextStep() {
           </div>
         </template>
 
-        <div v-if="eegData">
+        <div v-if="eegData" class="eeg-viewer-container">
           <EEGViewer 
             :data="eegData" 
             v-model:timeRange="timeRange"
@@ -178,6 +161,12 @@ function goToNextStep() {
             @update:timeRange="updateTimeRange"
             @update:selectedChannels="updateSelectedChannels"
           />
+          <!-- 下一步按钮放到图表右下角 -->
+          <div class="next-step-button">
+            <el-button type="success" size="default" plain @click="goToNextStep">
+              <el-icon><ArrowRight /></el-icon> 下一步：预处理
+            </el-button>
+          </div>
         </div>
         <el-empty v-else-if="!loading.data" description="暂无EEG数据" />
       </el-card>
@@ -187,16 +176,15 @@ function goToNextStep() {
 
 <style scoped>
 .subject-detail-container {
-  padding: 20px; /* 容器内边距 */
-  padding-bottom: 60px;
-}
-
-.back-button {
-  margin-bottom: 20px; /* 返回按钮下方间距 */
+  padding: 8px 16px;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
 .subject-info-card {
-  margin-bottom: 20px; /* 信息卡片下方间距 */
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
 }
 
 .card-header {
@@ -207,6 +195,9 @@ function goToNextStep() {
 
 .card-header h2, .card-header h3 {
   margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .data-controls {
@@ -215,12 +206,45 @@ function goToNextStep() {
 }
 
 .eeg-data-card {
-  margin-bottom: 20px; /* 数据卡片下方间距 */
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: flex-end; /* 按钮右对齐 */
-  margin-top: 20px; /* 按钮上方间距 */
+.eeg-viewer-container {
+  position: relative;
+  min-height: 400px;
+  margin-bottom: 50px;
+}
+
+.next-step-button {
+  position: absolute;
+  bottom: -40px;
+  right: 20px;
+  z-index: 10;
+  opacity: 0.9;
+}
+
+.next-step-button .el-button {
+  font-size: 14px;
+  padding: 8px 15px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .subject-detail-container {
+    padding: 8px;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .data-controls {
+    margin-top: 10px;
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style> 

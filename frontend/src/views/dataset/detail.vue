@@ -220,7 +220,7 @@ onMounted(() => {
             <el-table-column label="操作" width="280">
               <template #default="scope">
                 <el-button size="small" type="primary" @click="viewSubject(scope.row.id)">查看/分析</el-button>
-                <el-button size="small" type="success" @click="exportSubjectData(scope.row.id)">导出数据</el-button>
+                <el-button size="small" type="success" @click="exportSubjectData(scope.row.id)">导出</el-button>
               </template>
             </el-table-column>
           </el-table>
