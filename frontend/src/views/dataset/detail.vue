@@ -92,6 +92,29 @@ const analyzeSubject = (subjectId) => {
   router.push(`/datasets/${datasetId}/subjects/${subjectId}/analyze`);
 };
 
+// 导出受试者数据
+const exportSubjectData = async (subjectId) => {
+  try {
+    // 直接创建一个a标签，设置href为API URL
+    const link = document.createElement('a');
+    link.href = `${import.meta.env.VITE_API_BASE_URL}/api/datasets/${datasetId}/subjects/${subjectId}/export`;
+    link.setAttribute('download', `${datasetId}_sub-${subjectId}_data.zip`);
+    
+    // 添加到DOM并触发点击
+    document.body.appendChild(link);
+    link.click();
+    
+    // 清理DOM
+    setTimeout(() => {
+      document.body.removeChild(link);
+    }, 100);
+    
+  } catch (error) {
+    console.error('导出数据失败:', error);
+    ElMessage.error('导出数据失败');
+  }
+};
+
 // 页面加载时获取数据
 onMounted(() => {
   fetchDatasetInfo();
@@ -194,9 +217,10 @@ onMounted(() => {
             </el-table-column>
             
             <!-- 操作列 -->
-            <el-table-column label="操作" width="200">
+            <el-table-column label="操作" width="280">
               <template #default="scope">
                 <el-button size="small" type="primary" @click="viewSubject(scope.row.id)">查看/分析</el-button>
+                <el-button size="small" type="success" @click="exportSubjectData(scope.row.id)">导出数据</el-button>
               </template>
             </el-table-column>
           </el-table>

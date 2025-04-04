@@ -64,6 +64,13 @@ export const datasetService = {
   // 获取电极位置信息
   getElectrodePositions(datasetId, subjectId) {
     return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/electrodes`);
+  },
+
+  // 导出受试者原始数据
+  exportSubjectData(datasetId, subjectId) {
+    return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/export`, {
+      responseType: 'blob'
+    });
   }
 };
 

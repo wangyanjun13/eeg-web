@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi.responses import FileResponse, StreamingResponse
 from app.models.data_dataset import DatasetInfo, RawDataInfo, RawEEGData
 from app.models.common import APIResponse
 from app.services.dataset_service import DatasetService
 from pathlib import Path
 import asyncio
+import io
 
 # 创建服务实例
 DATA_DIR = Path("/app/data/eeg_samples")
@@ -122,4 +124,24 @@ async def get_electrode_positions(dataset_id: str, subject_id: str):
             data=positions
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{dataset_id}/subjects/{subject_id}/export")
+async def export_subject_data(dataset_id: str, subject_id: str):
+    """导出受试者原始EEG数据"""
+    try:
+        # 检查受试者目录是否存在
+        subject_dir = dataset_service.data_dir / dataset_id / f"sub-{subject_id}"
+        if not subject_dir.exists():
+            raise HTTPException(status_code=404, detail=f"未找到受试者数据目录: {subject_dir}")
+            
+        # 使用StreamingResponse，但不预先生成整个ZIP文件
+        return StreamingResponse(
+            dataset_service.stream_subject_data_direct(dataset_id, subject_id),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{dataset_id}_sub-{subject_id}_data.zip"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

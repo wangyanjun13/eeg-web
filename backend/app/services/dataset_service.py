@@ -385,4 +385,59 @@ class DatasetService:
             print(f"获取电极位置信息失败: {str(e)}")
             return {"positions": {}, "source": "error", "error": str(e)}
 
+
+    async def stream_subject_data_direct(self, dataset_id: str, subject_id: str):
+        """直接流式传输受试者数据，不预先生成完整ZIP文件"""
+        import zipfile
+        import io
+        import os
+        import asyncio
+        
+        # 获取受试者数据目录
+        subject_dir = self.data_dir / dataset_id / f"sub-{subject_id}"
+        
+        # 创建一个ZipFile对象，但不立即写入所有文件
+        zip_buffer = io.BytesIO()
+        
+        # 收集所有文件路径
+        file_paths = []
+        for root, _, files in os.walk(subject_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, str(self.data_dir / dataset_id))
+                file_paths.append((file_path, arcname))
+        
+        # 创建ZIP文件头部信息
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # 只添加一个小文件，让浏览器立即显示保存对话框
+            info_content = f"Dataset: {dataset_id}\nSubject: {subject_id}\nFiles: {len(file_paths)}"
+            zipf.writestr("info.txt", info_content)
+        
+        # 发送ZIP文件头部
+        zip_buffer.seek(0)
+        yield zip_buffer.getvalue()
+        
+        # 清空缓冲区，准备添加实际文件
+        zip_buffer = io.BytesIO()
+        
+        # 分批处理文件
+        batch_size = 5  # 每批处理5个文件
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for i in range(0, len(file_paths), batch_size):
+                batch = file_paths[i:i+batch_size]
+                
+                # 添加文件到ZIP
+                for file_path, arcname in batch:
+                    zipf.write(file_path, arcname)
+                
+                # 获取当前批次的数据并发送
+                zip_buffer.seek(0)
+                yield zip_buffer.getvalue()
+                
+                # 重置缓冲区
+                zip_buffer = io.BytesIO()
+                
+                # 让出控制权
+                await asyncio.sleep(0.01)
+
     # ... 其他辅助方法 ... 
