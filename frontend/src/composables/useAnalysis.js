@@ -1,136 +1,306 @@
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { useFormState } from './useFormState';
 import analysisService from '@/services/analysisService';
 
 /**
- * 分析功能钩子
- * @param {string} datasetId 数据集ID
- * @param {string} subjectId 被试ID
- * @returns {Object} 分析相关状态和方法
+ * 预处理和分析组合函数
+ * @param {String} datasetId 数据集ID
+ * @param {String} subjectId 受试者ID
+ * @returns {Object} 分析相关的状态和方法
  */
 export function useAnalysis(datasetId, subjectId) {
-  // 使用 localStorage 存储分析结果，以便在不同页面间共享
-  const storageKey = `analysis-${datasetId}-${subjectId}`;
+  const router = useRouter();
   
-  // 分析结果
-  const results = ref(null);
+  // 状态变量
   const isLoading = ref(false);
+  const currentTaskId = ref(null);
+  const taskStatus = ref(null);
   const error = ref(null);
+  const originalData = ref(null);
+  const processedData = ref(null);
+  const availableMethods = ref([]);
+  const appliedMethods = ref([]);
+  const results = ref({});
   
-  // 预处理参数
-  const { formState: preprocessParams } = useFormState(`preprocess-${datasetId}-${subjectId}`, {
-    // 默认预处理参数
+  // 预处理参数 - 与后端PreprocessParams结构匹配
+  const preprocessParams = reactive({
+    // 滤波参数
     filter: {
       highpass_filter: true,
       highpass: 1.0,
       lowpass_filter: true,
       lowpass: 40.0,
       notch_filter: true,
-      notch_freq: 50.0
+      line_freqs: [50.0, 60.0]
     },
+    // 重采样参数
+    resample: {
+      resample: false,
+      resample_freq: 250.0
+    },
+    // 参考设置
     reference: {
-      method: 'average',
-      custom_ref: []
+      reference: 'average',
+      custom_ref_channels: []
     },
-    // ... 其他预处理参数
+    // ICA设置
+    ica: {
+      run_ica: false,
+      ica_method: 'fastica',
+      n_components: 15,
+      auto_detect_artifacts: true
+    },
+    // 坏通道检测
+    bad_channels: {
+      detect_bad_channels: false,
+      bad_channel_method: 'correlation'
+    },
+    // 伪迹去除
+    artifacts: {
+      remove_artifacts: false,
+      artifact_detection_method: 'threshold',
+      amplitude_threshold: 100.0,
+      reject_by_annotation: true
+    }
   });
   
-  // 从 localStorage 恢复分析结果
+  /**
+   * 从localStorage加载保存的分析结果
+   */
   const loadSavedResults = () => {
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        results.value = JSON.parse(saved);
+      const savedKey = `analysis_${datasetId}_${subjectId}`;
+      const savedData = localStorage.getItem(savedKey);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        if (parsedData.results) {
+          results.value = parsedData.results;
+        }
+        if (parsedData.appliedMethods) {
+          appliedMethods.value = parsedData.appliedMethods;
+        }
       }
     } catch (e) {
-      console.error('Failed to load saved analysis results', e);
+      console.error('加载保存的分析结果失败:', e);
     }
   };
   
-  // 保存分析结果到 localStorage
+  /**
+   * 保存分析结果到localStorage
+   */
   const saveResults = () => {
-    if (results.value) {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(results.value));
-      } catch (e) {
-        console.error('Failed to save analysis results', e);
-      }
+    try {
+      const savedKey = `analysis_${datasetId}_${subjectId}`;
+      const dataToSave = {
+        results: results.value,
+        appliedMethods: appliedMethods.value
+      };
+      localStorage.setItem(savedKey, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.error('保存分析结果失败:', e);
     }
   };
   
   /**
    * 加载预处理模板
-   * @param {string} templateName 模板名称
+   * @param {String} templateName 模板名称
    */
   const loadPreprocessTemplate = async (templateName) => {
-    isLoading.value = true;
-    error.value = null;
-    
     try {
+      isLoading.value = true;
+      error.value = null;
+      
       const response = await analysisService.getPreprocessTemplate(templateName);
-      Object.assign(preprocessParams, response.data);
-    } catch (err) {
-      error.value = err.message || '加载预处理模板失败';
+      
+      if (response && response.data) {
+        const template = response.data;
+        
+        // 更新预处理参数 - 直接替换整个对象以确保结构匹配
+        if (template.filter) {
+          preprocessParams.filter = { ...template.filter };
+        }
+        if (template.resample) {
+          preprocessParams.resample = { ...template.resample };
+        }
+        if (template.reference) {
+          preprocessParams.reference = { ...template.reference };
+        }
+        if (template.ica) {
+          preprocessParams.ica = { ...template.ica };
+        }
+        if (template.bad_channels) {
+          preprocessParams.bad_channels = { ...template.bad_channels };
+        }
+        if (template.artifacts) {
+          preprocessParams.artifacts = { ...template.artifacts };
+        }
+        
+        ElMessage.success(`成功加载预处理模板`);
+      } else {
+        throw new Error('获取的模板数据结构不正确');
+      }
+    } catch (e) {
+      error.value = `加载预处理模板失败: ${e.message || e}`;
+      ElMessage.error(error.value);
     } finally {
       isLoading.value = false;
     }
   };
   
   /**
-   * 执行分析
-   * @param {string} type 分析类型
-   * @param {Object} params 分析参数
+   * 获取预处理状态
+   * @param {String} taskId 任务ID
    */
-  const runAnalysis = async (type, params) => {
-    isLoading.value = true;
-    error.value = null;
+  const getPreprocessStatus = async (taskId) => {
+    if (!taskId) {
+      return { status: 'unknown', progress: 0, message: '未知任务' };
+    }
     
     try {
-      let response;
+      const status = await analysisService.getPreprocessStatus(taskId);
+      taskStatus.value = status;
+      return status;
+    } catch (e) {
+      error.value = `获取预处理状态失败: ${e.message || e}`;
+      console.error(error.value);
+      return { status: 'error', progress: 0, message: error.value };
+    }
+  };
+  
+  /**
+   * 运行分析
+   * @param {String} type 分析类型
+   * @param {Object} params 分析参数
+   */
+  const runAnalysis = async (type, params = {}) => {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      
+      let result;
       
       switch (type) {
         case 'preprocess':
-          response = await analysisService.runPreprocessing(datasetId, subjectId, params);
+          // 使用完整的预处理参数
+          const response = await analysisService.preprocessData(datasetId, subjectId, preprocessParams);
+          currentTaskId.value = response.task_id;
+          result = response;
           break;
+          
+        case 'filter':
+          // 直接使用filter参数
+          result = await analysisService.applyFilter(datasetId, subjectId, preprocessParams.filter);
+          break;
+          
+        case 'ica':
+          // 直接使用ica参数
+          result = await analysisService.runICA(datasetId, subjectId, preprocessParams.ica);
+          break;
+          
+        case 'artifacts':
+          // 直接使用artifacts参数
+          result = await analysisService.removeArtifacts(datasetId, subjectId, preprocessParams.artifacts);
+          break;
+          
         case 'time':
-          response = await analysisService.runTimeAnalysis(datasetId, subjectId, params);
+          result = await analysisService.performTimeAnalysis(datasetId, subjectId, params);
           break;
+          
         case 'frequency':
-          response = await analysisService.runFrequencyAnalysis(datasetId, subjectId, params);
+          result = await analysisService.performFrequencyAnalysis(datasetId, subjectId, params);
           break;
+          
         case 'spatial':
-          response = await analysisService.runSpatialAnalysis(datasetId, subjectId, params);
+          result = await analysisService.performSpatialAnalysis(datasetId, subjectId, params);
           break;
+          
         case 'advanced':
-          response = await analysisService.runAdvancedAnalysis(datasetId, subjectId, params);
+          result = await analysisService.performAdvancedAnalysis(datasetId, subjectId, params);
           break;
+          
         default:
-          throw new Error('未知的分析类型');
+          throw new Error(`未知的分析类型: ${type}`);
       }
       
-      results.value = response.data;
+      // 保存结果
+      results.value[type] = result;
+      if (!appliedMethods.value.includes(type)) {
+        appliedMethods.value.push(type);
+      }
       saveResults();
-      return response.data;
-    } catch (err) {
-      error.value = err.message || '分析执行失败';
-      throw err;
+      
+      return result;
+    } catch (e) {
+      error.value = `运行${type}分析失败: ${e.message || e}`;
+      ElMessage.error(error.value);
+      throw e;
     } finally {
       isLoading.value = false;
     }
   };
   
+  /**
+   * 获取原始数据
+   */
+  const fetchOriginalData = async () => {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      
+      // 调用相应的API获取原始数据
+      const response = await analysisService.getRawData(datasetId, subjectId);
+      originalData.value = response.data;
+      
+      return originalData.value;
+    } catch (e) {
+      error.value = `获取原始数据失败: ${e.message || e}`;
+      ElMessage.error(error.value);
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+  
+  /**
+   * 获取处理后的数据
+   */
+  const fetchProcessedData = async () => {
+    try {
+      // 获取最近一次处理后的数据
+      const latestResult = results.value[appliedMethods.value[appliedMethods.value.length - 1]];
+      if (latestResult && latestResult.data) {
+        processedData.value = latestResult.data;
+      }
+      return processedData.value;
+    } catch (e) {
+      error.value = `获取处理后数据失败: ${e.message || e}`;
+      console.error(error.value);
+      return null;
+    }
+  };
+
   // 初始化时加载保存的结果
   loadSavedResults();
   
   return {
+    // 状态
     isLoading,
-    results,
     error,
+    originalData,
+    processedData,
     preprocessParams,
+    currentTaskId,
+    taskStatus,
+    availableMethods,
+    appliedMethods,
+    results,
+    
+    // 方法
     loadPreprocessTemplate,
+    getPreprocessStatus,
     runAnalysis,
-    loadSavedResults,
-    saveResults
+    fetchOriginalData,
+    fetchProcessedData
   };
-} 
+}

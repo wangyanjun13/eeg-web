@@ -4,6 +4,11 @@ import DatasetDetail from '../views/dataset/detail.vue';
 import DatasetUpload from '../views/dataset/DatasetUpload.vue';
 import SubjectDetail from '../views/subject/detail.vue';
 import NotFound from '../views/NotFound.vue';
+import Preprocessing from '../views/analysis/preprocessing.vue';
+import TimeAnalysis from '../views/analysis/timeAnalysis.vue';
+import FrequencyAnalysis from '../views/analysis/frequencyAnalysis.vue';
+import SpatialAnalysis from '../views/analysis/spatialAnalysis.vue';
+import AdvancedAnalysis from '../views/analysis/advancedAnalysis.vue';
 
 // 路由配置
 const routes = [
@@ -41,7 +46,7 @@ const routes = [
   {
     path: '/datasets/:datasetId/subjects/:subjectId/analyze',
     name: 'SubjectAnalyze',
-    component: () => import('../views/analysis/preprocessing.vue'),
+    component: Preprocessing,
     meta: {
       title: '数据分析 - EEG数据分析平台'
     }
@@ -49,7 +54,7 @@ const routes = [
   {
     path: '/analysis',
     name: 'Analysis',
-    component: () => import('../views/analysis/preprocessing.vue'),
+    component: Preprocessing,
     meta: {
       title: '数据分析工具 - EEG数据分析平台'
     }
@@ -57,7 +62,7 @@ const routes = [
   {
     path: '/analysis/preprocessing/:datasetId/:subjectId',
     name: 'Preprocessing',
-    component: () => import('../views/analysis/preprocessing.vue'),
+    component: Preprocessing,
     meta: {
       title: '预处理 - EEG数据分析平台'
     }
@@ -65,7 +70,7 @@ const routes = [
   {
     path: '/analysis/time-analysis/:datasetId/:subjectId',
     name: 'TimeAnalysis',
-    component: () => import('../views/analysis/timeAnalysis.vue'),
+    component: TimeAnalysis,
     meta: {
       title: '时域分析 - EEG数据分析平台'
     }
@@ -73,7 +78,7 @@ const routes = [
   {
     path: '/analysis/frequency-analysis/:datasetId/:subjectId',
     name: 'FrequencyAnalysis',
-    component: () => import('../views/analysis/frequencyAnalysis.vue'),
+    component: FrequencyAnalysis,
     meta: {
       title: '频域分析 - EEG数据分析平台'
     }
@@ -81,7 +86,7 @@ const routes = [
   {
     path: '/analysis/spatial-analysis/:datasetId/:subjectId',
     name: 'SpatialAnalysis',
-    component: () => import('../views/analysis/spatialAnalysis.vue'),
+    component: SpatialAnalysis,
     meta: {
       title: '空间分析 - EEG数据分析平台'
     }
@@ -89,7 +94,7 @@ const routes = [
   {
     path: '/analysis/advanced-analysis/:datasetId/:subjectId',
     name: 'AdvancedAnalysis',
-    component: () => import('../views/analysis/advancedAnalysis.vue'),
+    component: AdvancedAnalysis,
     meta: {
       title: '高级分析 - EEG数据分析平台'
     }

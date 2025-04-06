@@ -14,40 +14,61 @@ class PreprocessService:
 
     def apply_filter(self, dataset_id: str, subject_id: str, params: FilterParams) -> RawEEGData:
         """应用滤波器"""
-        # 获取原始数据
-        raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
-        
-        if isinstance(raw_data, RawEEGData) and raw_data.error:
-            raise ValueError(raw_data.error)
-
-        # 设置滤波参数
-        nyquist = raw_data.sampling_rate / 2
-        low = params.low_freq / nyquist
-        high = params.high_freq / nyquist
-        
-        # 应用滤波器
-        filtered_data = {}
-        for channel, signal_data in raw_data.data.items():
-            # 带通滤波
-            b, a = signal.butter(4, [low, high], btype='band')
-            filtered = signal.filtfilt(b, a, signal_data)
+        try:
+            # 获取原始数据
+            raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
             
-            # 陷波滤波
-            if params.notch:
-                notch_b, notch_a = signal.iirnotch(params.notch_freq / nyquist, Q=30)
-                filtered = signal.filtfilt(notch_b, notch_a, filtered)
-            
-            filtered_data[channel] = filtered.tolist()
+            if isinstance(raw_data, RawEEGData) and hasattr(raw_data, 'error') and raw_data.error:
+                raise ValueError(raw_data.error)
 
-        return RawEEGData(
-            data=filtered_data,
-            times=raw_data.times,
-            channels=raw_data.channels,
-            duration=raw_data.duration,
-            sampling_rate=raw_data.sampling_rate,
-            dataset_id=dataset_id,
-            subject_id=subject_id
-        )
+            # 确保数据是有效的
+            if not raw_data or not raw_data.data or not raw_data.channels:
+                raise ValueError(f"无法获取有效的EEG数据: dataset_id={dataset_id}, subject_id={subject_id}")
+
+            # 设置滤波参数
+            nyquist = raw_data.sampling_rate / 2
+            filtered_data = {}
+            
+            for channel, signal_data in raw_data.data.items():
+                try:
+                    data = np.array(signal_data)
+                    
+                    # 应用高通滤波
+                    if params.highpass_filter and params.highpass > 0:
+                        high_b, high_a = signal.butter(4, params.highpass / nyquist, btype='high')
+                        data = signal.filtfilt(high_b, high_a, data)
+                    
+                    # 应用低通滤波
+                    if params.lowpass_filter and params.lowpass > 0:
+                        low_b, low_a = signal.butter(4, params.lowpass / nyquist, btype='low')
+                        data = signal.filtfilt(low_b, low_a, data)
+                    
+                    # 应用陷波滤波
+                    if params.notch_filter and params.line_freqs:
+                        for freq in params.line_freqs:
+                            if 0 < freq < nyquist:
+                                notch_b, notch_a = signal.iirnotch(freq / nyquist, Q=30)
+                                data = signal.filtfilt(notch_b, notch_a, data)
+                    
+                    filtered_data[channel] = data.tolist()
+                except Exception as e:
+                    print(f"处理通道 {channel} 时出错: {str(e)}")
+                    # 如果处理失败，保留原始数据
+                    filtered_data[channel] = signal_data
+
+            return RawEEGData(
+                data=filtered_data,
+                times=raw_data.times,
+                channels=raw_data.channels,
+                duration=raw_data.duration,
+                sampling_rate=raw_data.sampling_rate,
+                dataset_id=dataset_id,
+                subject_id=subject_id
+            )
+        except Exception as e:
+            error_msg = f"滤波处理失败: {str(e)}"
+            print(error_msg)
+            raise ValueError(error_msg)
 
     def run_ica(self, dataset_id: str, subject_id: str, params: ICAParams) -> RawEEGData:
         """运行ICA分析"""

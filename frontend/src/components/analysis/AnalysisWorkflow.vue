@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 
 const props = defineProps({
   currentStep: {
     type: String,
-    required: true
+    required: true,
+    validator: (value) => ['raw', 'preprocessing', 'time', 'frequency', 'spatial', 'advanced'].includes(value)
   },
   datasetId: {
     type: String,
@@ -31,35 +32,35 @@ const steps = [
     key: 'preprocessing', 
     label: '预处理', 
     icon: 'Filter', 
-    path: '/analysis/preprocessing',
+    path: '/analysis/preprocessing/:datasetId/:subjectId',
     description: '滤波、去伪迹、重参考等'
   },
   { 
     key: 'time', 
     label: '时域分析', 
     icon: 'Timer', 
-    path: '/analysis/time-analysis',
+    path: '/analysis/time-analysis/:datasetId/:subjectId',
     description: 'ERP分析、时间序列分析'
   },
   { 
     key: 'frequency', 
     label: '频域分析', 
     icon: 'PieChart', 
-    path: '/analysis/frequency-analysis',
+    path: '/analysis/frequency-analysis/:datasetId/:subjectId',
     description: '频谱分析、时频分析'
   },
   { 
     key: 'spatial', 
     label: '空间分析', 
     icon: 'Position', 
-    path: '/analysis/spatial-analysis',
+    path: '/analysis/spatial-analysis/:datasetId/:subjectId',
     description: '地形图、源定位分析'
   },
   { 
     key: 'advanced', 
     label: '高级分析', 
     icon: 'DataAnalysis', 
-    path: '/analysis/advanced-analysis',
+    path: '/analysis/advanced-analysis/:datasetId/:subjectId',
     description: '连接性分析、机器学习'
   }
 ];
@@ -76,8 +77,6 @@ function navigateToStep(step) {
   }
   if (path.includes(':subjectId')) {
     path = path.replace(':subjectId', props.subjectId);
-  } else if (!path.includes('datasets')) {
-    path = `${path}/${props.datasetId}/${props.subjectId}`;
   }
   router.push(path);
 }
