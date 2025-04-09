@@ -164,19 +164,7 @@ class PreprocessService:
             subject_id=subject_id
         )
 
-    def preprocess_eeg(self, raw, params: Optional[PreprocessParams] = None) -> Tuple[mne.io.Raw, PreprocessParams, List[str]]:
-        """
-        执行EEG预处理流程
-        
-        参数:
-        - raw: MNE Raw对象
-        - params: 预处理参数，如果为None则使用默认参数
-        
-        返回:
-        - 处理后的Raw对象
-        - 使用的预处理参数
-        - 应用的处理方法列表
-        """
+    def preprocess_eeg(self, raw, params: Optional[PreprocessParams] = None):
         # 使用默认参数或用户提供的参数
         if params is None:
             params = PreprocessParams.get_template("default")
@@ -184,6 +172,7 @@ class PreprocessService:
         # 记录应用的处理方法
         applied_methods = []
             
+        # 按顺序应用预处理步骤
         # 1. 重采样
         if params.resample.resample:
             raw = raw.resample(params.resample.resample_freq)

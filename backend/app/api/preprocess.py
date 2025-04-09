@@ -46,17 +46,11 @@ async def get_all_templates():
 
 @router.post("/{dataset_id}/{subject_id}", response_model=APIResponse)
 async def preprocess_data(dataset_id: str, subject_id: str, params: PreprocessParams):
-    """执行完整预处理流程
-    
-    Args:
-        dataset_id: 数据集ID
-        subject_id: 受试者ID
-        params: 完整预处理参数
-    """
+    """执行完整预处理流程"""
     try:
-        # 在这里调用完整的预处理流程
-        # 临时实现，返回滤波的结果
-        result = preprocess_service.apply_filter(dataset_id, subject_id, params.filter)
+        # 实际应用所有预处理步骤，而不只是滤波
+        # 滤波、重采样、重参考、ICA、坏通道检测、去伪迹
+        result = preprocess_service.apply_complete_preprocessing(dataset_id, subject_id, params)
         return APIResponse(
             message="预处理完成",
             data=result

@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Loading } from '@element-plus/icons-vue';
 import AppLayout from '@/components/layout/AppLayout.vue';
 import AnalysisWorkflow from '@/components/analysis/AnalysisWorkflow.vue';
 import EEGViewer from '@/components/analysis/EEGViewer.vue';
@@ -630,7 +631,10 @@ watch(selectedTemplate, () => {
           />
         </div>
         
-        <el-empty v-else description="暂无数据" />
+        <div v-else class="loading-container">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span class="loading-text">数据加载中...</span>
+        </div>
       </div>
       
       <!-- 页面底部 -->
@@ -823,5 +827,25 @@ watch(selectedTemplate, () => {
   .page-footer {
     margin-left: 0;
   }
+}
+
+/* 加载状态容器 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+}
+
+.loading-container .el-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #409eff;
+}
+
+.loading-text {
+  color: #606266;
+  font-size: 14px;
 }
 </style> 
