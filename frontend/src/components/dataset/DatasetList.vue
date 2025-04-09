@@ -34,11 +34,10 @@ const { isLoading: loading, withLoading } = useLoading(false);
 const showFilterPanel = ref(false);
 
 // 防抖的获取数据集函数
-const debouncedFetchDatasets = useDebounceFn(async (keyword = '') => {
+const debouncedFetchDatasets = useDebounceFn(async () => {
   try {
-    const response = await withLoading(datasetService.getDatasets({ keyword }));
+    const response = await withLoading(datasetService.getDatasets(filterForm.value));
     datasets.value = response.data || [];
-    // 更新分页信息
     pagination.value.total = datasets.value.length;
   } catch (error) {
     console.error('获取数据集列表失败:', error);
@@ -48,12 +47,13 @@ const debouncedFetchDatasets = useDebounceFn(async (keyword = '') => {
 
 // 监听防抖关键词变化
 watch(debouncedKeyword, (newKeyword) => {
-  debouncedFetchDatasets(newKeyword);
+  debouncedFetchDatasets();
 });
 
 // 搜索数据集
 const searchDatasets = async (keyword) => {
-  debouncedKeyword.value = keyword;
+  filterForm.value.keyword = keyword;
+  debouncedFetchDatasets();
 };
 
 // 处理筛选条件变化

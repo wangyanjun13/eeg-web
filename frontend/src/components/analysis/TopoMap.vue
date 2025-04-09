@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, defineProps } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import * as echarts from 'echarts';
 
 const props = defineProps({
