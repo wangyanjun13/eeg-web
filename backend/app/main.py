@@ -10,9 +10,11 @@ from app.api.preprocess import router as preprocess_router
 from app.api.analysis import router as analysis_router
 
 app = FastAPI(
-    title="EEG Analyzer",
-    description="EEG数据分析平台",
-    version="1.0.0"
+    title="EEG数据分析API",
+    description="用于EEG数据处理和分析的后端API",
+    version="1.0.0",
+    # 禁用尾部斜杠重定向
+    redirect_slashes=False
 )
 
 # 自定义OpenAPI文档

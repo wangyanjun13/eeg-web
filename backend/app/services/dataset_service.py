@@ -376,7 +376,7 @@ class DatasetService:
                 print("未找到任何电极位置信息")
                 return {"positions": {}, "source": "none"}
             
-            print(f"成功获取 {len(positions)} 个电极位置")
+            #print(f"成功获取 {len(positions)} 个电极位置")
             return {
                 "positions": positions,
                 "source": "set_file"
