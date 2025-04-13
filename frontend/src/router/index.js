@@ -4,7 +4,7 @@ import DatasetDetail from '../views/dataset/detail.vue';
 import DatasetUpload from '../views/dataset/DatasetUpload.vue';
 import SubjectDetail from '../views/subject/detail.vue';
 import NotFound from '../views/NotFound.vue';
-import Preprocessing from '../views/analysis/preprocessing.vue';
+import Preprocessing from '../views/analysis/preprocessing/index.vue';
 import TimeAnalysis from '../views/analysis/timeAnalysis.vue';
 import FrequencyAnalysis from '../views/analysis/frequencyAnalysis.vue';
 import SpatialAnalysis from '../views/analysis/spatialAnalysis.vue';
