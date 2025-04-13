@@ -20,6 +20,10 @@ const props = defineProps({
   originalData: {
     type: Object,
     default: null
+  },
+  processingChannels: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -64,7 +68,8 @@ const applyFilter = async () => {
         lowpass_filter: props.preprocessParams.filter.lowpass_filter,
         lowpass: props.preprocessParams.filter.lowpass,
         notch_filter: props.preprocessParams.filter.notch_filter,
-        line_freqs: props.preprocessParams.filter.line_freqs
+        line_freqs: props.preprocessParams.filter.line_freqs,
+        channels: props.processingChannels
       }),
       'processing'
     );

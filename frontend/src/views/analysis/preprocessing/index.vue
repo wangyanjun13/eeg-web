@@ -1,9 +1,8 @@
 <script setup>
-import { ref, reactive, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
-import AppLayout from '@/components/layout/AppLayout.vue';
 import EEGViewer from '@/components/analysis/EEGViewer.vue';
 import AnalysisWorkflow from '@/components/analysis/AnalysisWorkflow.vue';
 import { useAnalysis } from '@/composables/useAnalysis';
@@ -14,10 +13,28 @@ import ICAProcessor from './ICAProcessor.vue';
 import BadChannelProcessor from './BadChannelProcessor.vue';
 import ArtifactProcessor from './ArtifactProcessor.vue';
 
+// 路由和基础数据
 const route = useRoute();
 const router = useRouter();
 const datasetId = route.params.datasetId;
 const subjectId = route.params.subjectId;
+
+// 预处理步骤定义 - 集中管理
+const processingSteps = [
+  { key: 'filter', label: '滤波处理', icon: 'Filter', component: FilterProcessor },
+  { key: 'resample', label: '重采样', icon: 'ScaleToOriginal', component: ResamplingProcessor },
+  { key: 'reference', label: '重参考', icon: 'Compass', component: ReferenceProcessor },
+  { key: 'ica', label: 'ICA分析', icon: 'DataAnalysis', component: ICAProcessor },
+  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: BadChannelProcessor },
+  { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: ArtifactProcessor }
+];
+
+// 模板选项
+const availableTemplates = [
+  { value: 'default', label: '默认预处理' },
+  { value: 'minimal', label: '最小预处理' },
+  { value: 'ds002218', label: 'DS002218 数据集预处理' }
+];
 
 // 使用分析组合函数
 const {
@@ -30,122 +47,111 @@ const {
   saveResults
 } = useAnalysis(datasetId, subjectId);
 
-// 数据状态
+// 用户界面状态
 const compareMode = ref(false);
 const timeRange = ref([0, 10]);
-const selectedChannels = ref([]);
 const activeTemplate = ref('default');
-const activeProcessor = ref('filter'); // 当前激活的处理器
+const activeProcessor = ref('filter');
 
-// 预处理步骤定义
-const processingSteps = [
-  { key: 'filter', label: '滤波处理', icon: 'Filter', component: FilterProcessor },
-  { key: 'resample', label: '重采样', icon: 'ScaleToOriginal', component: ResamplingProcessor },
-  { key: 'reference', label: '重参考', icon: 'Compass', component: ReferenceProcessor },
-  { key: 'ica', label: 'ICA分析', icon: 'DataAnalysis', component: ICAProcessor },
-  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: BadChannelProcessor },
-  { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: ArtifactProcessor }
-];
+// 通道控制
+const processingChannels = ref([]);
+const displayChannels = ref([]);
 
-// 找到当前步骤的索引
-const currentStepIndex = computed(() => {
-  return processingSteps.findIndex(step => step.key === activeProcessor.value);
+// 计算属性
+const currentStepIndex = computed(() => processingSteps.findIndex(step => step.key === activeProcessor.value));
+const nextStep = computed(() => currentStepIndex.value < processingSteps.length - 1 ? processingSteps[currentStepIndex.value + 1] : null);
+const activeProcessorComponent = computed(() => {
+  const step = processingSteps.find(step => step.key === activeProcessor.value);
+  return step ? step.component : null;
 });
 
-// 下一个处理步骤
-const nextStep = computed(() => {
-  if (currentStepIndex.value < processingSteps.length - 1) {
-    return processingSteps[currentStepIndex.value + 1];
-  }
-  return null;
-});
-
-const availableTemplates = [
-  { value: 'default', label: '默认预处理' },
-  { value: 'minimal', label: '最小预处理' },
-  { value: 'ds002218', label: 'DS002218 数据集预处理' }
-];
-
-// 加载初始数据
+// 初始化
 onMounted(async () => {
   await fetchOriginalData();
-  if (originalData.value && originalData.value.channels) {
-    // 默认选择前10个通道
-    selectedChannels.value = originalData.value.channels.slice(0, 10);
+  if (originalData.value?.channels) {
+    processingChannels.value = [...originalData.value.channels];
+    displayChannels.value = originalData.value.channels.slice(0, 10);
   }
-  
-  // 加载默认模板
   await loadPreprocessTemplate(activeTemplate.value);
 });
 
-// 切换对比模式
+// 通道管理
+const updateProcessingChannels = (channels) => {
+  if (!channels || !channels.length) return;
+  
+  processingChannels.value = [...channels];
+  
+  // 更新显示通道，确保有效性
+  const validDisplayChannels = displayChannels.value.filter(ch => channels.includes(ch));
+  displayChannels.value = validDisplayChannels.length > 0 
+    ? validDisplayChannels 
+    : channels.slice(0, Math.min(10, channels.length));
+};
+
+const updateDisplayChannels = (channels) => {
+  if (!channels || !channels.length) return;
+  
+  // 确保显示通道是处理通道的子集
+  displayChannels.value = channels.filter(ch => processingChannels.value.includes(ch));
+};
+
+// 数据处理事件处理
+const handleProcessComplete = (data) => {
+  if (!data) return;
+  
+  processedData.value = data;
+  compareMode.value = true;
+  
+  // 更新通道列表
+  if (data.channels?.length) {
+    processingChannels.value = data.channels;
+    
+    // 更新显示通道，保持有效性
+    const validChannels = displayChannels.value.filter(ch => data.channels.includes(ch));
+    displayChannels.value = validChannels.length > 0 
+      ? validChannels 
+      : data.channels.slice(0, Math.min(10, data.channels.length));
+  }
+  
+  // 保存结果
+  saveResults(activeProcessor.value, data);
+};
+
+// UI 事件处理
 const toggleCompareMode = () => {
   compareMode.value = !compareMode.value;
-  if (!compareMode.value) {
-    processedData.value = null; // 清除处理后的数据
-  }
+  if (!compareMode.value) processedData.value = null;
 };
 
-// 更新时间范围
-const updateTimeRange = (range) => {
-  timeRange.value = range;
-};
+const updateTimeRange = (range) => timeRange.value = range;
 
-// 处理模板变更
 const handleTemplateChange = async () => {
   try {
     await loadPreprocessTemplate(activeTemplate.value);
     ElMessage.success(`已加载${activeTemplate.value}模板`);
   } catch (error) {
-    console.error('加载模板失败:', error);
     ElMessage.error('加载模板失败');
   }
 };
 
-// 处理处理器产生的数据更新
-const handleProcessComplete = (data) => {
-  processedData.value = data;
-  compareMode.value = true;
-  
-  // 保存当前步骤的处理结果
-  savePreprocessingResults();
-};
-
-// 保存预处理结果
-const savePreprocessingResults = () => {
-  if (!processedData.value) return;
-  
-  try {
-    // 保存处理结果
-    saveResults(activeProcessor.value, processedData.value);
-    ElMessage.success('处理结果已保存');
-  } catch (error) {
-    console.error('保存处理结果失败:', error);
-    ElMessage.error('保存处理结果失败');
-  }
-};
-
-// 进入下一步处理
 const goToNextProcessingStep = () => {
   if (!nextStep.value) {
     ElMessage.info('已经是最后一个预处理步骤');
     return;
   }
   
-  if (processedData.value) {
-    // 如果有处理结果，先保存
-    savePreprocessingResults();
-  }
-  
-  // 切换到下一个处理器
   activeProcessor.value = nextStep.value.key;
 };
 
-// 渲染当前激活的处理器组件
-const activeProcessorComponent = computed(() => {
-  const step = processingSteps.find(step => step.key === activeProcessor.value);
-  return step ? step.component : null;
-});
+// 通道选择对话框
+const openChannelDisplaySelect = () => {
+  const { openChannelSelect } = EEGViewer.setup();
+  openChannelSelect(
+    displayChannels.value,
+    processingChannels.value,
+    updateDisplayChannels
+  );
+};
 </script>
 
 <template>
@@ -175,7 +181,7 @@ const activeProcessorComponent = computed(() => {
     <div class="steps-navigator">
       <el-steps :active="currentStepIndex" finish-status="success" simple>
         <el-step 
-          v-for="(step, index) in processingSteps" 
+          v-for="step in processingSteps" 
           :key="step.key" 
           :title="step.label"
           @click="activeProcessor = step.key"
@@ -191,12 +197,33 @@ const activeProcessorComponent = computed(() => {
     <div class="main-content">
       <!-- 参数设置区域 -->
       <div class="parameter-area">
+        <!-- 处理通道选择 - 仅第一步显示 -->
+        <div v-if="activeProcessor === 'filter'" class="processing-channels-section">
+          <h4>处理通道设置</h4>
+          <el-alert type="info" :closable="false" show-icon>
+            <p>请选择要进行预处理的通道。这将影响所有后续处理步骤。</p>
+            <p>注：设置后不可更改</p>
+          </el-alert>
+          <div class="channel-action">
+            <el-button 
+              size="small" 
+              @click="updateProcessingChannels(originalData?.channels)"
+              :disabled="currentStepIndex > 0"
+            >
+              选择处理通道
+            </el-button>
+            <span class="channel-count">已选: {{ processingChannels.length }}/{{ originalData?.channels?.length || 0 }}</span>
+          </div>
+        </div>
+        
+        <!-- 当前处理器组件 -->
         <component 
           :is="activeProcessorComponent" 
           :preprocessParams="preprocessParams"
           :datasetId="datasetId"
           :subjectId="subjectId"
           :originalData="originalData"
+          :processingChannels="processingChannels"  
           @process-complete="handleProcessComplete"
         />
         
@@ -225,6 +252,17 @@ const activeProcessorComponent = computed(() => {
       
       <!-- 数据显示区域 -->
       <div class="data-display">
+        <!-- 视图控制区域 -->
+        <div class="view-controls">
+          <el-button size="small" @click="toggleCompareMode">
+            {{ compareMode ? '单一视图' : '对比视图' }}
+          </el-button>
+          <el-button size="small" @click="openChannelDisplaySelect">
+            显示通道选择
+          </el-button>
+          <span class="display-info">显示: {{ displayChannels.length }}/{{ processingChannels.length }}</span>
+        </div>
+        
         <!-- 对比视图 -->
         <div v-if="compareMode && originalData && processedData" class="compare-view">
           <div class="original-data">
@@ -232,8 +270,11 @@ const activeProcessorComponent = computed(() => {
             <EEGViewer 
               :data="originalData" 
               v-model:timeRange="timeRange"
-              v-model:selectedChannels="selectedChannels"
+              :selectedChannels="displayChannels"
+              :availableChannels="processingChannels"
               @update:timeRange="updateTimeRange"
+              @update:selectedChannels="updateDisplayChannels"
+              :disableChannelSelect="true"
             />
           </div>
           
@@ -242,8 +283,11 @@ const activeProcessorComponent = computed(() => {
             <EEGViewer 
               :data="processedData" 
               v-model:timeRange="timeRange"
-              v-model:selectedChannels="selectedChannels"
+              :selectedChannels="displayChannels"
+              :availableChannels="processingChannels"
               @update:timeRange="updateTimeRange"
+              @update:selectedChannels="updateDisplayChannels"
+              :disableChannelSelect="true"
             />
           </div>
         </div>
@@ -253,8 +297,10 @@ const activeProcessorComponent = computed(() => {
           <EEGViewer 
             :data="originalData" 
             v-model:timeRange="timeRange"
-            v-model:selectedChannels="selectedChannels"
+            :selectedChannels="displayChannels"
+            :availableChannels="originalData.channels || []"
             @update:timeRange="updateTimeRange"
+            @update:selectedChannels="updateDisplayChannels"
           />
         </div>
         
@@ -290,7 +336,6 @@ const activeProcessorComponent = computed(() => {
   margin-bottom: 15px;
 }
 
-/* 步骤导航样式 */
 .steps-navigator {
   margin-bottom: 20px;
   padding: 8px 0;
@@ -298,9 +343,7 @@ const activeProcessorComponent = computed(() => {
   border-bottom: 1px solid #ebeef5;
 }
 
-.process-step {
-  cursor: pointer;
-}
+.process-step { cursor: pointer; }
 
 .main-content {
   display: flex;
@@ -358,8 +401,29 @@ const activeProcessorComponent = computed(() => {
   color: #409eff;
 }
 
-.loading-text {
+.loading-text { color: #606266; font-size: 14px; }
+
+.processing-channels-section {
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px dashed #dcdfe6;
+}
+
+.channel-action {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.channel-count, .display-info {
+  margin-left: 10px;
+  font-size: 12px;
   color: #606266;
-  font-size: 14px;
+}
+
+.view-controls {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
 }
 </style> 

@@ -9,6 +9,8 @@ import { useChannelPositions } from '@/composables/useChannelPositions' // 导�
 //   data: 包含EEG数据的对象
 //   timeRange: 时间范围，默认[0, 10]
 //   selectedChannels: 选中的通道，默认[]
+//   availableChannels: 可用于选择的通道列表
+//   disableChannelSelect: 是否禁用通道选择
 
 const props = defineProps({
   data: {
@@ -22,6 +24,14 @@ const props = defineProps({
   selectedChannels: {
     type: Array,
     default: () => []
+  },
+  availableChannels: {  // 新增：可用于选择的通道列表
+    type: Array,
+    default: () => []
+  },
+  disableChannelSelect: {  // 新增：是否禁用通道选择
+    type: Boolean,
+    default: false
   }
 })
 
@@ -47,6 +57,18 @@ const {
   openChannelSelect,
   renderChannelSelectDialog
 } = useChannelPositions()
+
+// 导出组件设置函数供外部使用
+const setup = () => {
+  return {
+    openChannelSelect
+  };
+};
+
+// 为组件的 setup 函数赋值给组件的静态属性
+defineExpose({
+  setup
+});
 
 // 图表初始化和更新
 const initChart = () => {
@@ -139,8 +161,14 @@ const getChartOption = (series, legendStatus) => ({
 const debouncedUpdateChart = useDebounceFn(() => {
   if (!chart || !props.data) return
   
-  // 原updateChart函数的内容
-  const series = props.selectedChannels.map((channel, index) => ({
+  // 过滤确保只使用可用通道
+  const validChannels = props.selectedChannels.filter(channel => 
+    props.availableChannels.length > 0 
+      ? props.availableChannels.includes(channel) 
+      : props.data.channels?.includes(channel)
+  );
+  
+  const series = validChannels.map((channel, index) => ({
     name: channel,
     type: 'line',
     showSymbol: true,
@@ -151,8 +179,7 @@ const debouncedUpdateChart = useDebounceFn(() => {
       props.data.times[idx],
       value
     ]).filter(point => 
-      point[0] >= props.timeRange[0] && 
-      point[0] <= props.timeRange[1]
+      point && point[0] >= props.timeRange[0] && point[0] <= props.timeRange[1]
     ) || [],
     animationDuration: 0,
     emphasis: { focus: 'none' },
@@ -160,24 +187,34 @@ const debouncedUpdateChart = useDebounceFn(() => {
       color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
       opacity: 0
     }
-  }))
+  }));
 
-  // 准备图例状态，使用现有状态或默认为显示
-  const legendStatus = props.selectedChannels.reduce((status, channel) => {
+  // 准备图例状态
+  const legendStatus = validChannels.reduce((status, channel) => {
     status[channel] = legendSelected.value[channel] !== undefined 
       ? legendSelected.value[channel] 
-      : true
-    return status
-  }, {})
+      : true;
+    return status;
+  }, {});
   
   // 设置图表选项
-  chart.setOption(getChartOption(series, legendStatus), true)
+  chart.setOption(getChartOption(series, legendStatus), true);
 }, 100)
 
 // 替换原来的updateChart函数调用为防抖版本
 const updateChart = () => {
-  debouncedUpdateChart()
+  debouncedUpdateChart();
 }
+
+// 监听 selectedChannels 变化
+watch(() => props.selectedChannels, () => {
+  nextTick(updateChart);
+}, { deep: true });
+
+// 监听 availableChannels 变化
+watch(() => props.availableChannels, () => {
+  nextTick(updateChart);
+}, { deep: true });
 
 // 切换纵坐标方向
 const toggleYAxisDirection = () => {
@@ -207,9 +244,19 @@ const showChannelCompare = (event) => {
 
 // 打开通道选择对话框
 const toggleChannelSelect = () => {
+  if (props.disableChannelSelect) {
+    ElMessage.info('当前模式下不允许更改显示通道，请在顶部控制栏中选择');
+    return;
+  }
+  
+  // 使用传入的可用通道列表或数据中的通道列表
+  const availableChannelList = props.availableChannels.length > 0 
+    ? props.availableChannels 
+    : props.data?.channels || [];
+    
   openChannelSelect(
     props.selectedChannels, 
-    props.data?.channels || [], 
+    availableChannelList, 
     (selected) => {
       emit('update:selectedChannels', selected)
       nextTick(updateChart)
@@ -271,7 +318,13 @@ onBeforeUnmount(() => {
   <div class="eeg-viewer">
     <div class="chart-controls">
       <el-button-group>
-        <el-button size="small" @click="toggleChannelSelect">选择通道</el-button>
+        <el-button 
+          size="small" 
+          @click="toggleChannelSelect"
+          :disabled="disableChannelSelect"
+        >
+          选择显示通道
+        </el-button>
         <el-button size="small" @click="toggleTheme">切换主题</el-button>
         <el-button size="small" @click="toggleFullScreen">
           {{ isFullScreen ? '退出全屏' : '全屏' }}

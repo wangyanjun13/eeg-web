@@ -20,6 +20,10 @@ const props = defineProps({
   originalData: {
     type: Object,
     default: null
+  },
+  processingChannels: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -50,7 +54,8 @@ const applyResampling = async () => {
     const response = await withLoading(
       analysisService.applyResampling(props.datasetId, props.subjectId, {
         resample: props.preprocessParams.resample.resample,
-        resample_freq: props.preprocessParams.resample.resample_freq
+        resample_freq: props.preprocessParams.resample.resample_freq,
+        channels: props.processingChannels // 传递处理通道
       }),
       'processing'
     );
@@ -62,6 +67,23 @@ const applyResampling = async () => {
     emit('process-complete', response.data);
     ElMessage.success('重采样应用成功');
     */
+    
+    // 临时模拟
+    setTimeout(() => {
+      // 模拟后端返回的数据，保持通道一致性
+      const simulatedData = {
+        ...props.originalData,
+        sampling_rate: props.preprocessParams.resample.resample_freq,
+        channels: props.processingChannels,
+        // 保持数据不变，但需确保通道列表与处理通道一致
+        data: Object.fromEntries(
+          props.processingChannels.map(ch => [ch, props.originalData.data[ch]])
+        )
+      };
+      emit('process-complete', simulatedData);
+      ElMessage.success('重采样模拟应用成功');
+    }, 1000);
+    
   } catch (error) {
     console.error('应用重采样失败:', error);
     const errorMessage = error.response?.data?.detail || error.message || '未知错误';
