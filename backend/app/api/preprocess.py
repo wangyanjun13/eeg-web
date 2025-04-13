@@ -4,6 +4,12 @@ from app.models.common import APIResponse
 from app.services.preprocess_service import PreprocessService
 from app.services.dataset_service import DatasetService
 from pathlib import Path
+import time
+from fastapi.responses import Response
+
+# 导入缓存相关函数
+from app.core.config import get_preprocess_cache_key
+from app.core.redis import get_metadata, save_metadata, get_from_cache, save_to_cache
 
 # 创建服务实例
 DATA_DIR = Path("/app/data/eeg_samples")
@@ -86,16 +92,54 @@ async def apply_filter(dataset_id: str, subject_id: str, params: FilterParams):
         if params.notch_filter and not params.line_freqs:
             raise ValueError("启用陷波滤波时必须指定频率")
             
-        result = preprocess_service.apply_filter(dataset_id, subject_id, params)
-        
-        # 检查结果是否有效
-        if not result or not hasattr(result, 'data') or not result.data:
-            raise ValueError("滤波处理返回了无效的数据")
+        # 处理通道参数
+        channels = params.dict().pop("channels", None) if hasattr(params, "channels") else None
             
-        return APIResponse(
+        # 记录处理开始时间
+        start_time = time.time()
+        
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "filter")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        from_cache = False
+        process_time = 0
+        
+        # 检查元数据
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta:
+            # 检查参数是否匹配
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            # 参数一致则标记为从缓存获取
+            if cached_meta.get('params') == params_dict:
+                from_cache = True
+                process_time = cached_meta.get('process_time', 0)
+        
+        # 执行处理
+        result = preprocess_service.apply_filter(dataset_id, subject_id, params, channels)
+        
+        # 如果不是从缓存获取，计算处理时间
+        if not from_cache:
+            process_time = time.time() - start_time
+        
+        # 创建响应
+        response = APIResponse(
             success=True,
             message="滤波处理完成",
             data=result
+        )
+        
+        # 返回响应，添加自定义头信息
+        return Response(
+            content=response.json(),
+            media_type="application/json",
+            headers={
+                "X-From-Cache": str(from_cache).lower(),
+                "X-Process-Time": str(process_time)
+            }
         )
     except ValueError as e:
         error_msg = f"参数错误: {str(e)}"

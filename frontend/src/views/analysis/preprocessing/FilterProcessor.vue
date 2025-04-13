@@ -58,7 +58,15 @@ const applyFilter = async () => {
       lowpass_filter: props.preprocessParams.filter.lowpass_filter,
       lowpass: props.preprocessParams.filter.lowpass,
       notch_filter: props.preprocessParams.filter.notch_filter,
-      line_freqs: props.preprocessParams.filter.line_freqs
+      line_freqs: props.preprocessParams.filter.line_freqs,
+      channels: props.processingChannels.length ? props.processingChannels : undefined
+    });
+
+    // 显示提示正在处理
+    const loadingMessage = ElMessage({
+      type: 'info',
+      message: '正在应用滤波处理，这可能需要几秒钟...',
+      duration: 0
     });
 
     const response = await withLoading(
@@ -74,12 +82,21 @@ const applyFilter = async () => {
       'processing'
     );
 
+    // 关闭加载提示
+    loadingMessage.close();
+
     if (!response || !response.data) {
       throw new Error('服务器返回数据无效');
     }
 
     emit('process-complete', response.data);
-    ElMessage.success('滤波器应用成功');
+    
+    // 根据是否从缓存获取，显示不同的成功消息
+    if (response.from_cache) {
+      ElMessage.success('从缓存获取滤波结果成功');
+    } else {
+      ElMessage.success('滤波器应用成功');
+    }
   } catch (error) {
     console.error('应用滤波器失败:', error);
     const errorMessage = error.response?.data?.detail || error.message || '未知错误';

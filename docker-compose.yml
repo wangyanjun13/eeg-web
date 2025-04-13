@@ -28,9 +28,22 @@ services:
     environment:
       - HTTP_PROXY=
       - HTTPS_PROXY=
+    depends_on:
+      - redis
     command: >
       sh -c "
         cd backend &&
         pip install -r requirements.txt &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       " 
+      
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --save 60 1 --loglevel warning
+
+volumes:
+  redis_data:

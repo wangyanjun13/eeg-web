@@ -6,15 +6,43 @@ from app.models.data_dataset import RawEEGData
 from mne.preprocessing import ICA
 import mne
 from typing import Dict, List, Optional, Tuple
+import time
+
+# 导入Redis缓存功能
+from app.core.config import get_preprocess_cache_key
+from app.core.redis import save_to_cache, get_from_cache, save_metadata, get_metadata
 
 class PreprocessService:
     def __init__(self, dataset_service):
         self.dataset_service = dataset_service
         # 不依赖AnalysisService，避免循环依赖
 
-    def apply_filter(self, dataset_id: str, subject_id: str, params: FilterParams) -> RawEEGData:
+    def apply_filter(self, dataset_id: str, subject_id: str, params: FilterParams, channels: List[str] = None) -> RawEEGData:
         """应用滤波器"""
         try:
+            # 检查缓存中是否有结果
+            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "filter")
+            cache_meta_key = f"{cache_key}:meta"
+            
+            # 首先检查元数据，比对参数判断缓存是否有效
+            cached_meta = get_metadata(cache_meta_key)
+            if cached_meta:
+                # 检查参数是否匹配
+                params_dict = params.dict()
+                if channels:
+                    params_dict['channels'] = channels
+                    
+                # 参数一致则返回缓存的结果
+                if cached_meta.get('params') == params_dict:
+                    print(f"找到有效的滤波缓存: {cache_key}")
+                    cached_data = get_from_cache(cache_key)
+                    if cached_data:
+                        return cached_data
+
+            # 缓存无效或不存在，执行滤波处理
+            print(f"没有找到有效的缓存，执行滤波处理...")
+            start_time = time.time()
+            
             # 获取原始数据
             raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
             
@@ -25,11 +53,19 @@ class PreprocessService:
             if not raw_data or not raw_data.data or not raw_data.channels:
                 raise ValueError(f"无法获取有效的EEG数据: dataset_id={dataset_id}, subject_id={subject_id}")
 
+            # 设置要处理的通道
+            process_channels = channels if channels else raw_data.channels
+            
             # 设置滤波参数
             nyquist = raw_data.sampling_rate / 2
             filtered_data = {}
             
             for channel, signal_data in raw_data.data.items():
+                # 如果指定了通道列表，只处理列表中的通道
+                if channels and channel not in channels:
+                    filtered_data[channel] = signal_data
+                    continue
+                    
                 try:
                     data = np.array(signal_data)
                     
@@ -56,7 +92,7 @@ class PreprocessService:
                     # 如果处理失败，保留原始数据
                     filtered_data[channel] = signal_data
 
-            return RawEEGData(
+            result = RawEEGData(
                 data=filtered_data,
                 times=raw_data.times,
                 channels=raw_data.channels,
@@ -65,6 +101,27 @@ class PreprocessService:
                 dataset_id=dataset_id,
                 subject_id=subject_id
             )
+            
+            # 计算处理时间
+            process_time = time.time() - start_time
+            print(f"滤波处理完成，耗时: {process_time:.2f}秒")
+            
+            # 缓存处理结果
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            metadata = {
+                'params': params_dict,
+                'process_time': process_time,
+                'timestamp': time.time()
+            }
+            
+            save_metadata(cache_meta_key, metadata)
+            save_to_cache(cache_key, result)
+            print(f"已缓存滤波结果: {cache_key}")
+            
+            return result
         except Exception as e:
             error_msg = f"滤波处理失败: {str(e)}"
             print(error_msg)
@@ -72,6 +129,19 @@ class PreprocessService:
 
     def run_ica(self, dataset_id: str, subject_id: str, params: ICAParams) -> RawEEGData:
         """运行ICA分析"""
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "ica")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta and cached_meta.get('params') == params.dict():
+            cached_data = get_from_cache(cache_key)
+            if cached_data:
+                print(f"使用缓存的ICA结果: {cache_key}")
+                return cached_data
+                
+        # 没有缓存，执行处理
+        start_time = time.time()
         # 获取原始数据
         raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
         
@@ -81,7 +151,7 @@ class PreprocessService:
         # 运行ICA
         ica = ICA(
             n_components=params.n_components,
-            random_state=params.random_state
+            random_state=42
         )
         ica.fit(data)
         
@@ -94,7 +164,7 @@ class PreprocessService:
             for i, ch in enumerate(raw_data.channels)
         }
         
-        return RawEEGData(
+        result = RawEEGData(
             data=processed_data,
             times=raw_data.times,
             channels=raw_data.channels,
@@ -103,20 +173,46 @@ class PreprocessService:
             dataset_id=dataset_id,
             subject_id=subject_id
         )
+        
+        # 计算处理时间并缓存结果
+        process_time = time.time() - start_time
+        metadata = {
+            'params': params.dict(),
+            'process_time': process_time,
+            'timestamp': time.time()
+        }
+        
+        save_metadata(cache_meta_key, metadata)
+        save_to_cache(cache_key, result)
+        
+        return result
 
     def remove_artifacts(self, dataset_id: str, subject_id: str, params: ArtifactParams) -> RawEEGData:
         """去除伪迹"""
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "artifacts")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta and cached_meta.get('params') == params.dict():
+            cached_data = get_from_cache(cache_key)
+            if cached_data:
+                print(f"使用缓存的伪迹处理结果: {cache_key}")
+                return cached_data
+        
+        # 没有缓存，执行处理
+        start_time = time.time()
         # 获取原始数据
         raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
         
-        if isinstance(raw_data, RawEEGData) and raw_data.error:
+        if isinstance(raw_data, RawEEGData) and hasattr(raw_data, 'error') and raw_data.error:
             raise ValueError(raw_data.error)
         
         # 转换为numpy数组以便处理
         data_array = np.array([raw_data.data[ch] for ch in raw_data.channels])
         
         # 简单的阈值去伪迹方法
-        if params.threshold > 0:
+        if params.amplitude_threshold and params.amplitude_threshold > 0:
             # 计算每个通道的标准差
             channel_stds = np.std(data_array, axis=1)
             
@@ -126,7 +222,7 @@ class PreprocessService:
                 channel_data = data_array[i]
                 
                 # 计算阈值（标准差的倍数）
-                threshold = channel_stds[i] * params.threshold
+                threshold = channel_stds[i] * params.amplitude_threshold
                 
                 # 找出超过阈值的点
                 artifacts = np.where(np.abs(channel_data) > threshold)[0]
@@ -154,7 +250,7 @@ class PreprocessService:
             for i, ch in enumerate(raw_data.channels)
         }
         
-        return RawEEGData(
+        result = RawEEGData(
             data=processed_data,
             times=raw_data.times,
             channels=raw_data.channels,
@@ -163,7 +259,20 @@ class PreprocessService:
             dataset_id=dataset_id,
             subject_id=subject_id
         )
-
+        
+        # 计算处理时间并缓存结果
+        process_time = time.time() - start_time
+        metadata = {
+            'params': params.dict(),
+            'process_time': process_time,
+            'timestamp': time.time()
+        }
+        
+        save_metadata(cache_meta_key, metadata)
+        save_to_cache(cache_key, result)
+        
+        return result
+    
     def preprocess_eeg(self, raw, params: Optional[PreprocessParams] = None):
         # 使用默认参数或用户提供的参数
         if params is None:

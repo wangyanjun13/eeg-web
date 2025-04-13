@@ -65,6 +65,16 @@ const activeProcessorComponent = computed(() => {
   return step ? step.component : null;
 });
 
+// 添加状态
+const processingStatus = ref({
+  filter: { fromCache: false, time: null },
+  resample: { fromCache: false, time: null },
+  reference: { fromCache: false, time: null },
+  ica: { fromCache: false, time: null },
+  badChannels: { fromCache: false, time: null },
+  artifacts: { fromCache: false, time: null }
+});
+
 // 初始化
 onMounted(async () => {
   await fetchOriginalData();
@@ -96,11 +106,24 @@ const updateDisplayChannels = (channels) => {
 };
 
 // 数据处理事件处理
-const handleProcessComplete = (data) => {
+const handleProcessComplete = (data, processorKey) => {
   if (!data) return;
   
   processedData.value = data;
   compareMode.value = true;
+  
+  // 记录处理状态
+  if (data.from_cache) {
+    processingStatus.value[processorKey] = { 
+      fromCache: true, 
+      time: data.process_time || null 
+    };
+  } else {
+    processingStatus.value[processorKey] = { 
+      fromCache: false, 
+      time: data.process_time || null 
+    };
+  }
   
   // 更新通道列表
   if (data.channels?.length) {
@@ -224,7 +247,7 @@ const openChannelDisplaySelect = () => {
           :subjectId="subjectId"
           :originalData="originalData"
           :processingChannels="processingChannels"  
-          @process-complete="handleProcessComplete"
+          @process-complete="(data) => handleProcessComplete(data, activeProcessor)"
         />
         
         <!-- 步骤导航按钮 -->
@@ -318,6 +341,16 @@ const openChannelDisplaySelect = () => {
       :dataset-id="datasetId" 
       :subject-id="subjectId" 
     />
+  </div>
+  
+  <!-- 在数据展示区域显示处理状态 -->
+  <div v-if="processedData && processingStatus[activeProcessor]" class="processing-status">
+    <el-tag size="small" :type="processingStatus[activeProcessor].fromCache ? 'success' : 'primary'">
+      {{ processingStatus[activeProcessor].fromCache ? '已从缓存加载' : '实时处理' }}
+    </el-tag>
+    <span v-if="processingStatus[activeProcessor].time" class="processing-time">
+      处理耗时: {{ processingStatus[activeProcessor].time.toFixed(2) }}秒
+    </span>
   </div>
 </template>
 
@@ -425,5 +458,18 @@ const openChannelDisplaySelect = () => {
   display: flex;
   align-items: center;
   margin-bottom: 15px;
+}
+
+/* 添加状态显示样式 */
+.processing-status {
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+  gap: 10px;
+}
+
+.processing-time {
+  font-size: 12px;
+  color: #606266;
 }
 </style> 

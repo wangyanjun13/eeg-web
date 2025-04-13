@@ -66,18 +66,31 @@ const analysisService = {
    * @param {Object} params - 滤波参数
    * @returns {Promise<Object>} - 处理结果
    */
-  applyFilter(datasetId, subjectId, params) {
-    // 确保参数格式正确
-    const filterParams = {
-      highpass_filter: Boolean(params.highpass_filter),
-      highpass: Number(params.highpass) || 1.0,
-      lowpass_filter: Boolean(params.lowpass_filter),
-      lowpass: Number(params.lowpass) || 40.0,
-      notch_filter: Boolean(params.notch_filter),
-      line_freqs: Array.isArray(params.line_freqs) ? params.line_freqs.map(Number) : [50.0, 60.0]
-    };
-    
-    return api.post(`/api/preprocess/${datasetId}/subjects/${subjectId}/filter`, filterParams);
+  async applyFilter(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/filter`, 
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      // 将缓存信息添加到返回的数据中
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('滤波处理请求失败:', error);
+      throw error;
+    }
   },
 
   /**
@@ -87,8 +100,30 @@ const analysisService = {
    * @param {Object} params - ICA参数
    * @returns {Promise<Object>} - 处理结果
    */
-  runICA(datasetId, subjectId, params) {
-    return api.post(`/api/preprocess/${datasetId}/subjects/${subjectId}/ica`, params);
+  async runICA(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/ica`,
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('ICA分析请求失败:', error);
+      throw error;
+    }
   },
 
   /**
@@ -98,8 +133,30 @@ const analysisService = {
    * @param {Object} params - 伪迹参数
    * @returns {Promise<Object>} - 处理结果
    */
-  removeArtifacts(datasetId, subjectId, params) {
-    return api.post(`/api/preprocess/${datasetId}/subjects/${subjectId}/artifacts`, params);
+  async removeArtifacts(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/artifacts`,
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('伪迹去除请求失败:', error);
+      throw error;
+    }
   },
 
   /**
