@@ -26,7 +26,8 @@ const {
   processedData,
   preprocessParams,
   fetchOriginalData,
-  loadPreprocessTemplate
+  loadPreprocessTemplate,
+  saveResults
 } = useAnalysis(datasetId, subjectId);
 
 // 数据状态
@@ -35,6 +36,29 @@ const timeRange = ref([0, 10]);
 const selectedChannels = ref([]);
 const activeTemplate = ref('default');
 const activeProcessor = ref('filter'); // 当前激活的处理器
+
+// 预处理步骤定义
+const processingSteps = [
+  { key: 'filter', label: '滤波处理', icon: 'Filter', component: FilterProcessor },
+  { key: 'resample', label: '重采样', icon: 'ScaleToOriginal', component: ResamplingProcessor },
+  { key: 'reference', label: '重参考', icon: 'Compass', component: ReferenceProcessor },
+  { key: 'ica', label: 'ICA分析', icon: 'DataAnalysis', component: ICAProcessor },
+  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: BadChannelProcessor },
+  { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: ArtifactProcessor }
+];
+
+// 找到当前步骤的索引
+const currentStepIndex = computed(() => {
+  return processingSteps.findIndex(step => step.key === activeProcessor.value);
+});
+
+// 下一个处理步骤
+const nextStep = computed(() => {
+  if (currentStepIndex.value < processingSteps.length - 1) {
+    return processingSteps[currentStepIndex.value + 1];
+  }
+  return null;
+});
 
 const availableTemplates = [
   { value: 'default', label: '默认预处理' },
@@ -82,26 +106,45 @@ const handleTemplateChange = async () => {
 const handleProcessComplete = (data) => {
   processedData.value = data;
   compareMode.value = true;
+  
+  // 保存当前步骤的处理结果
+  savePreprocessingResults();
+};
+
+// 保存预处理结果
+const savePreprocessingResults = () => {
+  if (!processedData.value) return;
+  
+  try {
+    // 保存处理结果
+    saveResults(activeProcessor.value, processedData.value);
+    ElMessage.success('处理结果已保存');
+  } catch (error) {
+    console.error('保存处理结果失败:', error);
+    ElMessage.error('保存处理结果失败');
+  }
+};
+
+// 进入下一步处理
+const goToNextProcessingStep = () => {
+  if (!nextStep.value) {
+    ElMessage.info('已经是最后一个预处理步骤');
+    return;
+  }
+  
+  if (processedData.value) {
+    // 如果有处理结果，先保存
+    savePreprocessingResults();
+  }
+  
+  // 切换到下一个处理器
+  activeProcessor.value = nextStep.value.key;
 };
 
 // 渲染当前激活的处理器组件
 const activeProcessorComponent = computed(() => {
-  switch (activeProcessor.value) {
-    case 'filter':
-      return FilterProcessor;
-    case 'resample':
-      return ResamplingProcessor;
-    case 'reference':
-      return ReferenceProcessor;
-    case 'ica':
-      return ICAProcessor;
-    case 'badChannels':
-      return BadChannelProcessor;
-    case 'artifacts':
-      return ArtifactProcessor;
-    default:
-      return null;
-  }
+  const step = processingSteps.find(step => step.key === activeProcessor.value);
+  return step ? step.component : null;
 });
 </script>
 
@@ -128,41 +171,24 @@ const activeProcessorComponent = computed(() => {
       </div>
     </div>
     
-    <div class="main-content">
-      <!-- 侧边处理器选择器 -->
-      <div class="processor-selector">
-        <el-menu
-          :default-active="activeProcessor"
-          @select="activeProcessor = $event"
-          class="processor-menu"
+    <!-- 步骤导航 -->
+    <div class="steps-navigator">
+      <el-steps :active="currentStepIndex" finish-status="success" simple>
+        <el-step 
+          v-for="(step, index) in processingSteps" 
+          :key="step.key" 
+          :title="step.label"
+          @click="activeProcessor = step.key"
+          class="process-step"
         >
-          <el-menu-item index="filter">
-            <el-icon><Filter /></el-icon>
-            <span>滤波处理</span>
-          </el-menu-item>
-          <el-menu-item index="resample">
-            <el-icon><ScaleToOriginal /></el-icon>
-            <span>重采样</span>
-          </el-menu-item>
-          <el-menu-item index="reference">
-            <el-icon><Compass /></el-icon>
-            <span>重参考</span>
-          </el-menu-item>
-          <el-menu-item index="ica">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>ICA分析</span>
-          </el-menu-item>
-          <el-menu-item index="badChannels">
-            <el-icon><CircleClose /></el-icon>
-            <span>坏通道检测</span>
-          </el-menu-item>
-          <el-menu-item index="artifacts">
-            <el-icon><Delete /></el-icon>
-            <span>伪迹处理</span>
-          </el-menu-item>
-        </el-menu>
-      </div>
-      
+          <template #icon>
+            <el-icon><component :is="step.icon" /></el-icon>
+          </template>
+        </el-step>
+      </el-steps>
+    </div>
+    
+    <div class="main-content">
       <!-- 参数设置区域 -->
       <div class="parameter-area">
         <component 
@@ -173,6 +199,28 @@ const activeProcessorComponent = computed(() => {
           :originalData="originalData"
           @process-complete="handleProcessComplete"
         />
+        
+        <!-- 步骤导航按钮 -->
+        <div class="step-navigation">
+          <el-button 
+            v-if="nextStep"
+            type="primary" 
+            @click="goToNextProcessingStep"
+            :disabled="!processedData"
+          >
+            下一步: {{ nextStep?.label }}
+            <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+          </el-button>
+          
+          <el-button 
+            v-if="!nextStep && processedData"
+            type="success" 
+            @click="$refs.workflowRef?.goToNextStep()"
+          >
+            完成预处理，进入时域分析
+            <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+          </el-button>
+        </div>
       </div>
       
       <!-- 数据显示区域 -->
@@ -219,6 +267,7 @@ const activeProcessorComponent = computed(() => {
     
     <!-- 分析流程导航 -->
     <AnalysisWorkflow 
+      ref="workflowRef"
       current-step="preprocessing" 
       :dataset-id="datasetId" 
       :subject-id="subjectId" 
@@ -238,7 +287,19 @@ const activeProcessorComponent = computed(() => {
 .top-controls {
   display: flex;
   justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+/* 步骤导航样式 */
+.steps-navigator {
   margin-bottom: 20px;
+  padding: 8px 0;
+  border-top: 1px solid #ebeef5;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.process-step {
+  cursor: pointer;
 }
 
 .main-content {
@@ -248,20 +309,19 @@ const activeProcessorComponent = computed(() => {
   min-height: 600px;
 }
 
-.processor-selector {
-  width: 200px;
-}
-
-.processor-menu {
-  height: 100%;
-  border-right: 1px solid #e6e6e6;
-}
-
 .parameter-area {
-  width: 300px;
+  width: 280px;
   border: 1px solid #e6e6e6;
   border-radius: 4px;
   padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-navigation {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #ebeef5;
 }
 
 .data-display {

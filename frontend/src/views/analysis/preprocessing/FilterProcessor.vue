@@ -87,89 +87,115 @@ const applyFilter = async () => {
   <div class="filter-processor">
     <h3>滤波设置</h3>
     
-    <el-form label-position="top" label-width="100px">
+    <el-form label-position="left" label-width="80px" class="compact-form">
       <!-- 高通滤波 -->
       <el-form-item label="高通滤波">
-        <el-switch v-model="preprocessParams.filter.highpass_filter" />
-        <el-input-number 
-          v-if="preprocessParams.filter.highpass_filter"
-          v-model="preprocessParams.filter.highpass" 
-          :min="0.1" 
-          :max="100" 
-          :step="0.1"
-          :disabled="!preprocessParams.filter.highpass_filter"
-          size="small"
-          style="margin-left: 10px;"
-        />
-        <span v-if="preprocessParams.filter.highpass_filter" class="unit">Hz</span>
+        <div class="filter-control">
+          <el-switch v-model="preprocessParams.filter.highpass_filter" />
+          <el-input-number 
+            v-if="preprocessParams.filter.highpass_filter"
+            v-model="preprocessParams.filter.highpass" 
+            :min="0.1" 
+            :max="100" 
+            :step="0.1"
+            :disabled="!preprocessParams.filter.highpass_filter"
+            size="small"
+            class="small-input"
+          />
+          <span v-if="preprocessParams.filter.highpass_filter" class="unit">Hz</span>
+        </div>
       </el-form-item>
       
       <!-- 低通滤波 -->
       <el-form-item label="低通滤波">
-        <el-switch v-model="preprocessParams.filter.lowpass_filter" />
-        <el-input-number 
-          v-if="preprocessParams.filter.lowpass_filter"
-          v-model="preprocessParams.filter.lowpass" 
-          :min="1" 
-          :max="500" 
-          :step="1"
-          :disabled="!preprocessParams.filter.lowpass_filter"
-          size="small"
-          style="margin-left: 10px;"
-        />
-        <span v-if="preprocessParams.filter.lowpass_filter" class="unit">Hz</span>
+        <div class="filter-control">
+          <el-switch v-model="preprocessParams.filter.lowpass_filter" />
+          <el-input-number 
+            v-if="preprocessParams.filter.lowpass_filter"
+            v-model="preprocessParams.filter.lowpass" 
+            :min="1" 
+            :max="500" 
+            :step="1"
+            :disabled="!preprocessParams.filter.lowpass_filter"
+            size="small"
+            class="small-input"
+          />
+          <span v-if="preprocessParams.filter.lowpass_filter" class="unit">Hz</span>
+        </div>
       </el-form-item>
       
       <!-- 陷波滤波 -->
       <el-form-item label="陷波滤波">
-        <el-switch v-model="preprocessParams.filter.notch_filter" />
-        <div v-if="preprocessParams.filter.notch_filter" class="notch-frequencies">
-          <el-checkbox-group v-model="preprocessParams.filter.line_freqs">
-            <el-checkbox :label="50">50Hz</el-checkbox>
-            <el-checkbox :label="60">60Hz</el-checkbox>
-          </el-checkbox-group>
+        <div class="filter-control">
+          <el-switch v-model="preprocessParams.filter.notch_filter" />
+          <div v-if="preprocessParams.filter.notch_filter" class="notch-frequencies">
+            <el-checkbox-group v-model="preprocessParams.filter.line_freqs">
+              <el-checkbox :label="50" size="small">50Hz</el-checkbox>
+              <el-checkbox :label="60" size="small">60Hz</el-checkbox>
+            </el-checkbox-group>
+          </div>
         </div>
       </el-form-item>
+      
+      <!-- 操作按钮 - 现在位于表单底部，水平居中 -->
+      <el-form-item class="action-item">
+        <el-button 
+          type="primary" 
+          @click="applyFilter" 
+          :loading="isLoading.processing"
+          :disabled="!originalData"
+          size="small"
+        >
+          应用滤波器
+        </el-button>
+      </el-form-item>
     </el-form>
-    
-    <div class="actions">
-      <el-button 
-        type="primary" 
-        @click="applyFilter" 
-        :loading="isLoading.processing"
-        :disabled="!originalData"
-      >
-        应用滤波器
-      </el-button>
-    </div>
   </div>
 </template>
 
 <style scoped>
 .filter-processor {
   padding: 10px;
+  max-width: 250px;
 }
 
 h3 {
   margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 18px;
+  margin-bottom: 15px;
+  font-size: 16px;
   color: #303133;
 }
 
+.compact-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.filter-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.small-input {
+  width: 80px;
+}
+
 .unit {
-  margin-left: 5px;
   color: #606266;
+  font-size: 12px;
 }
 
 .notch-frequencies {
-  margin-top: 10px;
-  margin-left: 10px;
+  margin-left: 5px;
 }
 
-.actions {
+.action-item {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
+  justify-content: center;
+  margin-top: 15px;
+}
+
+:deep(.el-checkbox__label) {
+  font-size: 12px;
 }
 </style> 

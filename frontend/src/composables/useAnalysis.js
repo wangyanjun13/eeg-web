@@ -89,16 +89,28 @@ export function useAnalysis(datasetId, subjectId) {
   /**
    * 保存分析结果到localStorage
    */
-  const saveResults = () => {
+  const saveResults = (step, data) => {
     try {
+      // 更新结果状态
+      results.value[step] = data;
+      
+      // 记录应用的方法
+      if (!appliedMethods.value.includes(step)) {
+        appliedMethods.value.push(step);
+      }
+      
+      // 保存到 localStorage
       const savedKey = `analysis_${datasetId}_${subjectId}`;
       const dataToSave = {
         results: results.value,
         appliedMethods: appliedMethods.value
       };
       localStorage.setItem(savedKey, JSON.stringify(dataToSave));
+      
+      return true;
     } catch (e) {
-      console.error('保存分析结果失败:', e);
+      console.error('保存处理结果失败:', e);
+      return false;
     }
   };
   
@@ -228,7 +240,7 @@ export function useAnalysis(datasetId, subjectId) {
       if (!appliedMethods.value.includes(type)) {
         appliedMethods.value.push(type);
       }
-      saveResults();
+      saveResults(type, result);
       
       return result;
     } catch (e) {
@@ -301,6 +313,7 @@ export function useAnalysis(datasetId, subjectId) {
     getPreprocessStatus,
     runAnalysis,
     fetchOriginalData,
-    fetchProcessedData
+    fetchProcessedData,
+    saveResults
   };
 }
