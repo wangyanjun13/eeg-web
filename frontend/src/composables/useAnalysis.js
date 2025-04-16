@@ -62,6 +62,26 @@ export function useAnalysis(datasetId, subjectId) {
       artifact_detection_method: 'threshold',
       amplitude_threshold: 100.0,
       reject_by_annotation: true
+    },
+    // 添加分段参数
+    segment: {
+      segment_mode: 'time',
+      start_time: 0.0,
+      end_time: 10.0,
+      event_name: null,
+      pre_event: 0.2,
+      post_event: 0.8,
+      apply_baseline: true,
+      baseline_start: -0.2,
+      baseline_end: 0.0
+    },
+    // 添加坏段参数
+    bad_segments: {
+      detect_bad_segments: true,
+      detection_method: 'auto',
+      amplitude_threshold: 100.0,
+      gradient_threshold: 10.0,
+      reject_method: 'zero'
     }
   });
   
@@ -147,6 +167,13 @@ export function useAnalysis(datasetId, subjectId) {
         if (template.artifacts) {
           preprocessParams.artifacts = { ...template.artifacts };
         }
+        // 添加新参数的支持
+        if (template.segment) {
+          preprocessParams.segment = { ...template.segment };
+        }
+        if (template.bad_segments) {
+          preprocessParams.bad_segments = { ...template.bad_segments };
+        }
         
         ElMessage.success(`成功加载预处理模板`);
       } else {
@@ -203,6 +230,31 @@ export function useAnalysis(datasetId, subjectId) {
         case 'filter':
           // 直接使用filter参数
           result = await analysisService.applyFilter(datasetId, subjectId, preprocessParams.filter);
+          break;
+          
+        case 'resample':
+          // 重采样
+          result = await analysisService.applyResample(datasetId, subjectId, preprocessParams.resample);
+          break;
+          
+        case 'segment':
+          // 数据分段
+          result = await analysisService.segmentData(datasetId, subjectId, preprocessParams.segment);
+          break;
+          
+        case 'badChannels':
+          // 坏通道检测
+          result = await analysisService.detectBadChannels(datasetId, subjectId, preprocessParams.bad_channels);
+          break;
+          
+        case 'badSegments':
+          // 坏段检测
+          result = await analysisService.detectBadSegments(datasetId, subjectId, preprocessParams.bad_segments);
+          break;
+          
+        case 'reference':
+          // 重参考
+          result = await analysisService.applyReference(datasetId, subjectId, preprocessParams.reference);
           break;
           
         case 'ica':

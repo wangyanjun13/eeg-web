@@ -12,6 +12,8 @@ import ReferenceProcessor from './ReferenceProcessor.vue';
 import ICAProcessor from './ICAProcessor.vue';
 import BadChannelProcessor from './BadChannelProcessor.vue';
 import ArtifactProcessor from './ArtifactProcessor.vue';
+import SegmentProcessor from './SegmentProcessor.vue';
+import BadSegmentProcessor from './BadSegmentProcessor.vue';
 
 // 路由和基础数据
 const route = useRoute();
@@ -23,9 +25,11 @@ const subjectId = route.params.subjectId;
 const processingSteps = ref([
   { key: 'filter', label: '滤波处理', icon: 'Filter', component: markRaw(FilterProcessor) },
   { key: 'resample', label: '重采样', icon: 'ScaleToOriginal', component: markRaw(ResamplingProcessor) },
+  { key: 'segment', label: '数据分段', icon: 'ScaleToOriginal', component: markRaw(SegmentProcessor) },
+  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: markRaw(BadChannelProcessor) },
+  { key: 'badSegments', label: '坏段剔除', icon: 'Delete', component: markRaw(BadSegmentProcessor) },
   { key: 'reference', label: '重参考', icon: 'Compass', component: markRaw(ReferenceProcessor) },
   { key: 'ica', label: 'ICA分析', icon: 'DataAnalysis', component: markRaw(ICAProcessor) },
-  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: markRaw(BadChannelProcessor) },
   { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: markRaw(ArtifactProcessor) }
 ]);
 

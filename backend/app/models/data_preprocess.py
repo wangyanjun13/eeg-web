@@ -39,13 +39,38 @@ class ArtifactParams(BaseModel):
     amplitude_threshold: Optional[float] = 100.0  # μV
     reject_by_annotation: bool = True
 
+class SegmentParams(BaseModel):
+    """分段参数"""
+    segment_mode: str = "time"  # "time", "event", "epoch"
+    # 时间窗口分段
+    start_time: float = 0.0
+    end_time: float = 10.0
+    # 事件相关分段
+    event_name: Optional[str] = None
+    pre_event: float = 0.2
+    post_event: float = 0.8
+    # 基线校正
+    apply_baseline: bool = True
+    baseline_start: float = -0.2
+    baseline_end: float = 0.0
+
+class BadSegmentParams(BaseModel):
+    """坏段检测参数"""
+    detect_bad_segments: bool = True
+    detection_method: str = "auto"  # "auto", "threshold", "manual"
+    amplitude_threshold: float = 100.0  # μV
+    gradient_threshold: float = 10.0  # μV/ms
+    reject_method: str = "zero"  # "zero", "interpolate", "remove"
+
 class PreprocessParams(BaseModel):
     """预处理参数集合"""
     filter: FilterParams = FilterParams()
     resample: ResampleParams = ResampleParams()
+    segment: SegmentParams = SegmentParams()
+    bad_channels: BadChannelParams = BadChannelParams()
+    bad_segments: BadSegmentParams = BadSegmentParams()
     reference: ReferenceParams = ReferenceParams()
     ica: ICAParams = ICAParams()
-    bad_channels: BadChannelParams = BadChannelParams()
     artifacts: ArtifactParams = ArtifactParams()
     
     # 预定义模板

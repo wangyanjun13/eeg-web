@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams
 from app.models.common import APIResponse
 from app.services.preprocess_service import PreprocessService
 from app.services.dataset_service import DatasetService
@@ -212,6 +212,42 @@ async def get_preprocess_status(dataset_id: str, subject_id: str):
                     "artifacts"
                 ]
             }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{dataset_id}/subjects/{subject_id}/segment", response_model=APIResponse)
+async def segment_data(dataset_id: str, subject_id: str, params: SegmentParams):
+    """数据分段
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+        params: 分段参数
+    """
+    try:
+        result = preprocess_service.segment_data(dataset_id, subject_id, params)
+        return APIResponse(
+            message="数据分段完成",
+            data=result
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{dataset_id}/subjects/{subject_id}/bad_segments", response_model=APIResponse)
+async def detect_bad_segments(dataset_id: str, subject_id: str, params: BadSegmentParams):
+    """检测并剔除坏段
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+        params: 坏段检测与剔除参数
+    """
+    try:
+        result = preprocess_service.detect_bad_segments(dataset_id, subject_id, params)
+        return APIResponse(
+            message="坏段处理完成",
+            data=result
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 

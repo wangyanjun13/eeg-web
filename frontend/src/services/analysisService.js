@@ -94,6 +94,171 @@ const analysisService = {
   },
 
   /**
+   * 应用重采样
+   * @param {string} datasetId - 数据集ID
+   * @param {string} subjectId - 受试者ID
+   * @param {Object} params - 重采样参数
+   * @returns {Promise<Object>} - 处理结果
+   */
+  async applyResample(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/resample`, 
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('重采样请求失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 应用参考设置
+   * @param {string} datasetId - 数据集ID
+   * @param {string} subjectId - 受试者ID
+   * @param {Object} params - 参考参数
+   * @returns {Promise<Object>} - 处理结果
+   */
+  async applyReference(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/reference`, 
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('参考设置请求失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 检测坏通道
+   * @param {string} datasetId - 数据集ID
+   * @param {string} subjectId - 受试者ID
+   * @param {Object} params - 坏通道检测参数
+   * @returns {Promise<Object>} - 处理结果
+   */
+  async detectBadChannels(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/bad_channels`, 
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('坏通道检测请求失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 数据分段
+   * @param {string} datasetId - 数据集ID
+   * @param {string} subjectId - 受试者ID
+   * @param {Object} params - 分段参数
+   * @returns {Promise<Object>} - 处理结果
+   */
+  async segmentData(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/segment`, 
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('数据分段请求失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 检测并剔除坏段
+   * @param {string} datasetId - 数据集ID
+   * @param {string} subjectId - 受试者ID
+   * @param {Object} params - 坏段处理参数
+   * @returns {Promise<Object>} - 处理结果
+   */
+  async detectBadSegments(datasetId, subjectId, params) {
+    try {
+      const response = await axios.post(
+        `/api/preprocess/${datasetId}/subjects/${subjectId}/bad_segments`, 
+        params
+      );
+      
+      // 从响应中提取缓存状态信息
+      const data = response.data?.data || {};
+      const fromCache = response.headers['x-from-cache'] === 'true';
+      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      
+      return {
+        ...response.data,
+        data: {
+          ...data,
+          from_cache: fromCache,
+          process_time: processTime
+        }
+      };
+    } catch (error) {
+      console.error('坏段处理请求失败:', error);
+      throw error;
+    }
+  },
+
+  /**
    * 运行ICA分析
    * @param {string} datasetId - 数据集ID
    * @param {string} subjectId - 受试者ID
