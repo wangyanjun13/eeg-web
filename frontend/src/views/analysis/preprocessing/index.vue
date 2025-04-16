@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, markRaw, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 import EEGViewer from '@/components/analysis/EEGViewer.vue';
 import AnalysisWorkflow from '@/components/analysis/AnalysisWorkflow.vue';
@@ -20,14 +20,14 @@ const datasetId = route.params.datasetId;
 const subjectId = route.params.subjectId;
 
 // 预处理步骤定义 - 集中管理
-const processingSteps = [
-  { key: 'filter', label: '滤波处理', icon: 'Filter', component: FilterProcessor },
-  { key: 'resample', label: '重采样', icon: 'ScaleToOriginal', component: ResamplingProcessor },
-  { key: 'reference', label: '重参考', icon: 'Compass', component: ReferenceProcessor },
-  { key: 'ica', label: 'ICA分析', icon: 'DataAnalysis', component: ICAProcessor },
-  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: BadChannelProcessor },
-  { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: ArtifactProcessor }
-];
+const processingSteps = ref([
+  { key: 'filter', label: '滤波处理', icon: 'Filter', component: markRaw(FilterProcessor) },
+  { key: 'resample', label: '重采样', icon: 'ScaleToOriginal', component: markRaw(ResamplingProcessor) },
+  { key: 'reference', label: '重参考', icon: 'Compass', component: markRaw(ReferenceProcessor) },
+  { key: 'ica', label: 'ICA分析', icon: 'DataAnalysis', component: markRaw(ICAProcessor) },
+  { key: 'badChannels', label: '坏通道检测', icon: 'CircleClose', component: markRaw(BadChannelProcessor) },
+  { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: markRaw(ArtifactProcessor) }
+]);
 
 // 模板选项
 const availableTemplates = [
@@ -58,10 +58,10 @@ const processingChannels = ref([]);
 const displayChannels = ref([]);
 
 // 计算属性
-const currentStepIndex = computed(() => processingSteps.findIndex(step => step.key === activeProcessor.value));
-const nextStep = computed(() => currentStepIndex.value < processingSteps.length - 1 ? processingSteps[currentStepIndex.value + 1] : null);
+const currentStepIndex = computed(() => processingSteps.value.findIndex(step => step.key === activeProcessor.value));
+const nextStepInfo = computed(() => currentStepIndex.value < processingSteps.value.length - 1 ? processingSteps.value[currentStepIndex.value + 1] : null);
 const activeProcessorComponent = computed(() => {
-  const step = processingSteps.find(step => step.key === activeProcessor.value);
+  const step = processingSteps.value.find(step => step.key === activeProcessor.value);
   return step ? step.component : null;
 });
 
@@ -74,6 +74,83 @@ const processingStatus = ref({
   badChannels: { fromCache: false, time: null },
   artifacts: { fromCache: false, time: null }
 });
+
+// 当前步骤
+const activeStepIndex = ref(0);
+const completedSteps = ref([]);
+
+// 当前步骤组件
+const currentComponent = computed(() => {
+  return processingSteps.value[activeStepIndex.value].component;
+});
+
+// 当前步骤的输入数据
+const currentStepInput = computed(() => {
+  // 第一步使用原始数据
+  if (activeStepIndex.value === 0) {
+    return originalData.value;
+  }
+  
+  // 其他步骤使用上一步的处理结果
+  if (processedData.value) {
+    return processedData.value;
+  }
+  
+  // 如果没有处理结果，使用原始数据
+  return originalData.value;
+});
+
+// 是否可以进入下一步
+const canGoNext = computed(() => {
+  return completedSteps.value.includes(processingSteps.value[activeStepIndex.value].key);
+});
+
+// 是否可以导航到前一步
+const canNavigatePrev = computed(() => {
+  return activeStepIndex.value > 0;
+});
+
+// 是否可以导航到下一步
+const canNavigateNext = computed(() => {
+  return activeStepIndex.value < processingSteps.value.length - 1 && canGoNext.value;
+});
+
+// 获取步骤状态
+const getStepStatus = (stepKey) => {
+  const index = processingSteps.value.findIndex(step => step.key === stepKey);
+  
+  if (index === activeStepIndex.value) {
+    return 'process';
+  }
+  
+  if (completedSteps.value.includes(stepKey)) {
+    return 'success';
+  }
+  
+  if (index < activeStepIndex.value) {
+    return 'finish';
+  }
+  
+  return 'wait';
+};
+
+// 判断是否可以切换到目标步骤
+const canSwitchToStep = (targetIndex) => {
+  // 如果是向前跳转，需要确认
+  if (targetIndex < activeStepIndex.value) {
+    return true;
+  }
+  
+  // 如果是向后跳转，检查所有前置步骤是否已完成
+  for (let i = 0; i < targetIndex; i++) {
+    const stepKey = processingSteps.value[i].key;
+    if (!completedSteps.value.includes(stepKey)) {
+      return false;
+    }
+  }
+  
+  return true;
+};
 
 // 初始化
 onMounted(async () => {
@@ -138,6 +215,12 @@ const handleProcessComplete = (data, processorKey) => {
   
   // 保存结果
   saveResults(activeProcessor.value, data);
+  
+  // 标记当前步骤为已完成
+  const currentStepKey = processingSteps.value[activeStepIndex.value].key;
+  if (!completedSteps.value.includes(currentStepKey)) {
+    completedSteps.value.push(currentStepKey);
+  }
 };
 
 // UI 事件处理
@@ -158,23 +241,135 @@ const handleTemplateChange = async () => {
 };
 
 const goToNextProcessingStep = () => {
-  if (!nextStep.value) {
+  if (!nextStepInfo.value) {
     ElMessage.info('已经是最后一个预处理步骤');
     return;
   }
   
-  activeProcessor.value = nextStep.value.key;
+  activeProcessor.value = nextStepInfo.value.key;
 };
 
 // 通道选择对话框
 const openChannelDisplaySelect = () => {
-  const { openChannelSelect } = EEGViewer.setup();
-  openChannelSelect(
-    displayChannels.value,
-    processingChannels.value,
-    updateDisplayChannels
-  );
+  const { setup } = EEGViewer;
+  if (setup) {
+    const { openChannelSelect } = setup();
+    openChannelSelect(
+      displayChannels.value,
+      processingChannels.value,
+      updateDisplayChannels
+    );
+  }
 };
+
+// 处理步骤点击
+const handleStepClick = async (stepIndex) => {
+  // 检查是否可以跳转到目标步骤
+  if (!canSwitchToStep(stepIndex)) {
+    ElMessage.warning('请先完成前面的步骤');
+    return;
+  }
+  
+  // 如果是返回前面的步骤，需要确认
+  if (stepIndex < activeStepIndex.value) {
+    try {
+      await ElMessageBox.confirm(
+        '返回前面的步骤可能会丢失后续处理结果，确定要返回吗？',
+        '提示',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      // 用户确认返回，清除后续步骤的完成状态
+      const currentStepKey = processingSteps.value[activeStepIndex.value].key;
+      const completedIndex = completedSteps.value.indexOf(currentStepKey);
+      if (completedIndex !== -1) {
+        completedSteps.value = completedSteps.value.slice(0, completedIndex + 1);
+      }
+    } catch (e) {
+      // 用户取消返回
+      return;
+    }
+  }
+  
+  // 设置当前步骤
+  activeStepIndex.value = stepIndex;
+};
+
+// 处理上一步
+const handlePrevStep = () => {
+  if (activeStepIndex.value > 0) {
+    handleStepClick(activeStepIndex.value - 1);
+  }
+};
+
+// 处理下一步
+const handleNextStep = () => {
+  if (activeStepIndex.value < processingSteps.value.length - 1) {
+    handleStepClick(activeStepIndex.value + 1);
+  }
+};
+
+// 处理完成
+const handleComplete = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定完成预处理流程吗？将进入分析阶段。',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    );
+    
+    // 导航到分析页面
+    router.push({
+      name: 'analysis',
+      params: {
+        datasetId: datasetId,
+        subjectId: subjectId
+      }
+    });
+  } catch (e) {
+    // 用户取消操作
+  }
+};
+
+// 监听页面离开
+const beforePageLeave = async (e) => {
+  // 如果有已完成的步骤，提示用户确认
+  if (completedSteps.value.length > 0) {
+    e.preventDefault();
+    try {
+      await ElMessageBox.confirm(
+        '离开页面将丢失当前处理结果，确定要离开吗？',
+        '提示',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      window.removeEventListener('beforeunload', beforePageLeave);
+      window.location.href = e.target.href;
+    } catch (error) {
+      // 用户取消离开
+    }
+  }
+};
+
+// 添加页面离开事件监听
+onMounted(() => {
+  window.addEventListener('beforeunload', beforePageLeave);
+});
+
+// 组件销毁前移除事件监听
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforePageLeave);
+});
 </script>
 
 <template>
@@ -201,19 +396,15 @@ const openChannelDisplaySelect = () => {
     </div>
     
     <!-- 步骤导航 -->
-    <div class="steps-navigator">
-      <el-steps :active="currentStepIndex" finish-status="success" simple>
+    <div class="steps-nav">
+      <el-steps :active="activeStepIndex" finish-status="success">
         <el-step 
-          v-for="step in processingSteps" 
+          v-for="(step, index) in processingSteps" 
           :key="step.key" 
           :title="step.label"
-          @click="activeProcessor = step.key"
-          class="process-step"
-        >
-          <template #icon>
-            <el-icon><component :is="step.icon" /></el-icon>
-          </template>
-        </el-step>
+          :status="getStepStatus(step.key)"
+          @click="handleStepClick(index)"
+        />
       </el-steps>
     </div>
     
@@ -241,34 +432,33 @@ const openChannelDisplaySelect = () => {
         
         <!-- 当前处理器组件 -->
         <component 
-          :is="activeProcessorComponent" 
+          :is="currentComponent" 
           :preprocessParams="preprocessParams"
           :datasetId="datasetId"
           :subjectId="subjectId"
-          :originalData="originalData"
-          :processingChannels="processingChannels"  
-          @process-complete="(data) => handleProcessComplete(data, activeProcessor)"
+          :originalData="currentStepInput"
+          :processingChannels="processingChannels"
+          @process-complete="(data) => handleProcessComplete(data, processingSteps[activeStepIndex].key)"
         />
         
         <!-- 步骤导航按钮 -->
         <div class="step-navigation">
           <el-button 
-            v-if="nextStep"
-            type="primary" 
-            @click="goToNextProcessingStep"
-            :disabled="!processedData"
-          >
-            下一步: {{ nextStep?.label }}
-            <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+            @click="handlePrevStep" 
+            :disabled="activeStepIndex <= 0 || isLoading">
+            上一步
           </el-button>
-          
           <el-button 
-            v-if="!nextStep && processedData"
+            type="primary" 
+            @click="handleNextStep" 
+            :disabled="activeStepIndex >= processingSteps.length - 1 || !canGoNext || isLoading">
+            下一步
+          </el-button>
+          <el-button 
             type="success" 
-            @click="$refs.workflowRef?.goToNextStep()"
-          >
-            完成预处理，进入时域分析
-            <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+            @click="handleComplete" 
+            :disabled="isLoading">
+            完成预处理
           </el-button>
         </div>
       </div>
@@ -369,11 +559,8 @@ const openChannelDisplaySelect = () => {
   margin-bottom: 15px;
 }
 
-.steps-navigator {
+.steps-nav {
   margin-bottom: 20px;
-  padding: 8px 0;
-  border-top: 1px solid #ebeef5;
-  border-bottom: 1px solid #ebeef5;
 }
 
 .process-step { cursor: pointer; }
