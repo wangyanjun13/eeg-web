@@ -1,8 +1,9 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted, nextTick, watch, onBeforeUnmount } from 'vue';
 import { ElMessage } from 'element-plus';
 import analysisService from '@/services/analysisService';
 import { useLoading } from '@/composables/useLoading';
+import * as echarts from 'echarts';
 
 const props = defineProps({
   preprocessParams: {
@@ -33,6 +34,176 @@ const { isLoading, withLoading } = useLoading({
   processing: false
 });
 
+// 滤波器响应可视化
+const showFilterResponse = ref(false);
+const filterResponseRef = ref(null);
+let filterResponseChart = null;
+
+// 计算滤波器响应
+const filterResponse = computed(() => {
+  if (!showFilterResponse.value) return null;
+  
+  // 生成频率范围 (0-100Hz)
+  const freqs = Array.from({length: 101}, (_, i) => i);
+  
+  // 计算滤波器响应
+  return freqs.map(f => {
+    let gain = 1.0;
+    
+    // 简单模拟高通滤波
+    if (props.preprocessParams.filter.highpass_filter) {
+      const hpFreq = props.preprocessParams.filter.highpass;
+      // 衰减曲线：低于高通频率的信号衰减
+      if (f < hpFreq) {
+        // 使用温和的衰减曲线
+        gain *= Math.pow(f / hpFreq, 2);
+      }
+    }
+    
+    // 简单模拟低通滤波
+    if (props.preprocessParams.filter.lowpass_filter) {
+      const lpFreq = props.preprocessParams.filter.lowpass;
+      // 衰减曲线：高于低通频率的信号衰减
+      if (f > lpFreq) {
+        // 使用温和的衰减曲线
+        gain *= Math.max(0, Math.pow(1 - (f - lpFreq) / (lpFreq), 2));
+      }
+    }
+    
+    // 陷波滤波
+    if (props.preprocessParams.filter.notch_filter) {
+      for (const lineFreq of props.preprocessParams.filter.line_freqs) {
+        // 简单模拟陷波（在线频率附近有凹陷）
+        const dist = Math.abs(f - lineFreq);
+        if (dist < 2) {
+          gain *= Math.min(dist / 2, 0.1); // 在线频率处衰减至少90%
+        }
+      }
+    }
+    
+    return [f, gain];
+  });
+});
+
+// 初始化滤波器响应图表
+const initFilterResponseChart = () => {
+  if (filterResponseChart) filterResponseChart.dispose();
+  if (!filterResponseRef.value) return;
+  
+  filterResponseChart = echarts.init(filterResponseRef.value);
+  updateFilterResponseChart();
+  
+  window.addEventListener('resize', () => filterResponseChart?.resize());
+};
+
+// 更新滤波器响应图表
+const updateFilterResponseChart = () => {
+  if (!filterResponseChart || !showFilterResponse.value) return;
+  
+  const option = {
+    title: {
+      text: '滤波器频率响应',
+      textStyle: {
+        fontSize: 14
+      },
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const data = params[0].data;
+        return `频率: ${data[0]} Hz<br/>增益: ${data[1].toFixed(3)}`;
+      }
+    },
+    grid: {
+      left: '10%',
+      right: '5%',
+      bottom: '15%',
+      top: '25%'
+    },
+    xAxis: {
+      type: 'value',
+      name: '频率 (Hz)',
+      nameLocation: 'middle',
+      nameGap: 25,
+      max: 100
+    },
+    yAxis: {
+      type: 'value',
+      name: '增益',
+      nameLocation: 'middle',
+      nameGap: 30,
+      nameRotate: 90,
+      min: 0,
+      max: 1.05
+    },
+    series: [
+      {
+        type: 'line',
+        data: filterResponse.value,
+        smooth: true,
+        showSymbol: false,
+        itemStyle: {
+          color: '#409EFF'
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              {
+                offset: 0,
+                color: 'rgba(64, 158, 255, 0.4)'
+              },
+              {
+                offset: 1,
+                color: 'rgba(64, 158, 255, 0.1)'
+              }
+            ]
+          }
+        }
+      }
+    ]
+  };
+  
+  filterResponseChart.setOption(option);
+};
+
+// 监听滤波器参数变化，更新响应图
+watch(() => props.preprocessParams.filter, () => {
+  if (showFilterResponse.value) {
+    nextTick(updateFilterResponseChart);
+  }
+}, { deep: true });
+
+// 监听是否显示滤波器响应
+watch(showFilterResponse, (newValue) => {
+  if (newValue) {
+    nextTick(() => {
+      initFilterResponseChart();
+    });
+  }
+});
+
+// 组件挂载完成
+onMounted(() => {
+  if (showFilterResponse.value) {
+    nextTick(initFilterResponseChart);
+  }
+});
+
+// 组件卸载前清理
+onBeforeUnmount(() => {
+  if (filterResponseChart) {
+    filterResponseChart.dispose();
+    filterResponseChart = null;
+  }
+  window.removeEventListener('resize', () => filterResponseChart?.resize());
+});
+
 // 应用滤波
 const applyFilter = async () => {
   if (!props.originalData) {
@@ -41,15 +212,15 @@ const applyFilter = async () => {
   }
 
   try {
-    // 参数验证
+    // 参数验证 - 调整为更合理的范围
     if (props.preprocessParams.filter.highpass_filter && 
-        (props.preprocessParams.filter.highpass <= 0 || props.preprocessParams.filter.highpass >= 100)) {
-      throw new Error('高通滤波截止频率必须在0-100Hz之间');
+        (props.preprocessParams.filter.highpass < 0.1 || props.preprocessParams.filter.highpass > 30)) {
+      throw new Error('高通滤波截止频率建议在0.1-30Hz之间');
     }
 
     if (props.preprocessParams.filter.lowpass_filter && 
-        (props.preprocessParams.filter.lowpass <= 0 || props.preprocessParams.filter.lowpass >= 500)) {
-      throw new Error('低通滤波截止频率必须在0-500Hz之间');
+        (props.preprocessParams.filter.lowpass < 30 || props.preprocessParams.filter.lowpass > 120)) {
+      throw new Error('低通滤波截止频率建议在30-120Hz之间');
     }
 
     console.log('应用滤波器，参数:', {
@@ -110,7 +281,7 @@ const applyFilter = async () => {
     <h3>滤波设置</h3>
     
     <el-form label-position="left" label-width="80px" class="compact-form">
-      <!-- 高通滤波 -->
+      <!-- 高通滤波 - 调整范围 -->
       <el-form-item label="高通滤波">
         <div class="filter-control">
           <el-switch v-model="preprocessParams.filter.highpass_filter" />
@@ -118,7 +289,7 @@ const applyFilter = async () => {
             v-if="preprocessParams.filter.highpass_filter"
             v-model="preprocessParams.filter.highpass" 
             :min="0.1" 
-            :max="100" 
+            :max="30" 
             :step="0.1"
             :disabled="!preprocessParams.filter.highpass_filter"
             size="small"
@@ -128,15 +299,15 @@ const applyFilter = async () => {
         </div>
       </el-form-item>
       
-      <!-- 低通滤波 -->
+      <!-- 低通滤波 - 调整范围 -->
       <el-form-item label="低通滤波">
         <div class="filter-control">
           <el-switch v-model="preprocessParams.filter.lowpass_filter" />
           <el-input-number 
             v-if="preprocessParams.filter.lowpass_filter"
             v-model="preprocessParams.filter.lowpass" 
-            :min="1" 
-            :max="500" 
+            :min="30" 
+            :max="120" 
             :step="1"
             :disabled="!preprocessParams.filter.lowpass_filter"
             size="small"
@@ -159,7 +330,20 @@ const applyFilter = async () => {
         </div>
       </el-form-item>
       
-      <!-- 操作按钮 - 现在位于表单底部，水平居中 -->
+      <!-- 滤波器响应可视化 -->
+      <el-form-item label="显示响应">
+        <el-switch v-model="showFilterResponse" />
+      </el-form-item>
+      
+      <div v-if="showFilterResponse" class="filter-response">
+        <div ref="filterResponseRef" class="filter-chart"></div>
+        <div class="filter-explanation">
+          <p>滤波器频率响应表示各频率成分的保留程度</p>
+          <p>增益=1表示信号完全保留，0表示完全抑制</p>
+        </div>
+      </div>
+      
+      <!-- 操作按钮 -->
       <el-form-item class="action-item">
         <el-button 
           type="primary" 
@@ -209,6 +393,31 @@ h3 {
 
 .notch-frequencies {
   margin-left: 5px;
+}
+
+.filter-response {
+  margin-top: 5px;
+  margin-bottom: 15px;
+  border: 1px solid #EBEEF5;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.filter-chart {
+  height: 180px;
+  width: 100%;
+}
+
+.filter-explanation {
+  margin-top: 8px;
+  padding-top: 5px;
+  border-top: 1px dashed #EBEEF5;
+  font-size: 12px;
+  color: #909399;
+}
+
+.filter-explanation p {
+  margin: 5px 0;
 }
 
 .action-item {

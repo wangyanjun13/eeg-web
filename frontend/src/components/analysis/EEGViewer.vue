@@ -4,6 +4,7 @@ import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { useDebounce, useDebounceFn } from '@/composables/useDebounce'
 import { useChannelPositions } from '@/composables/useChannelPositions' // 导入通道位置组合式函数
+
 // 作用：EEG数据可视化组件
 // 参数：
 //   data: 包含EEG数据的对象
@@ -11,6 +12,7 @@ import { useChannelPositions } from '@/composables/useChannelPositions' // 导�
 //   selectedChannels: 选中的通道，默认[]
 //   availableChannels: 可用于选择的通道列表
 //   disableChannelSelect: 是否禁用通道选择
+//   viewMode: 查看模式，'time'或'frequency'
 
 const props = defineProps({
   data: {
@@ -32,10 +34,14 @@ const props = defineProps({
   disableChannelSelect: {  // 新增：是否禁用通道选择
     type: Boolean,
     default: false
+  },
+  viewMode: {  // 新增：视图模式
+    type: String,
+    default: 'time' // 'time' 或 'frequency'
   }
 })
 
-const emit = defineEmits(['update:timeRange', 'update:selectedChannels'])
+const emit = defineEmits(['update:timeRange', 'update:selectedChannels', 'update:viewMode'])
 
 // 核心状态
 const chartRef = ref(null)
@@ -45,6 +51,7 @@ const themeStyle = ref('light')
 const channelCompareVisible = ref(false)
 const legendSelected = ref({}) // 存储图例选中状态
 const isYAxisInverted = ref(false) // 纵坐标是否反转
+const localViewMode = ref(props.viewMode) // 本地视图模式状态
 
 // 使用通道位置组合式函数
 const { 
@@ -91,75 +98,167 @@ const handleSeriesMouseover = (params) => {
       tooltip: {
         showContent: true,
         formatter: (p) => {
-          const time = p.data[0]?.toFixed(3) || p.data[0]
-          const value = p.data[1]?.toFixed(3) || p.data[1]
-          return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>电压: ${value} μV`
+          if (localViewMode.value === 'time') {
+            const time = p.data[0]?.toFixed(3) || p.data[0]
+            const value = p.data[1]?.toFixed(3) || p.data[1]
+            return `<span style="color: ${p.color}">${p.seriesName}</span><br/>时间: ${time} s<br/>电压: ${value} μV`
+          } else {
+            const freq = p.data[0]?.toFixed(2) || p.data[0]
+            const power = p.data[1]?.toFixed(3) || p.data[1]
+            return `<span style="color: ${p.color}">${p.seriesName}</span><br/>频率: ${freq} Hz<br/>功率: ${power}`
+          }
         }
       }
     })
   }
 }
 
+// 计算频谱数据
+const calculateSpectrumData = (channelData, times) => {
+  if (!channelData || !times || channelData.length === 0) return [];
+  
+  try {
+    // 采样率计算
+    const samplingRate = 1 / (times[1] - times[0]);
+    
+    // 使用FFT计算频谱
+    // 仅计算开始和结束时间范围内的数据
+    const startIndex = Math.max(0, Math.floor(props.timeRange[0] / (times[1] - times[0])));
+    const endIndex = Math.min(channelData.length - 1, Math.ceil(props.timeRange[1] / (times[1] - times[0])));
+    
+    // 确保数据长度是2的幂，便于FFT计算
+    const dataLength = 2 ** Math.floor(Math.log2(endIndex - startIndex));
+    const slicedData = channelData.slice(startIndex, startIndex + dataLength);
+    
+    // 使用Web API的FFT或替代方法
+    const fft = performFFT(slicedData, samplingRate);
+    
+    // 只返回0到50Hz的频率范围
+    const maxFreqIndex = Math.min(Math.floor(50 * dataLength / samplingRate), fft.length / 2);
+    return fft.slice(0, maxFreqIndex).map((value, index) => 
+      [index * samplingRate / dataLength, value]
+    );
+  } catch (error) {
+    console.error('计算频谱出错:', error);
+    return [];
+  }
+}
+
+// 简化的FFT实现
+const performFFT = (timeData, samplingRate) => {
+  // 简单的功率谱估计，实际应用中可使用更复杂的FFT算法或库
+  const n = timeData.length;
+  const result = Array(n / 2).fill(0);
+  
+  // 加窗并移除直流分量
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += timeData[i];
+  mean /= n;
+  
+  // 使用汉宁窗计算加窗数据
+  const windowed = timeData.map((x, i) => 
+    (x - mean) * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1)))
+  );
+  
+  // 简单频谱计算 - 实际应用中应使用更高效的FFT算法
+  for (let k = 0; k < n / 2; k++) {
+    let real = 0, imag = 0;
+    for (let t = 0; t < n; t++) {
+      const angle = -2 * Math.PI * k * t / n;
+      real += windowed[t] * Math.cos(angle);
+      imag += windowed[t] * Math.sin(angle);
+    }
+    
+    // 功率谱计算
+    result[k] = Math.sqrt(real * real + imag * imag) / n;
+  }
+  
+  return result;
+}
+
 // 生成图表配置
-const getChartOption = (series, legendStatus) => ({
-  legend: {
-    type: 'scroll',
-    orient: 'horizontal',
-    top: 0,
-    left: 'center',
-    width: '90%',
-    data: props.selectedChannels,
-    textStyle: { fontSize: 12 },
-    pageButtonItemGap: 5,
-    pageButtonPosition: 'end',
-    pageIconSize: 12,
-    tooltip: { show: true },
-    selectedMode: true,
-    selected: legendStatus
-  },
-  tooltip: {
-    show: true,
-    trigger: 'item',
-    axisPointer: {
-      type: 'cross',
-      snap: true,
-      label: { show: true }
+const getChartOption = (series, legendStatus) => {
+  const baseOption = {
+    legend: {
+      type: 'scroll',
+      orient: 'horizontal',
+      top: 0,
+      left: 'center',
+      width: '90%',
+      data: props.selectedChannels,
+      textStyle: { fontSize: 12 },
+      pageButtonItemGap: 5,
+      pageButtonPosition: 'end',
+      pageIconSize: 12,
+      tooltip: { show: true },
+      selectedMode: true,
+      selected: legendStatus
     },
-    showContent: false,
-    position: (pos) => [pos[0] + 10, pos[1] - 10]
-  },
-  grid: {
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
-    top: '50px',
-    containLabel: true
-  },
-  xAxis: {
-    type: 'value',
-    name: '时间 (s)',
-    min: props.timeRange[0],
-    max: props.timeRange[1]
-  },
-  yAxis: {
-    type: 'value',
-    name: '电压 (μV)',
-    nameLocation: 'middle',
-    nameGap: 40,
-    nameRotate: 90,
-    inverse: isYAxisInverted.value
-  },
-  dataZoom: [{
+    tooltip: {
+      show: true,
+      trigger: 'item',
+      axisPointer: {
+        type: 'cross',
+        snap: true,
+        label: { show: true }
+      },
+      showContent: false,
+      position: (pos) => [pos[0] + 10, pos[1] - 10]
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '50px',
+      containLabel: true
+    },
+    series
+  };
+  
+  if (localViewMode.value === 'time') {
+    baseOption.xAxis = {
+      type: 'value',
+      name: '时间 (s)',
+      min: props.timeRange[0],
+      max: props.timeRange[1]
+    };
+    baseOption.yAxis = {
+      type: 'value',
+      name: '电压 (μV)',
+      nameLocation: 'middle',
+      nameGap: 40,
+      nameRotate: 90,
+      inverse: isYAxisInverted.value
+    };
+  } else {
+    baseOption.xAxis = {
+      type: 'value',
+      name: '频率 (Hz)',
+      min: 0,
+      max: 50
+    };
+    baseOption.yAxis = {
+      type: 'value',
+      name: '功率',
+      nameLocation: 'middle',
+      nameGap: 40,
+      nameRotate: 90,
+      scale: true
+    };
+  }
+  
+  baseOption.dataZoom = [{
     type: 'inside',
     start: 0,
     end: 100
-  }],
-  series
-})
+  }];
+  
+  return baseOption;
+}
 
 // 使用防抖函数优化图表更新
 const debouncedUpdateChart = useDebounceFn(() => {
-  if (!chart || !props.data) return
+  if (!chart || !props.data) return;
   
   // 过滤确保只使用可用通道
   const validChannels = props.selectedChannels.filter(channel => 
@@ -168,26 +267,50 @@ const debouncedUpdateChart = useDebounceFn(() => {
       : props.data.channels?.includes(channel)
   );
   
-  const series = validChannels.map((channel, index) => ({
-    name: channel,
-    type: 'line',
-    showSymbol: true,
-    symbolSize: 5,
-    symbol: 'circle',
-    sampling: 'lttb',
-    data: props.data.data[channel]?.map((value, idx) => [
-      props.data.times[idx],
-      value
-    ]).filter(point => 
-      point && point[0] >= props.timeRange[0] && point[0] <= props.timeRange[1]
-    ) || [],
-    animationDuration: 0,
-    emphasis: { focus: 'none' },
-    itemStyle: {
-      color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
-      opacity: 0
-    }
-  }));
+  let series;
+  
+  if (localViewMode.value === 'time') {
+    // 时域表示
+    series = validChannels.map((channel, index) => ({
+      name: channel,
+      type: 'line',
+      showSymbol: false,
+      sampling: 'lttb',
+      data: props.data.data[channel]?.map((value, idx) => [
+        props.data.times[idx],
+        value
+      ]).filter(point => 
+        point && point[0] >= props.timeRange[0] && point[0] <= props.timeRange[1]
+      ) || [],
+      animationDuration: 0,
+      emphasis: { focus: 'none' },
+      itemStyle: {
+        color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
+        opacity: 0.8
+      }
+    }));
+  } else {
+    // 频域表示
+    series = validChannels.map((channel, index) => {
+      const spectrumData = calculateSpectrumData(
+        props.data.data[channel], 
+        props.data.times
+      );
+      return {
+        name: channel,
+        type: 'line',
+        showSymbol: false,
+        sampling: 'lttb',
+        data: spectrumData,
+        animationDuration: 0,
+        emphasis: { focus: 'none' },
+        itemStyle: {
+          color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
+          opacity: 0.8
+        }
+      };
+    });
+  }
 
   // 准备图例状态
   const legendStatus = validChannels.reduce((status, channel) => {
@@ -215,6 +338,19 @@ watch(() => props.selectedChannels, () => {
 watch(() => props.availableChannels, () => {
   nextTick(updateChart);
 }, { deep: true });
+
+// 监听 viewMode 变化
+watch(() => props.viewMode, (newValue) => {
+  localViewMode.value = newValue;
+  nextTick(updateChart);
+});
+
+// 切换视图模式
+const toggleViewMode = () => {
+  localViewMode.value = localViewMode.value === 'time' ? 'frequency' : 'time';
+  emit('update:viewMode', localViewMode.value);
+  nextTick(updateChart);
+}
 
 // 切换纵坐标方向
 const toggleYAxisDirection = () => {
@@ -325,6 +461,13 @@ onBeforeUnmount(() => {
         >
           选择显示通道
         </el-button>
+        <el-button 
+          size="small" 
+          @click="toggleViewMode"
+          :type="localViewMode === 'time' ? '' : 'primary'"
+        >
+          {{ localViewMode === 'time' ? '频域视图' : '时域视图' }}
+        </el-button>
         <el-button size="small" @click="toggleTheme">切换主题</el-button>
         <el-button size="small" @click="toggleFullScreen">
           {{ isFullScreen ? '退出全屏' : '全屏' }}
@@ -333,13 +476,17 @@ onBeforeUnmount(() => {
     </div>
     
     <div class="coordinate-controls">
-      <el-tooltip content="反转纵坐标轴（负值向上显示）" placement="top">
+      <el-tooltip 
+        :content="localViewMode === 'time' ? '反转纵坐标轴（负值向上显示）' : '调整频谱比例'"
+        placement="top"
+      >
         <el-button 
           type="primary" 
           :plain="!isYAxisInverted" 
           size="small" 
           @click="toggleYAxisDirection"
           class="invert-button"
+          v-if="localViewMode === 'time'"
         >
           {{ isYAxisInverted ? '恢复' : '坐标反转' }}
         </el-button>

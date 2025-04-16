@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, markRaw, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Loading } from '@element-plus/icons-vue';
+import { Loading, InfoFilled } from '@element-plus/icons-vue';
 import EEGViewer from '@/components/analysis/EEGViewer.vue';
 import AnalysisWorkflow from '@/components/analysis/AnalysisWorkflow.vue';
 import { useAnalysis } from '@/composables/useAnalysis';
@@ -33,13 +33,6 @@ const processingSteps = ref([
   { key: 'artifacts', label: '伪迹处理', icon: 'Delete', component: markRaw(ArtifactProcessor) }
 ]);
 
-// 模板选项
-const availableTemplates = [
-  { value: 'default', label: '默认预处理' },
-  { value: 'minimal', label: '最小预处理' },
-  { value: 'ds002218', label: 'DS002218 数据集预处理' }
-];
-
 // 使用分析组合函数
 const {
   isLoading,
@@ -47,15 +40,14 @@ const {
   processedData,
   preprocessParams,
   fetchOriginalData,
-  loadPreprocessTemplate,
   saveResults
 } = useAnalysis(datasetId, subjectId);
 
 // 用户界面状态
 const compareMode = ref(false);
 const timeRange = ref([0, 10]);
-const activeTemplate = ref('default');
 const activeProcessor = ref('filter');
+const viewMode = ref('time');
 
 // 通道控制
 const processingChannels = ref([]);
@@ -163,7 +155,6 @@ onMounted(async () => {
     processingChannels.value = [...originalData.value.channels];
     displayChannels.value = originalData.value.channels.slice(0, 10);
   }
-  await loadPreprocessTemplate(activeTemplate.value);
 });
 
 // 通道管理
@@ -184,6 +175,11 @@ const updateDisplayChannels = (channels) => {
   
   // 确保显示通道是处理通道的子集
   displayChannels.value = channels.filter(ch => processingChannels.value.includes(ch));
+};
+
+// 更新视图模式
+const updateViewMode = (mode) => {
+  viewMode.value = mode;
 };
 
 // 数据处理事件处理
@@ -234,24 +230,6 @@ const toggleCompareMode = () => {
 };
 
 const updateTimeRange = (range) => timeRange.value = range;
-
-const handleTemplateChange = async () => {
-  try {
-    await loadPreprocessTemplate(activeTemplate.value);
-    ElMessage.success(`已加载${activeTemplate.value}模板`);
-  } catch (error) {
-    ElMessage.error('加载模板失败');
-  }
-};
-
-const goToNextProcessingStep = () => {
-  if (!nextStepInfo.value) {
-    ElMessage.info('已经是最后一个预处理步骤');
-    return;
-  }
-  
-  activeProcessor.value = nextStepInfo.value.key;
-};
 
 // 通道选择对话框
 const openChannelDisplaySelect = () => {
@@ -378,27 +356,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="preprocessing-container">
-    <!-- 顶部控制栏 -->
-    <div class="top-controls">
-      <div class="template-selector">
-        <span>预处理模板:</span>
-        <el-select v-model="activeTemplate" @change="handleTemplateChange" size="small">
-          <el-option
-            v-for="item in availableTemplates"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          />
-        </el-select>
-      </div>
-      
-      <div class="view-toggle">
-        <el-button type="primary" size="small" @click="toggleCompareMode">
-          {{ compareMode ? '关闭对比模式' : '开启对比模式' }}
-        </el-button>
-      </div>
-    </div>
-    
     <!-- 步骤导航 -->
     <div class="steps-nav">
       <el-steps :active="activeStepIndex" finish-status="success">
@@ -415,20 +372,24 @@ onBeforeUnmount(() => {
     <div class="main-content">
       <!-- 参数设置区域 -->
       <div class="parameter-area">
-        <!-- 处理通道选择 - 仅第一步显示 -->
+        <!-- 处理通道选择 - 更紧凑的设计 -->
         <div v-if="activeProcessor === 'filter'" class="processing-channels-section">
-          <h4>处理通道设置</h4>
-          <el-alert type="info" :closable="false" show-icon>
-            <p>请选择要进行预处理的通道。这将影响所有后续处理步骤。</p>
-            <p>注：设置后不可更改</p>
-          </el-alert>
-          <div class="channel-action">
+          <div class="channel-header">
+            <h4>处理通道</h4>
+            <el-tooltip placement="right" content="选择要进行预处理的通道，将影响所有后续步骤，设置后不可更改">
+              <el-icon><InfoFilled /></el-icon>
+            </el-tooltip>
+          </div>
+          
+          <div class="channel-compact-action">
             <el-button 
               size="small" 
+              type="primary"
+              plain
               @click="updateProcessingChannels(originalData?.channels)"
               :disabled="currentStepIndex > 0"
             >
-              选择处理通道
+              选择通道
             </el-button>
             <span class="channel-count">已选: {{ processingChannels.length }}/{{ originalData?.channels?.length || 0 }}</span>
           </div>
@@ -467,21 +428,25 @@ onBeforeUnmount(() => {
         </div>
       </div>
       
-      <!-- 数据显示区域 -->
+      <!-- 数据显示区域 - 总是显示对比视图 -->
       <div class="data-display">
-        <!-- 视图控制区域 -->
+        <!-- 视图控制区域 - 移除对比模式切换 -->
         <div class="view-controls">
-          <el-button size="small" @click="toggleCompareMode">
-            {{ compareMode ? '单一视图' : '对比视图' }}
-          </el-button>
           <el-button size="small" @click="openChannelDisplaySelect">
             显示通道选择
           </el-button>
+          
+          <!-- 视图模式切换按钮 -->
+          <el-radio-group v-model="viewMode" size="small" class="view-mode-selector">
+            <el-radio-button label="time">时域</el-radio-button>
+            <el-radio-button label="frequency">频域</el-radio-button>
+          </el-radio-group>
+          
           <span class="display-info">显示: {{ displayChannels.length }}/{{ processingChannels.length }}</span>
         </div>
         
-        <!-- 对比视图 -->
-        <div v-if="compareMode && originalData && processedData" class="compare-view">
+        <!-- 始终显示对比视图 -->
+        <div v-if="originalData" class="compare-view">
           <div class="original-data">
             <h3>原始数据</h3>
             <EEGViewer 
@@ -492,12 +457,15 @@ onBeforeUnmount(() => {
               @update:timeRange="updateTimeRange"
               @update:selectedChannels="updateDisplayChannels"
               :disableChannelSelect="true"
+              :viewMode="viewMode"
+              @update:viewMode="updateViewMode"
             />
           </div>
           
           <div class="processed-data">
-            <h3>处理后数据</h3>
+            <h3>{{ processedData ? '处理后数据' : '等待处理' }}</h3>
             <EEGViewer 
+              v-if="processedData"
               :data="processedData" 
               v-model:timeRange="timeRange"
               :selectedChannels="displayChannels"
@@ -505,20 +473,13 @@ onBeforeUnmount(() => {
               @update:timeRange="updateTimeRange"
               @update:selectedChannels="updateDisplayChannels"
               :disableChannelSelect="true"
+              :viewMode="viewMode"
+              @update:viewMode="updateViewMode"
             />
+            <div v-else class="placeholder-message">
+              <el-empty description="请应用处理后查看结果" />
+            </div>
           </div>
-        </div>
-        
-        <!-- 单一数据展示 -->
-        <div v-else-if="originalData" class="single-view">
-          <EEGViewer 
-            :data="originalData" 
-            v-model:timeRange="timeRange"
-            :selectedChannels="displayChannels"
-            :availableChannels="originalData.channels || []"
-            @update:timeRange="updateTimeRange"
-            @update:selectedChannels="updateDisplayChannels"
-          />
         </div>
         
         <div v-else class="loading-container">
@@ -537,7 +498,7 @@ onBeforeUnmount(() => {
     />
   </div>
   
-  <!-- 在数据展示区域显示处理状态 -->
+  <!-- 处理状态显示 -->
   <div v-if="processedData && processingStatus[activeProcessor]" class="processing-status">
     <el-tag size="small" :type="processingStatus[activeProcessor].fromCache ? 'success' : 'primary'">
       {{ processingStatus[activeProcessor].fromCache ? '已从缓存加载' : '实时处理' }}
@@ -555,12 +516,6 @@ onBeforeUnmount(() => {
   height: 100vh;
   padding: 20px;
   padding-bottom: 60px;
-}
-
-.top-controls {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 15px;
 }
 
 .steps-nav {
@@ -609,6 +564,7 @@ onBeforeUnmount(() => {
 .compare-view h3 {
   margin: 0 0 10px 0;
   font-size: 16px;
+  color: #606266;
 }
 
 .loading-container {
@@ -628,19 +584,31 @@ onBeforeUnmount(() => {
 .loading-text { color: #606266; font-size: 14px; }
 
 .processing-channels-section {
-  margin-bottom: 15px;
-  padding-bottom: 15px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px dashed #dcdfe6;
 }
 
-.channel-action {
+.channel-header {
   display: flex;
   align-items: center;
-  margin-top: 10px;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
-.channel-count, .display-info {
-  margin-left: 10px;
+.channel-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.channel-compact-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-count {
   font-size: 12px;
   color: #606266;
 }
@@ -649,6 +617,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   margin-bottom: 15px;
+  gap: 10px;
+}
+
+.view-mode-selector {
+  margin-left: auto;
+  margin-right: 10px;
 }
 
 /* 添加状态显示样式 */
@@ -662,5 +636,15 @@ onBeforeUnmount(() => {
 .processing-time {
   font-size: 12px;
   color: #606266;
+}
+
+/* 添加等待处理的占位样式 */
+.placeholder-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 500px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
 }
 </style> 
