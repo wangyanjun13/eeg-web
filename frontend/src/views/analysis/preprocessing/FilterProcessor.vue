@@ -223,6 +223,11 @@ const applyFilter = async () => {
       throw new Error('低通滤波截止频率建议在30-120Hz之间');
     }
 
+    // 验证处理通道不为空
+    if (!props.processingChannels || props.processingChannels.length === 0) {
+      throw new Error('请至少选择一个通道进行处理');
+    }
+
     console.log('应用滤波器，参数:', {
       highpass_filter: props.preprocessParams.filter.highpass_filter,
       highpass: props.preprocessParams.filter.highpass,
@@ -230,7 +235,7 @@ const applyFilter = async () => {
       lowpass: props.preprocessParams.filter.lowpass,
       notch_filter: props.preprocessParams.filter.notch_filter,
       line_freqs: props.preprocessParams.filter.line_freqs,
-      channels: props.processingChannels.length ? props.processingChannels : undefined
+      channels: props.processingChannels
     });
 
     // 显示提示正在处理
@@ -356,6 +361,18 @@ const applyFilter = async () => {
         </el-button>
       </el-form-item>
     </el-form>
+    
+    <!-- 在表单底部添加一个提示 -->
+    <div class="channels-hint" v-if="processingChannels.length > 0">
+      <el-alert
+        title="通道选择提示"
+        type="info"
+        description="请先在右侧图表选择要显示和处理的通道，将应用于后续流程，不可更改。"
+        :closable="false"
+        show-icon
+        class="custom-alert"
+      />
+    </div>
   </div>
 </template>
 
@@ -428,5 +445,17 @@ h3 {
 
 :deep(.el-checkbox__label) {
   font-size: 12px;
+}
+
+/* 添加通道提示样式 */
+.channels-hint {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/* 自定义提示图标大小 */
+.custom-alert :deep(.el-alert__icon) {
+  font-size: 14px; /* 减小图标大小 */
+  margin-right: 6px; /* 稍微调整间距 */
 }
 </style> 

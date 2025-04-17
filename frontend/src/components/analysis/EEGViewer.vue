@@ -385,7 +385,7 @@ const showChannelCompare = (event) => {
 // 打开通道选择对话框
 const toggleChannelSelect = () => {
   if (props.disableChannelSelect) {
-    ElMessage.info('当前模式下不允许更改显示通道，请在顶部控制栏中选择');
+    ElMessage.info('当前预处理步骤不允许更改通道选择');
     return;
   }
   

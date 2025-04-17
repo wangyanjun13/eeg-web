@@ -164,7 +164,7 @@ function goToNextStep() {
           <!-- 下一步按钮放到图表右下角 -->
           <div class="next-step-button">
             <el-button type="success" size="default" plain @click="goToNextStep">
-              <el-icon><ArrowRight /></el-icon> 下一步：预处理
+              <el-icon><ArrowRight /></el-icon> 开始预处理流程
             </el-button>
           </div>
         </div>

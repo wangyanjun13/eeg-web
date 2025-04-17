@@ -358,6 +358,12 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforePageLeave);
 });
+
+// 添加一个计算属性来决定是否禁用通道选择
+const disableChannelSelection = computed(() => {
+  // 在首个步骤(滤波)中不禁用通道选择
+  return activeStepIndex.value !== 0;
+});
 </script>
 
 <template>
@@ -429,9 +435,6 @@ onBeforeUnmount(() => {
       <div class="data-display">
         <!-- 视图控制区域 - 移除对比模式切换 -->
         <div class="view-controls">
-          <el-button size="small" @click="openChannelDisplaySelect">
-            显示通道选择
-          </el-button>
           
           <!-- 视图模式切换按钮 -->
           <el-radio-group v-model="viewMode" size="small" class="view-mode-selector">
@@ -453,7 +456,7 @@ onBeforeUnmount(() => {
               :availableChannels="processingChannels"
               @update:timeRange="updateTimeRange"
               @update:selectedChannels="updateDisplayChannels"
-              :disableChannelSelect="true"
+              :disableChannelSelect="disableChannelSelection"
               :viewMode="viewMode"
               @update:viewMode="updateViewMode"
             />
@@ -469,7 +472,7 @@ onBeforeUnmount(() => {
               :availableChannels="processingChannels"
               @update:timeRange="updateTimeRange"
               @update:selectedChannels="updateDisplayChannels"
-              :disableChannelSelect="true"
+              :disableChannelSelect="disableChannelSelection"
               :viewMode="viewMode"
               @update:viewMode="updateViewMode"
             />
