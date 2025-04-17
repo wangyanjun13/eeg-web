@@ -152,8 +152,10 @@ const canSwitchToStep = (targetIndex) => {
 onMounted(async () => {
   await fetchOriginalData();
   if (originalData.value?.channels) {
+    // 自动设置所有通道为处理通道，无需用户手动选择
     processingChannels.value = [...originalData.value.channels];
-    displayChannels.value = originalData.value.channels.slice(0, 10);
+    // 初始显示前10个通道或所有通道（如果少于10个）
+    displayChannels.value = originalData.value.channels.slice(0, Math.min(10, originalData.value.channels.length));
   }
 });
 
@@ -187,7 +189,6 @@ const handleProcessComplete = (data, processorKey) => {
   if (!data) return;
   
   processedData.value = data;
-  compareMode.value = true;
   
   // 记录处理状态
   if (data.from_cache) {
@@ -202,15 +203,20 @@ const handleProcessComplete = (data, processorKey) => {
     };
   }
   
-  // 更新通道列表
+  // 更新通道列表，但尽量保持显示通道不变
   if (data.channels?.length) {
+    // 更新处理通道
     processingChannels.value = data.channels;
     
-    // 更新显示通道，保持有效性
+    // 尝试保持显示通道不变，仅在必要时更新
     const validChannels = displayChannels.value.filter(ch => data.channels.includes(ch));
-    displayChannels.value = validChannels.length > 0 
-      ? validChannels 
-      : data.channels.slice(0, Math.min(10, data.channels.length));
+    if (validChannels.length === 0) {
+      // 如果所有当前显示通道都无效，则选择新的显示通道
+      displayChannels.value = data.channels.slice(0, Math.min(10, data.channels.length));
+    } else {
+      // 保留有效的通道
+      displayChannels.value = validChannels;
+    }
   }
   
   // 保存结果
@@ -376,22 +382,13 @@ onBeforeUnmount(() => {
         <div v-if="activeProcessor === 'filter'" class="processing-channels-section">
           <div class="channel-header">
             <h4>处理通道</h4>
-            <el-tooltip placement="right" content="选择要进行预处理的通道，将影响所有后续步骤，设置后不可更改">
+            <el-tooltip placement="right" content="预处理将应用于所有可用通道">
               <el-icon><InfoFilled /></el-icon>
             </el-tooltip>
           </div>
           
           <div class="channel-compact-action">
-            <el-button 
-              size="small" 
-              type="primary"
-              plain
-              @click="updateProcessingChannels(originalData?.channels)"
-              :disabled="currentStepIndex > 0"
-            >
-              选择通道
-            </el-button>
-            <span class="channel-count">已选: {{ processingChannels.length }}/{{ originalData?.channels?.length || 0 }}</span>
+            <span class="channel-count">通道数量: {{ processingChannels.length }}</span>
           </div>
         </div>
         

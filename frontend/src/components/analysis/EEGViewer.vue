@@ -4,6 +4,7 @@ import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { useDebounce, useDebounceFn } from '@/composables/useDebounce'
 import { useChannelPositions } from '@/composables/useChannelPositions' // 导入通道位置组合式函数
+import { InfoFilled } from '@element-plus/icons-vue'
 
 // 作用：EEG数据可视化组件
 // 参数：
@@ -105,7 +106,7 @@ const handleSeriesMouseover = (params) => {
           } else {
             const freq = p.data[0]?.toFixed(2) || p.data[0]
             const power = p.data[1]?.toFixed(3) || p.data[1]
-            return `<span style="color: ${p.color}">${p.seriesName}</span><br/>频率: ${freq} Hz<br/>功率: ${power}`
+            return `<span style="color: ${p.color}">${p.seriesName}</span><br/>频率: ${freq} Hz<br/>功率谱密度: ${power} μV²/Hz`
           }
         }
       }
@@ -160,7 +161,9 @@ const performFFT = (timeData, samplingRate) => {
     (x - mean) * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1)))
   );
   
-  // 简单频谱计算 - 实际应用中应使用更高效的FFT算法
+  // 功率谱计算 - 标准脑电分析中通常使用功率谱密度(PSD)表示
+  // 单位应为μV²/Hz，需要除以频率分辨率(samplingRate/n)来获得密度
+  const freqResolution = samplingRate / n;
   for (let k = 0; k < n / 2; k++) {
     let real = 0, imag = 0;
     for (let t = 0; t < n; t++) {
@@ -169,8 +172,9 @@ const performFFT = (timeData, samplingRate) => {
       imag += windowed[t] * Math.sin(angle);
     }
     
-    // 功率谱计算
-    result[k] = Math.sqrt(real * real + imag * imag) / n;
+    // 功率谱密度计算 - 平方后除以频率分辨率
+    const magnitude = (real * real + imag * imag) / (n * n);
+    result[k] = magnitude / freqResolution; // 单位为μV²/Hz
   }
   
   return result;
@@ -239,9 +243,9 @@ const getChartOption = (series, legendStatus) => {
     };
     baseOption.yAxis = {
       type: 'value',
-      name: '功率',
+      name: '功率谱密度 (μV²/Hz)',
       nameLocation: 'middle',
-      nameGap: 40,
+      nameGap: 50,
       nameRotate: 90,
       scale: true
     };
@@ -404,14 +408,47 @@ const toggleChannelSelect = () => {
 const channelCompareContent = computed(() => {
   if (!props.data || !props.selectedChannels.length) return []
   
-  const currentTime = getCurrentTime()
-  const timeIndex = props.data.times.findIndex(t => t >= currentTime)
+  const currentPoint = getCurrentTime() // 获取当前坐标点
   
-  return props.selectedChannels.map((channel, index) => ({
-    channel,
-    value: props.data.data[channel]?.[timeIndex]?.toFixed(3) || 0,
-    color: chart?.getOption()?.series?.[index]?.itemStyle?.color || '#000'
-  }))
+  if (localViewMode.value === 'time') {
+    // 时域模式 - 显示时间-电压信息
+    const timeIndex = props.data.times.findIndex(t => t >= currentPoint)
+    
+    return props.selectedChannels.map((channel, index) => ({
+      channel,
+      value: props.data.data[channel]?.[timeIndex]?.toFixed(3) || 0,
+      unit: 'μV',
+      color: chart?.getOption()?.series?.[index]?.itemStyle?.color || '#000'
+    }))
+  } else {
+    // 频域模式 - 显示频率-功率信息
+    return props.selectedChannels.map((channel, index) => {
+      // 计算频谱数据
+      const spectrumData = calculateSpectrumData(
+        props.data.data[channel],
+        props.data.times
+      );
+      
+      // 找到最接近当前频率点的数据
+      let closestPoint = null;
+      let minDistance = Infinity;
+      
+      for (const point of spectrumData) {
+        const distance = Math.abs(point[0] - currentPoint);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestPoint = point;
+        }
+      }
+      
+      return {
+        channel,
+        value: closestPoint ? closestPoint[1].toFixed(3) : 0,
+        unit: 'μV²/Hz',  // 专业的功率谱密度单位
+        color: chart?.getOption()?.series?.[index]?.itemStyle?.color || '#000'
+      };
+    });
+  }
 })
 
 // 全屏切换 - 简化版本，仅切换状态
@@ -475,6 +512,14 @@ onBeforeUnmount(() => {
       </el-button-group>
     </div>
     
+    <!-- 添加简约提示 -->
+    <div class="chart-tip">
+      <el-tooltip content="双击图表可查看具体时间点的数据" placement="top">
+        <el-icon><InfoFilled /></el-icon>
+        <span>双击查看数据</span>
+      </el-tooltip>
+    </div>
+    
     <div class="coordinate-controls">
       <el-tooltip 
         :content="localViewMode === 'time' ? '反转纵坐标轴（负值向上显示）' : '调整频谱比例'"
@@ -503,11 +548,21 @@ onBeforeUnmount(() => {
     <component :is="renderChannelSelectDialog()" />
     
     <!-- 通道数据比较对话框 -->
-    <el-dialog v-model="channelCompareVisible" title="通道数据对比" width="30%">
+    <el-dialog v-model="channelCompareVisible" 
+      :title="localViewMode === 'time' ? '通道数据对比' : '频谱功率密度对比'" 
+      width="30%">
       <div class="channel-compare">
-        <div class="time-info">当前时间: {{ getCurrentTime().toFixed(3) }} s</div>
+        <div class="time-info">
+          <template v-if="localViewMode === 'time'">
+            当前时间: {{ getCurrentTime().toFixed(3) }} s
+          </template>
+          <template v-else>
+            当前频率: {{ getCurrentTime().toFixed(2) }} Hz
+          </template>
+        </div>
         <div v-for="item in channelCompareContent" :key="item.channel" class="channel-item">
-          <span :style="{ color: item.color }">{{ item.channel }}</span>: {{ item.value }} μV
+          <span :style="{ color: item.color }">{{ item.channel }}</span>: 
+          {{ item.value }} {{ item.unit }}
         </div>
       </div>
     </el-dialog>
