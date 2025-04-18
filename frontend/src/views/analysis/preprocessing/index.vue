@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, markRaw, watch, onBeforeUnmount } from 'vue';
+import { ref, onMounted, computed, markRaw, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading, InfoFilled } from '@element-plus/icons-vue';
@@ -44,7 +44,6 @@ const {
 } = useAnalysis(datasetId, subjectId);
 
 // 用户界面状态
-const compareMode = ref(false);
 const timeRange = ref([0, 10]);
 const activeProcessor = ref('filter');
 const viewMode = ref('time');
@@ -53,316 +52,260 @@ const viewMode = ref('time');
 const processingChannels = ref([]);
 const displayChannels = ref([]);
 
-// 计算属性
-const currentStepIndex = computed(() => processingSteps.value.findIndex(step => step.key === activeProcessor.value));
-const nextStepInfo = computed(() => currentStepIndex.value < processingSteps.value.length - 1 ? processingSteps.value[currentStepIndex.value + 1] : null);
-const activeProcessorComponent = computed(() => {
-  const step = processingSteps.value.find(step => step.key === activeProcessor.value);
-  return step ? step.component : null;
-});
-
-// 添加状态
-const processingStatus = ref({
-  filter: { fromCache: false, time: null },
-  resample: { fromCache: false, time: null },
-  reference: { fromCache: false, time: null },
-  ica: { fromCache: false, time: null },
-  badChannels: { fromCache: false, time: null },
-  artifacts: { fromCache: false, time: null }
-});
-
-// 当前步骤
+// 状态管理
+const processingStatus = ref({});
 const activeStepIndex = ref(0);
 const completedSteps = ref([]);
 
-// 当前步骤组件
-const currentComponent = computed(() => {
-  return processingSteps.value[activeStepIndex.value].component;
-});
+// 计算属性
+const currentComponent = computed(() => processingSteps.value[activeStepIndex.value].component);
 
-// 当前步骤的输入数据
 const currentStepInput = computed(() => {
-  // 第一步使用原始数据
-  if (activeStepIndex.value === 0) {
-    return originalData.value;
-  }
-  
-  // 其他步骤使用上一步的处理结果
-  if (processedData.value) {
-    return processedData.value;
-  }
-  
-  // 如果没有处理结果，使用原始数据
-  return originalData.value;
+  return activeStepIndex.value === 0 ? originalData.value : 
+         processedData.value ? processedData.value : originalData.value;
 });
 
-// 是否可以进入下一步
-const canGoNext = computed(() => {
-  return completedSteps.value.includes(processingSteps.value[activeStepIndex.value].key);
-});
-
-// 是否可以导航到前一步
-const canNavigatePrev = computed(() => {
-  return activeStepIndex.value > 0;
-});
-
-// 是否可以导航到下一步
-const canNavigateNext = computed(() => {
-  return activeStepIndex.value < processingSteps.value.length - 1 && canGoNext.value;
-});
+const disableChannelSelection = computed(() => activeStepIndex.value !== 0);
 
 // 获取步骤状态
 const getStepStatus = (stepKey) => {
   const index = processingSteps.value.findIndex(step => step.key === stepKey);
   
-  if (index === activeStepIndex.value) {
-    return 'process';
-  }
-  
-  if (completedSteps.value.includes(stepKey)) {
-    return 'success';
-  }
-  
-  if (index < activeStepIndex.value) {
-    return 'finish';
-  }
+  if (index === activeStepIndex.value) return 'process';
+  if (completedSteps.value.includes(stepKey)) return 'success';
+  if (index < activeStepIndex.value) return 'finish';
   
   return 'wait';
 };
 
 // 判断是否可以切换到目标步骤
 const canSwitchToStep = (targetIndex) => {
-  // 如果是向前跳转，需要确认
-  if (targetIndex < activeStepIndex.value) {
-    return true;
-  }
+  if (targetIndex < activeStepIndex.value) return true;
   
-  // 如果是向后跳转，检查所有前置步骤是否已完成
+  // 检查所有前置步骤是否已完成
   for (let i = 0; i < targetIndex; i++) {
-    const stepKey = processingSteps.value[i].key;
-    if (!completedSteps.value.includes(stepKey)) {
+    if (!completedSteps.value.includes(processingSteps.value[i].key)) {
       return false;
     }
   }
-  
   return true;
 };
 
-// 初始化
-onMounted(async () => {
-  await fetchOriginalData();
-  if (originalData.value?.channels) {
-    // 自动设置所有通道为处理通道，无需用户手动选择
-    processingChannels.value = [...originalData.value.channels];
-    // 初始显示前10个通道或所有通道（如果少于10个）
-    displayChannels.value = originalData.value.channels.slice(0, Math.min(10, originalData.value.channels.length));
-  }
-});
-
-// 通道管理
-const updateProcessingChannels = (channels) => {
-  if (!channels || !channels.length) return;
-  
-  processingChannels.value = [...channels];
-  
-  // 更新显示通道，确保有效性
-  const validDisplayChannels = displayChannels.value.filter(ch => channels.includes(ch));
-  displayChannels.value = validDisplayChannels.length > 0 
-    ? validDisplayChannels 
-    : channels.slice(0, Math.min(10, channels.length));
-};
-
-const updateDisplayChannels = (channels) => {
-  if (!channels || !channels.length) return;
-  
-  // 确保显示通道是处理通道的子集
-  displayChannels.value = channels.filter(ch => processingChannels.value.includes(ch));
-};
-
-// 更新视图模式
-const updateViewMode = (mode) => {
-  viewMode.value = mode;
-};
-
-// 数据处理事件处理
-const handleProcessComplete = (data, processorKey) => {
-  if (!data) return;
-  
-  processedData.value = data;
-  
-  // 记录处理状态
-  if (data.from_cache) {
-    processingStatus.value[processorKey] = { 
-      fromCache: true, 
-      time: data.process_time || null 
-    };
-  } else {
-    processingStatus.value[processorKey] = { 
-      fromCache: false, 
-      time: data.process_time || null 
-    };
-  }
-  
-  // 更新通道列表，但尽量保持显示通道不变
-  if (data.channels?.length) {
-    // 更新处理通道
-    processingChannels.value = data.channels;
+// 数据刷新工具函数
+const refreshData = (data, callback) => {
+  setTimeout(() => {
+    originalData.value = null;
+    processedData.value = null;
     
-    // 尝试保持显示通道不变，仅在必要时更新
-    const validChannels = displayChannels.value.filter(ch => data.channels.includes(ch));
-    if (validChannels.length === 0) {
-      // 如果所有当前显示通道都无效，则选择新的显示通道
-      displayChannels.value = data.channels.slice(0, Math.min(10, data.channels.length));
-    } else {
-      // 保留有效的通道
-      displayChannels.value = validChannels;
-    }
-  }
+    setTimeout(() => {
+      if (data) originalData.value = JSON.parse(JSON.stringify(data));
+      if (callback) callback();
+    }, 0);
+  }, 0);
+};
+
+// 保存结果并处理错误
+const saveResultSafely = (key, data) => {
+  // 保存到全局存储
+  if (!window.savedResults) window.savedResults = {};
+  window.savedResults[key] = JSON.parse(JSON.stringify(data));
   
-  // 保存结果
-  saveResults(activeProcessor.value, data);
-  
-  // 标记当前步骤为已完成
-  const currentStepKey = processingSteps.value[activeStepIndex.value].key;
-  if (!completedSteps.value.includes(currentStepKey)) {
-    completedSteps.value.push(currentStepKey);
+  // 尝试保存到状态管理
+  try {
+    saveResults(key, data);
+  } catch (e) {
+    console.warn('保存到localStorage失败，但流程继续', e);
   }
 };
 
-// UI 事件处理
-const toggleCompareMode = () => {
-  compareMode.value = !compareMode.value;
-  if (!compareMode.value) processedData.value = null;
-};
-
-const updateTimeRange = (range) => timeRange.value = range;
-
-// 通道选择对话框
-const openChannelDisplaySelect = () => {
-  const { setup } = EEGViewer;
-  if (setup) {
-    const { openChannelSelect } = setup();
-    openChannelSelect(
-      displayChannels.value,
-      processingChannels.value,
-      updateDisplayChannels
-    );
-  }
-};
-
-// 处理步骤点击
-const handleStepClick = async (stepIndex) => {
-  // 检查是否可以跳转到目标步骤
-  if (!canSwitchToStep(stepIndex)) {
-    ElMessage.warning('请先完成前面的步骤');
-    return;
-  }
-  
-  // 如果是返回前面的步骤，需要确认
-  if (stepIndex < activeStepIndex.value) {
-    try {
-      await ElMessageBox.confirm(
-        '返回前面的步骤可能会丢失后续处理结果，确定要返回吗？',
-        '提示',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
-      );
-      // 用户确认返回，清除后续步骤的完成状态
-      const currentStepKey = processingSteps.value[activeStepIndex.value].key;
-      const completedIndex = completedSteps.value.indexOf(currentStepKey);
-      if (completedIndex !== -1) {
-        completedSteps.value = completedSteps.value.slice(0, completedIndex + 1);
-      }
-    } catch (e) {
-      // 用户取消返回
-      return;
-    }
-  }
-  
-  // 设置当前步骤
-  activeStepIndex.value = stepIndex;
-};
-
-// 处理上一步
+// 处理点击上一步
 const handlePrevStep = () => {
   if (activeStepIndex.value > 0) {
     handleStepClick(activeStepIndex.value - 1);
   }
 };
 
-// 处理下一步
-const handleNextStep = () => {
-  if (activeStepIndex.value < processingSteps.value.length - 1) {
-    handleStepClick(activeStepIndex.value + 1);
+// 处理步骤点击
+const handleStepClick = async (stepIndex) => {
+  if (!canSwitchToStep(stepIndex)) {
+    ElMessage.warning('请先完成前面的步骤');
+    return;
+  }
+  
+  // 处理返回前面的步骤
+  if (stepIndex < activeStepIndex.value) {
+    try {
+      await ElMessageBox.confirm(
+        '返回前面的步骤可能会丢失后续处理结果，确定要返回吗？',
+        '提示',
+        { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+      );
+      
+      // 清除后续步骤的完成状态
+      completedSteps.value = completedSteps.value.filter(step => {
+        const idx = processingSteps.value.findIndex(s => s.key === step);
+        return idx < stepIndex;
+      });
+      
+      // 确定要恢复的数据
+      let dataToRestore;
+      if (stepIndex === 0) {
+        await fetchOriginalData();
+        dataToRestore = originalData.value;
+      } else {
+        const prevStepKey = processingSteps.value[stepIndex - 1].key;
+        dataToRestore = window.savedResults?.[prevStepKey] || 
+                       (await fetchOriginalData(), originalData.value);
+      }
+      
+      // 更新步骤索引
+      activeStepIndex.value = stepIndex;
+      activeProcessor.value = processingSteps.value[stepIndex].key;
+      
+      // 强制刷新数据
+      refreshData(dataToRestore);
+      
+    } catch (e) {
+      // 用户取消
+      return;
+    }
+  } else if (stepIndex > activeStepIndex.value) {
+    // 调用 handleNextStep 处理向前跳转
+    handleNextStep();
   }
 };
 
-// 处理完成
+// 处理下一步按钮点击
+const handleNextStep = async () => {
+  if (activeStepIndex.value < processingSteps.value.length - 1) {
+    const currentStepKey = processingSteps.value[activeStepIndex.value].key;
+    let currentResult;
+    
+    // 如果当前步骤未完成，提示确认
+    if (!completedSteps.value.includes(currentStepKey)) {
+      try {
+        await ElMessageBox.confirm(
+          `您尚未应用${processingSteps.value[activeStepIndex.value].label}处理，是否直接进入${processingSteps.value[activeStepIndex.value + 1].label}步骤？`,
+          '提示',
+          { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+        );
+        
+        // 标记为已完成并保存当前输入作为结果
+        completedSteps.value.push(currentStepKey);
+        currentResult = processedData.value || originalData.value;
+        saveResultSafely(currentStepKey, currentResult);
+      } catch (e) {
+        return; // 用户取消
+      }
+    } else {
+      // 已完成，使用处理结果
+      currentResult = processedData.value || originalData.value;
+      saveResultSafely(currentStepKey, currentResult);
+    }
+    
+    // 准备数据并跳转
+    const dataToPass = currentResult || window.savedResults[currentStepKey];
+    const nextStepIndex = activeStepIndex.value + 1;
+    
+    // 更新步骤索引
+    activeStepIndex.value = nextStepIndex;
+    activeProcessor.value = processingSteps.value[nextStepIndex].key;
+    
+    // 强制刷新数据
+    refreshData(dataToPass);
+  }
+};
+
+// 处理完成回调
+const handleProcessComplete = (data, processorKey) => {
+  if (!data) return;
+  
+  // 更新处理后数据
+  const processedResult = JSON.parse(JSON.stringify(data));
+  processedData.value = processedResult;
+  
+  // 记录处理状态
+  processingStatus.value[processorKey] = { 
+    fromCache: data.from_cache || false, 
+    time: data.process_time || null 
+  };
+  
+  // 更新通道列表
+  if (data.channels?.length) {
+    processingChannels.value = [...data.channels];
+    
+    // 保持显示通道一致性
+    const validChannels = displayChannels.value.filter(ch => data.channels.includes(ch));
+    displayChannels.value = validChannels.length ? 
+                           [...validChannels] : 
+                           [...data.channels.slice(0, Math.min(10, data.channels.length))];
+  }
+  
+  // 保存结果
+  saveResultSafely(processorKey, processedResult);
+  
+  // 标记为已完成
+  if (!completedSteps.value.includes(processorKey)) {
+    completedSteps.value.push(processorKey);
+  }
+};
+
+// 处理通道更新
+const updateDisplayChannels = (channels) => {
+  if (channels?.length) {
+    displayChannels.value = channels.filter(ch => processingChannels.value.includes(ch));
+  }
+};
+
+// 更新时间范围和视图模式
+const updateTimeRange = (range) => timeRange.value = range;
+const updateViewMode = (mode) => viewMode.value = mode;
+
+// 完成预处理
 const handleComplete = async () => {
   try {
     await ElMessageBox.confirm(
       '确定完成预处理流程吗？将进入分析阶段。',
       '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'info'
-      }
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
     );
     
-    // 导航到分析页面
     router.push({
       name: 'analysis',
-      params: {
-        datasetId: datasetId,
-        subjectId: subjectId
-      }
+      params: { datasetId, subjectId }
     });
-  } catch (e) {
-    // 用户取消操作
-  }
+  } catch (e) {} // 用户取消
 };
 
-// 监听页面离开
+// 页面离开确认
 const beforePageLeave = async (e) => {
-  // 如果有已完成的步骤，提示用户确认
   if (completedSteps.value.length > 0) {
     e.preventDefault();
     try {
       await ElMessageBox.confirm(
         '离开页面将丢失当前处理结果，确定要离开吗？',
         '提示',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
+        { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
       );
       window.removeEventListener('beforeunload', beforePageLeave);
       window.location.href = e.target.href;
-    } catch (error) {
-      // 用户取消离开
-    }
+    } catch (error) {} // 用户取消
   }
 };
 
-// 添加页面离开事件监听
-onMounted(() => {
+// 组件生命周期
+onMounted(async () => {
+  await fetchOriginalData();
+  if (originalData.value?.channels) {
+    processingChannels.value = [...originalData.value.channels];
+    displayChannels.value = originalData.value.channels.slice(0, Math.min(10, originalData.value.channels.length));
+  }
+  window.savedResults = {};
   window.addEventListener('beforeunload', beforePageLeave);
 });
 
-// 组件销毁前移除事件监听
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforePageLeave);
-});
-
-// 添加一个计算属性来决定是否禁用通道选择
-const disableChannelSelection = computed(() => {
-  // 在首个步骤(滤波)中不禁用通道选择
-  return activeStepIndex.value !== 0;
 });
 </script>
 
@@ -384,7 +327,7 @@ const disableChannelSelection = computed(() => {
     <div class="main-content">
       <!-- 参数设置区域 -->
       <div class="parameter-area">
-        <!-- 处理通道选择 - 更紧凑的设计 -->
+        <!-- 处理通道信息 -->
         <div v-if="activeProcessor === 'filter'" class="processing-channels-section">
           <div class="channel-header">
             <h4>处理通道</h4>
@@ -392,7 +335,6 @@ const disableChannelSelection = computed(() => {
               <el-icon><InfoFilled /></el-icon>
             </el-tooltip>
           </div>
-          
           <div class="channel-compact-action">
             <span class="channel-count">通道数量: {{ processingChannels.length }}</span>
           </div>
@@ -405,7 +347,7 @@ const disableChannelSelection = computed(() => {
           :datasetId="datasetId"
           :subjectId="subjectId"
           :originalData="currentStepInput"
-          :processingChannels="processingChannels"
+          :processingChannels="processingChannels"  
           @process-complete="(data) => handleProcessComplete(data, processingSteps[activeStepIndex].key)"
         />
         
@@ -419,7 +361,7 @@ const disableChannelSelection = computed(() => {
           <el-button 
             type="primary" 
             @click="handleNextStep" 
-            :disabled="activeStepIndex >= processingSteps.length - 1 || !canGoNext || isLoading">
+            :disabled="activeStepIndex >= processingSteps.length - 1 || isLoading">
             下一步
           </el-button>
           <el-button 
@@ -431,24 +373,21 @@ const disableChannelSelection = computed(() => {
         </div>
       </div>
       
-      <!-- 数据显示区域 - 总是显示对比视图 -->
+      <!-- 数据显示区域 -->
       <div class="data-display">
-        <!-- 视图控制区域 - 移除对比模式切换 -->
+        <!-- 视图控制区域 -->
         <div class="view-controls">
-          
-          <!-- 视图模式切换按钮 -->
           <el-radio-group v-model="viewMode" size="small" class="view-mode-selector">
             <el-radio-button label="time">时域</el-radio-button>
             <el-radio-button label="frequency">频域</el-radio-button>
           </el-radio-group>
-          
           <span class="display-info">显示: {{ displayChannels.length }}/{{ processingChannels.length }}</span>
         </div>
         
-        <!-- 始终显示对比视图 -->
+        <!-- 数据对比视图 -->
         <div v-if="originalData" class="compare-view">
           <div class="original-data">
-            <h3>原始数据</h3>
+            <h3>处理前数据</h3>
             <EEGViewer 
               :data="originalData" 
               v-model:timeRange="timeRange"
@@ -482,6 +421,7 @@ const disableChannelSelection = computed(() => {
           </div>
         </div>
         
+        <!-- 加载中状态 -->
         <div v-else class="loading-container">
           <el-icon class="is-loading"><Loading /></el-icon>
           <span class="loading-text">数据加载中...</span>
@@ -518,10 +458,7 @@ const disableChannelSelection = computed(() => {
   padding-bottom: 60px;
 }
 
-.steps-nav {
-  margin-bottom: 20px;
-}
-
+.steps-nav { margin-bottom: 20px; }
 .process-step { cursor: pointer; }
 
 .main-content {
@@ -608,10 +545,7 @@ const disableChannelSelection = computed(() => {
   gap: 8px;
 }
 
-.channel-count {
-  font-size: 12px;
-  color: #606266;
-}
+.channel-count { font-size: 12px; color: #606266; }
 
 .view-controls {
   display: flex;
@@ -625,7 +559,6 @@ const disableChannelSelection = computed(() => {
   margin-right: 10px;
 }
 
-/* 添加状态显示样式 */
 .processing-status {
   display: flex;
   align-items: center;
@@ -633,12 +566,8 @@ const disableChannelSelection = computed(() => {
   gap: 10px;
 }
 
-.processing-time {
-  font-size: 12px;
-  color: #606266;
-}
+.processing-time { font-size: 12px; color: #606266; }
 
-/* 添加等待处理的占位样式 */
 .placeholder-message {
   display: flex;
   justify-content: center;

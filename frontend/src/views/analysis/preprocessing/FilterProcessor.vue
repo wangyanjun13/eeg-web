@@ -245,6 +245,9 @@ const applyFilter = async () => {
       duration: 0
     });
 
+    // 添加一个随机参数或时间戳，确保每次请求都是唯一的，避免缓存
+    const uniqueParam = { timestamp: new Date().getTime() };
+
     const response = await withLoading(
       analysisService.applyFilter(props.datasetId, props.subjectId, {
         highpass_filter: props.preprocessParams.filter.highpass_filter,
@@ -253,7 +256,8 @@ const applyFilter = async () => {
         lowpass: props.preprocessParams.filter.lowpass,
         notch_filter: props.preprocessParams.filter.notch_filter,
         line_freqs: props.preprocessParams.filter.line_freqs,
-        channels: props.processingChannels
+        channels: props.processingChannels,
+        force_refresh: uniqueParam // 添加一个强制刷新参数
       }),
       'processing'
     );
