@@ -332,8 +332,8 @@ const applyFilter = async () => {
           <el-switch v-model="preprocessParams.filter.notch_filter" />
           <div v-if="preprocessParams.filter.notch_filter" class="notch-frequencies">
             <el-checkbox-group v-model="preprocessParams.filter.line_freqs">
-              <el-checkbox :label="50" size="small">50Hz</el-checkbox>
-              <el-checkbox :label="60" size="small">60Hz</el-checkbox>
+              <el-checkbox :value="50" size="small">50Hz</el-checkbox>
+              <el-checkbox :value="60" size="small">60Hz</el-checkbox>
             </el-checkbox-group>
           </div>
         </div>

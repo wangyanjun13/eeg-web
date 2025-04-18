@@ -106,15 +106,55 @@ const refreshData = (data, callback) => {
 
 // 保存结果并处理错误
 const saveResultSafely = (key, data) => {
-  // 保存到全局存储
-  if (!window.savedResults) window.savedResults = {};
-  window.savedResults[key] = JSON.parse(JSON.stringify(data));
+  if (!data) {
+    console.warn('尝试保存空数据');
+    return false;
+  }
   
-  // 尝试保存到状态管理
   try {
-    saveResults(key, data);
+    // 创建深度复制以避免引用问题
+    const dataCopy = JSON.parse(JSON.stringify(data));
+    
+    // 保存到全局存储对象
+    if (typeof window !== 'undefined') {
+      if (!window.savedResults) window.savedResults = {};
+      window.savedResults[key] = dataCopy;
+    }
+    
+    // 尝试保存到状态管理
+    try {
+      saveResults(key, dataCopy);
+    } catch (e) {
+      console.warn('保存到localStorage失败，但流程继续', e);
+    }
+    
+    return true;
   } catch (e) {
-    console.warn('保存到localStorage失败，但流程继续', e);
+    console.warn('数据序列化失败，可能含有循环引用', e);
+    
+    // 如果序列化失败，尝试使用更安全的方式
+    try {
+      // 简单地复制主要字段而非整个对象
+      const safeData = {
+        channels: data.channels ? [...data.channels] : [],
+        times: data.times ? data.times.slice(0, 10) : [], // 只保存少量时间点作为示例
+        sampling_rate: data.sampling_rate,
+        duration: data.duration,
+        from_cache: data.from_cache,
+        process_time: data.process_time
+      };
+      
+      if (typeof window !== 'undefined') {
+        if (!window.savedResults) window.savedResults = {};
+        window.savedResults[key] = safeData;
+      }
+      
+      saveResults(key, safeData);
+      return true;
+    } catch (fallbackError) {
+      console.error('备用保存方法也失败', fallbackError);
+      return false;
+    }
   }
 };
 
@@ -193,6 +233,8 @@ const handleNextStep = async () => {
         // 标记为已完成并保存当前输入作为结果
         completedSteps.value.push(currentStepKey);
         currentResult = processedData.value || originalData.value;
+        
+        // 保存结果
         saveResultSafely(currentStepKey, currentResult);
       } catch (e) {
         return; // 用户取消
@@ -203,15 +245,36 @@ const handleNextStep = async () => {
       saveResultSafely(currentStepKey, currentResult);
     }
     
-    // 准备数据并跳转
-    const dataToPass = currentResult || window.savedResults[currentStepKey];
-    const nextStepIndex = activeStepIndex.value + 1;
+    // 获取要传递的数据（首选内存中的数据）
+    // 增加安全检查
+    let dataToPass;
+    
+    if (typeof window !== 'undefined' && window.savedResults && window.savedResults[currentStepKey]) {
+      dataToPass = window.savedResults[currentStepKey];
+    } else if (currentResult) {
+      dataToPass = currentResult;
+      console.warn(`未找到${currentStepKey}的保存结果，使用当前结果`);
+    } else {
+      console.error('无法获取有效的处理结果数据');
+      ElMessage.error('处理数据不完整，无法继续');
+      return;
+    }
+    
+    // 防止空数据
+    if (!dataToPass || !dataToPass.channels || dataToPass.channels.length === 0) {
+      console.error('数据无效，缺少通道信息');
+      ElMessage.error('处理数据不完整，无法继续');
+      return;
+    }
     
     // 更新步骤索引
+    const nextStepIndex = activeStepIndex.value + 1;
     activeStepIndex.value = nextStepIndex;
     activeProcessor.value = processingSteps.value[nextStepIndex].key;
     
-    // 强制刷新数据
+    console.log('切换到下一步，数据有效');
+    
+    // 强制刷新数据，确保Vue检测到变化
     refreshData(dataToPass);
   }
 };
@@ -300,8 +363,16 @@ onMounted(async () => {
     processingChannels.value = [...originalData.value.channels];
     displayChannels.value = originalData.value.channels.slice(0, Math.min(10, originalData.value.channels.length));
   }
-  window.savedResults = {};
-  window.addEventListener('beforeunload', beforePageLeave);
+  
+  // 初始化全局存储
+  if (typeof window !== 'undefined') {
+    window.savedResults = window.savedResults || {};
+  }
+  
+  // 添加事件监听
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', beforePageLeave);
+  }
 });
 
 onBeforeUnmount(() => {

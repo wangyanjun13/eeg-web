@@ -86,6 +86,82 @@ export function useAnalysis(datasetId, subjectId) {
   });
   
   /**
+   * 检查localStorage是否可用
+   */
+  const checkStorageSupport = () => {
+    try {
+      const testKey = `test_${Date.now()}`;
+      localStorage.setItem(testKey, 'test');
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      console.warn('当前环境不支持 localStorage，将使用内存存储', e);
+      return false;
+    }
+  };
+  
+  // 修改 saveResults 函数，增加一个标志位
+  const storageSupported = checkStorageSupport();
+  const saveResults = (step, data) => {
+    try {
+      // 更新结果状态
+      results.value[step] = data;
+      
+      // 记录应用的方法
+      if (!appliedMethods.value.includes(step)) {
+        appliedMethods.value.push(step);
+      }
+      
+      // 确保全局对象存在
+      if (typeof window !== 'undefined') {
+        if (!window.savedResults) window.savedResults = {};
+        // 使用深拷贝避免引用问题
+        window.savedResults[step] = JSON.parse(JSON.stringify(data));
+      }
+      
+      // 只有在支持的环境中尝试使用 localStorage
+      if (storageSupported) {
+        try {
+          const savedKey = `analysis_${datasetId}_${subjectId}`;
+          
+          // 进一步优化存储数据结构
+          const minimalData = {
+            results: Object.fromEntries(
+              Object.entries(results.value).map(([k, v]) => [
+                k, 
+                { 
+                  timestamp: new Date().getTime(),
+                  applied: true,
+                  // 仅存储必要的元数据
+                  summary: v ? {
+                    channels: Array.isArray(v.channels) ? v.channels.length : 0,
+                    sampling_rate: typeof v.sampling_rate === 'number' ? v.sampling_rate : null,
+                    from_cache: !!v.from_cache
+                  } : null
+                }
+              ])
+            ),
+            appliedMethods: appliedMethods.value,
+            lastUpdated: new Date().toISOString()
+          };
+          
+          // 尝试压缩数据
+          const serializedData = JSON.stringify(minimalData);
+          localStorage.setItem(savedKey, serializedData);
+        } catch (storageError) {
+          console.warn('无法保存到localStorage，但处理将继续', storageError);
+        }
+      }
+      
+      return true;
+    } catch (e) {
+      console.error('保存处理结果失败:', e);
+      // 仍然返回true，避免中断主流程
+      return true;
+    }
+  };
+  
+  /**
    * 从localStorage加载保存的分析结果
    */
   const loadSavedResults = () => {
@@ -103,34 +179,6 @@ export function useAnalysis(datasetId, subjectId) {
       }
     } catch (e) {
       console.error('加载保存的分析结果失败:', e);
-    }
-  };
-  
-  /**
-   * 保存分析结果到localStorage
-   */
-  const saveResults = (step, data) => {
-    try {
-      // 更新结果状态
-      results.value[step] = data;
-      
-      // 记录应用的方法
-      if (!appliedMethods.value.includes(step)) {
-        appliedMethods.value.push(step);
-      }
-      
-      // 保存到 localStorage
-      const savedKey = `analysis_${datasetId}_${subjectId}`;
-      const dataToSave = {
-        results: results.value,
-        appliedMethods: appliedMethods.value
-      };
-      localStorage.setItem(savedKey, JSON.stringify(dataToSave));
-      
-      return true;
-    } catch (e) {
-      console.error('保存处理结果失败:', e);
-      return false;
     }
   };
   
