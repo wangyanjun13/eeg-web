@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams
 from app.models.common import APIResponse
 from app.services.preprocess_service import PreprocessService
 from app.services.dataset_service import DatasetService
@@ -250,4 +250,82 @@ async def detect_bad_segments(dataset_id: str, subject_id: str, params: BadSegme
             data=result
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{dataset_id}/subjects/{subject_id}/resample", response_model=APIResponse)
+async def apply_resample(dataset_id: str, subject_id: str, params: ResampleParams):
+    """应用重采样
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+        params: 重采样参数
+            - resample: 是否开启重采样
+            - resample_freq: 目标采样频率
+    """
+    try:
+        # 输出接收到的参数，帮助调试
+        print(f"接收到重采样请求: dataset_id={dataset_id}, subject_id={subject_id}")
+        print(f"重采样参数: {params.dict()}")
+        
+        # 参数验证
+        if params.resample and params.resample_freq <= 0:
+            raise ValueError("重采样频率必须大于0Hz")
+            
+        # 处理通道参数
+        channels = params.dict().pop("channels", None) if hasattr(params, "channels") else None
+            
+        # 记录处理开始时间
+        start_time = time.time()
+        
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "resample")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        from_cache = False
+        process_time = 0
+        
+        # 检查元数据
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta:
+            # 检查参数是否匹配
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            # 参数一致则标记为从缓存获取
+            if cached_meta.get('params') == params_dict:
+                from_cache = True
+                process_time = cached_meta.get('process_time', 0)
+        
+        # 执行处理
+        result = preprocess_service.apply_resample(dataset_id, subject_id, params, channels)
+        
+        # 如果不是从缓存获取，计算处理时间
+        if not from_cache:
+            process_time = time.time() - start_time
+        
+        # 创建响应
+        response = APIResponse(
+            success=True,
+            message="重采样处理完成",
+            data=result
+        )
+        
+        # 返回响应，添加自定义头信息
+        return Response(
+            content=response.json(),
+            media_type="application/json",
+            headers={
+                "X-From-Cache": str(from_cache).lower(),
+                "X-Process-Time": str(process_time)
+            }
+        )
+    except ValueError as e:
+        error_msg = f"参数错误: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        error_msg = f"重采样处理失败: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) 

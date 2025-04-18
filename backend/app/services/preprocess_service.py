@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessedData, PreprocessParams, SegmentParams, BadSegmentParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessedData, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams
 from scipy import signal
 from app.models.data_dataset import RawEEGData
 from mne.preprocessing import ICA
@@ -918,3 +918,117 @@ class PreprocessService:
             print(f"获取步骤输入数据失败: {str(e)}")
             # 发生错误时返回原始数据
             return self.dataset_service.get_subject_data(dataset_id, subject_id)
+
+    def apply_resample(self, dataset_id: str, subject_id: str, params: ResampleParams, channels: List[str] = None) -> RawEEGData:
+        """应用重采样处理"""
+        try:
+            # 检查缓存
+            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "resample")
+            cache_meta_key = f"{cache_key}:meta"
+            
+            # 首先检查元数据，比对参数判断缓存是否有效
+            cached_meta = get_metadata(cache_meta_key)
+            if cached_meta:
+                # 检查参数是否匹配
+                params_dict = params.dict()
+                if channels:
+                    params_dict['channels'] = channels
+                    
+                # 参数一致则返回缓存的结果
+                if cached_meta.get('params') == params_dict:
+                    print(f"找到有效的重采样缓存: {cache_key}")
+                    cached_data = get_from_cache(cache_key)
+                    if cached_data:
+                        return cached_data
+
+            # 缓存无效或不存在，执行重采样处理
+            print(f"没有找到有效的缓存，执行重采样处理...")
+            start_time = time.time()
+            
+            # 获取输入数据（使用前一步的结果作为输入 - 通常是滤波后的数据）
+            input_data = self.get_input_data_for_step(dataset_id, subject_id, "resample")
+            
+            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
+                raise ValueError(input_data.error)
+
+            # 确保数据是有效的
+            if not input_data or not input_data.data or not input_data.channels:
+                raise ValueError(f"无法获取有效的EEG数据: dataset_id={dataset_id}, subject_id={subject_id}")
+
+            # 应用重采样
+            if params.resample and params.resample_freq > 0:
+                orig_freq = input_data.sampling_rate
+                target_freq = params.resample_freq
+                
+                # 计算重采样因子
+                ratio = target_freq / orig_freq
+                
+                # 为每个通道应用重采样
+                resampled_data = {}
+                
+                # 设置要处理的通道
+                process_channels = channels if channels else input_data.channels
+                
+                for channel in input_data.channels:
+                    # 如果指定了通道列表，只处理列表中的通道
+                    if channels and channel not in channels:
+                        resampled_data[channel] = input_data.data[channel]
+                        continue
+                    
+                    try:
+                        # 获取通道数据
+                        signal_data = np.array(input_data.data[channel])
+                        
+                        # 使用scipy的resample函数进行重采样
+                        n_samples = int(len(signal_data) * ratio)
+                        resampled_signal = signal.resample(signal_data, n_samples)
+                        
+                        # 保存重采样后的数据
+                        resampled_data[channel] = resampled_signal.tolist()
+                    except Exception as e:
+                        print(f"处理通道 {channel} 时出错: {str(e)}")
+                        # 如果处理失败，保留原始数据
+                        resampled_data[channel] = input_data.data[channel]
+                
+                # 重新计算时间点
+                orig_duration = input_data.duration
+                resampled_times = np.linspace(0, orig_duration, n_samples).tolist()
+                
+                # 创建结果数据
+                result = RawEEGData(
+                    data=resampled_data,
+                    times=resampled_times,
+                    channels=input_data.channels,
+                    duration=input_data.duration,
+                    sampling_rate=params.resample_freq,
+                    dataset_id=dataset_id,
+                    subject_id=subject_id
+                )
+            else:
+                # 如果不进行重采样，直接返回输入数据
+                result = input_data
+            
+            # 计算处理时间
+            process_time = time.time() - start_time
+            print(f"重采样处理完成，耗时: {process_time:.2f}秒")
+            
+            # 缓存处理结果
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            metadata = {
+                'params': params_dict,
+                'process_time': process_time,
+                'timestamp': time.time()
+            }
+            
+            save_metadata(cache_meta_key, metadata)
+            save_to_cache(cache_key, result)
+            print(f"已缓存重采样结果: {cache_key}")
+            
+            return result
+        except Exception as e:
+            error_msg = f"重采样处理失败: {str(e)}"
+            print(error_msg)
+            raise ValueError(error_msg)
