@@ -1,0 +1,151 @@
+import { createRouter, createWebHistory } from 'vue-router';
+import DatasetOverview from '../views/dataset/index.vue';
+import DatasetDetail from '../views/dataset/detail.vue';
+import DatasetUpload from '../views/dataset/DatasetUpload.vue';
+import SubjectDetail from '../views/subject/detail.vue';
+import NotFound from '../views/NotFound.vue';
+import Preprocessing from '../views/analysis/preprocessing/index.vue';
+import TimeAnalysis from '../views/analysis/timeAnalysis.vue';
+import FrequencyAnalysis from '../views/analysis/frequencyAnalysis.vue';
+import SpatialAnalysis from '../views/analysis/spatialAnalysis.vue';
+import AdvancedAnalysis from '../views/analysis/advancedAnalysis.vue';
+
+// 路由配置
+const routes = [
+  {
+    path: '/',
+    redirect: '/datasets',
+    meta: {
+      title: 'EEG数据分析平台'
+    }
+  },
+  {
+    path: '/datasets',
+    name: 'Datasets',
+    component: DatasetOverview,
+    meta: {
+      title: '数据集浏览 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/datasets/:id',
+    name: 'DatasetDetail',
+    component: DatasetDetail,
+    meta: {
+      title: '数据集详情 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/datasets/:datasetId/subjects/:subjectId',
+    name: 'SubjectDetail',
+    component: SubjectDetail,
+    meta: {
+      title: '被试详情 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/datasets/:datasetId/subjects/:subjectId/analyze',
+    name: 'SubjectAnalyze',
+    component: Preprocessing,
+    meta: {
+      title: '数据分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis',
+    name: 'Analysis',
+    component: Preprocessing,
+    meta: {
+      title: '数据分析工具 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/preprocessing/:datasetId/:subjectId',
+    name: 'Preprocessing',
+    component: Preprocessing,
+    meta: {
+      title: '预处理 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/time-analysis/:datasetId/:subjectId',
+    name: 'TimeAnalysis',
+    component: TimeAnalysis,
+    meta: {
+      title: '时域分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/frequency-analysis/:datasetId/:subjectId',
+    name: 'FrequencyAnalysis',
+    component: FrequencyAnalysis,
+    meta: {
+      title: '频域分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/spatial-analysis/:datasetId/:subjectId',
+    name: 'SpatialAnalysis',
+    component: SpatialAnalysis,
+    meta: {
+      title: '空间分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/analysis/advanced-analysis/:datasetId/:subjectId',
+    name: 'AdvancedAnalysis',
+    component: AdvancedAnalysis,
+    meta: {
+      title: '高级分析 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/upload',
+    name: 'DatasetUpload',
+    component: DatasetUpload,
+    meta: {
+      title: '上传数据 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/user/profile',
+    name: 'UserProfile',
+    component: () => import('../views/user/UserProfile.vue'),
+    meta: {
+      title: '个人资料 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/user/settings',
+    name: 'UserSettings',
+    component: () => import('../views/user/UserSettings.vue'),
+    meta: {
+      title: '用户设置 - EEG数据分析平台'
+    }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: NotFound,
+    meta: {
+      title: '页面未找到 - EEG数据分析平台'
+    }
+  }
+];
+
+// 创建路由实例
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+});
+
+// 全局前置守卫，用于更改页面标题
+router.beforeEach((to, from, next) => {
+  // 设置页面标题
+  if (to.meta.title) {
+    document.title = to.meta.title;
+  }
+  next();
+});
+
+export default router; 
