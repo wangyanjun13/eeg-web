@@ -114,72 +114,6 @@ const handleSeriesMouseover = (params) => {
   }
 }
 
-// 计算频谱数据
-const calculateSpectrumData = (channelData, times) => {
-  if (!channelData || !times || channelData.length === 0) return [];
-  
-  try {
-    // 采样率计算
-    const samplingRate = 1 / (times[1] - times[0]);
-    
-    // 使用FFT计算频谱
-    // 仅计算开始和结束时间范围内的数据
-    const startIndex = Math.max(0, Math.floor(props.timeRange[0] / (times[1] - times[0])));
-    const endIndex = Math.min(channelData.length - 1, Math.ceil(props.timeRange[1] / (times[1] - times[0])));
-    
-    // 确保数据长度是2的幂，便于FFT计算
-    const dataLength = 2 ** Math.floor(Math.log2(endIndex - startIndex));
-    const slicedData = channelData.slice(startIndex, startIndex + dataLength);
-    
-    // 使用Web API的FFT或替代方法
-    const fft = performFFT(slicedData, samplingRate);
-    
-    // 只返回0到50Hz的频率范围
-    const maxFreqIndex = Math.min(Math.floor(50 * dataLength / samplingRate), fft.length / 2);
-    return fft.slice(0, maxFreqIndex).map((value, index) => 
-      [index * samplingRate / dataLength, value]
-    );
-  } catch (error) {
-    console.error('计算频谱出错:', error);
-    return [];
-  }
-}
-
-// 简化的FFT实现
-const performFFT = (timeData, samplingRate) => {
-  // 简单的功率谱估计，实际应用中可使用更复杂的FFT算法或库
-  const n = timeData.length;
-  const result = Array(n / 2).fill(0);
-  
-  // 加窗并移除直流分量
-  let mean = 0;
-  for (let i = 0; i < n; i++) mean += timeData[i];
-  mean /= n;
-  
-  // 使用汉宁窗计算加窗数据
-  const windowed = timeData.map((x, i) => 
-    (x - mean) * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1)))
-  );
-  
-  // 功率谱计算 - 标准脑电分析中通常使用功率谱密度(PSD)表示
-  // 单位应为μV²/Hz，需要除以频率分辨率(samplingRate/n)来获得密度
-  const freqResolution = samplingRate / n;
-  for (let k = 0; k < n / 2; k++) {
-    let real = 0, imag = 0;
-    for (let t = 0; t < n; t++) {
-      const angle = -2 * Math.PI * k * t / n;
-      real += windowed[t] * Math.cos(angle);
-      imag += windowed[t] * Math.sin(angle);
-    }
-    
-    // 功率谱密度计算 - 平方后除以频率分辨率
-    const magnitude = (real * real + imag * imag) / (n * n);
-    result[k] = magnitude / freqResolution; // 单位为μV²/Hz
-  }
-  
-  return result;
-}
-
 // 生成图表配置
 const getChartOption = (series, legendStatus) => {
   const baseOption = {
@@ -235,12 +169,56 @@ const getChartOption = (series, legendStatus) => {
       inverse: isYAxisInverted.value
     };
   } else {
+    const samplingRate = props.data?.sampling_rate || 100;
+    const nyquistFreq = samplingRate / 2;
+    
+    // 确保频率范围合理
+    let maxFreq = Math.min(nyquistFreq, 100);
+    if (maxFreq < 1) {
+      console.warn('采样率异常，设置默认频率范围');
+      maxFreq = 100;
+    }
+    
     baseOption.xAxis = {
       type: 'value',
       name: '频率 (Hz)',
       min: 0,
-      max: 50
+      max: maxFreq,
+      axisLabel: {
+        formatter: '{value} Hz'
+      }
     };
+    
+    // 添加常见EEG频段标记
+    const bandMarkers = [
+      { value: 4, name: 'θ', color: 'rgba(110, 110, 110, 0.4)' },
+      { value: 8, name: 'α', color: 'rgba(110, 110, 110, 0.4)' },
+      { value: 13, name: 'β', color: 'rgba(110, 110, 110, 0.4)' },
+      { value: 30, name: 'γ', color: 'rgba(110, 110, 110, 0.4)' }
+    ];
+    
+    // 过滤掉超出显示范围的标记
+    const validMarkers = bandMarkers.filter(marker => marker.value <= maxFreq);
+    
+    // 如果有有效的频段标记，添加标记线
+    if (validMarkers.length > 0) {
+      baseOption.series.push({
+        type: 'line',
+        name: 'EEG频段',
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          lineStyle: { color: '#888', type: 'dashed', width: 1 },
+          label: { show: true, position: 'start' },
+          data: validMarkers.map(marker => ({
+            xAxis: marker.value,
+            name: marker.name,
+            lineStyle: { color: marker.color }
+          }))
+        }
+      });
+    }
+    
     baseOption.yAxis = {
       type: 'value',
       name: '功率谱密度 (μV²/Hz)',
@@ -258,6 +236,86 @@ const getChartOption = (series, legendStatus) => {
   }];
   
   return baseOption;
+}
+
+// 计算频谱数据
+const calculateSpectrumData = (channelData, times) => {
+  if (!channelData || !times || channelData.length === 0) return [];
+  
+  try {
+    // 确保正确计算采样率
+    const samplingRate = props.data.sampling_rate || 1 / (times[1] - times[0]);
+    
+    // 使用FFT计算频谱
+    // 仅计算开始和结束时间范围内的数据
+    const startIndex = Math.max(0, Math.floor(props.timeRange[0] / (times[1] - times[0])));
+    const endIndex = Math.min(channelData.length - 1, Math.ceil(props.timeRange[1] / (times[1] - times[0])));
+    
+    // 确保数据长度是2的幂，便于FFT计算
+    let dataLength = endIndex - startIndex;
+    // 找到最接近的2的幂
+    dataLength = Math.pow(2, Math.floor(Math.log2(dataLength)));
+    
+    const slicedData = channelData.slice(startIndex, startIndex + dataLength);
+    
+    // 应用汉宁窗减少频谱泄漏
+    const windowedData = slicedData.map((x, i) => 
+      x * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (dataLength - 1)))
+    );
+    
+    // 使用Web API的FFT或替代方法
+    const fft = performFFT(windowedData, samplingRate);
+    
+    // 获取采样率的一半 (Nyquist频率) 作为最大频率
+    const nyquistFreq = samplingRate / 2;
+    
+    // 确定有效范围：从0到Nyquist频率
+    const maxFreqIndex = Math.min(Math.floor(nyquistFreq * dataLength / samplingRate), fft.length / 2);
+    
+    // 返回计算结果，无需添加冗余日志
+    return fft.slice(0, maxFreqIndex).map((value, index) => {
+      const freq = index * samplingRate / dataLength;
+      return [freq, value];
+    });
+  } catch (error) {
+    console.error('计算频谱出错:', error);
+    return [];
+  }
+}
+
+// 简化的FFT实现
+const performFFT = (timeData, samplingRate) => {
+  // 简单的功率谱估计，实际应用中可使用更复杂的FFT算法或库
+  const n = timeData.length;
+  const result = Array(n / 2).fill(0);
+  
+  // 加窗并移除直流分量
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += timeData[i];
+  mean /= n;
+  
+  // 使用汉宁窗计算加窗数据
+  const windowed = timeData.map((x, i) => 
+    (x - mean) * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1)))
+  );
+  
+  // 功率谱计算 - 标准脑电分析中通常使用功率谱密度(PSD)表示
+  // 单位应为μV²/Hz，需要除以频率分辨率(samplingRate/n)来获得密度
+  const freqResolution = samplingRate / n;
+  for (let k = 0; k < n / 2; k++) {
+    let real = 0, imag = 0;
+    for (let t = 0; t < n; t++) {
+      const angle = -2 * Math.PI * k * t / n;
+      real += windowed[t] * Math.cos(angle);
+      imag += windowed[t] * Math.sin(angle);
+    }
+    
+    // 功率谱密度计算 - 平方后除以频率分辨率
+    const magnitude = (real * real + imag * imag) / (n * n);
+    result[k] = magnitude / freqResolution; // 单位为μV²/Hz
+  }
+  
+  return result;
 }
 
 // 使用防抖函数优化图表更新

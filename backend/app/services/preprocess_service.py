@@ -920,7 +920,7 @@ class PreprocessService:
             return self.dataset_service.get_subject_data(dataset_id, subject_id)
 
     def apply_resample(self, dataset_id: str, subject_id: str, params: ResampleParams, channels: List[str] = None) -> RawEEGData:
-        """应用重采样处理"""
+        """应用重采样处理，使用与EEGLAB类似的多相滤波器方法"""
         try:
             # 检查缓存
             cache_key = get_preprocess_cache_key(dataset_id, subject_id, "resample")
@@ -942,75 +942,112 @@ class PreprocessService:
                         return cached_data
 
             # 缓存无效或不存在，执行重采样处理
-            print(f"没有找到有效的缓存，执行重采样处理...")
+            print(f"执行重采样处理: {params.resample_freq}Hz")
             start_time = time.time()
             
-            # 获取输入数据（使用前一步的结果作为输入 - 通常是滤波后的数据）
+            # 获取输入数据（必须是滤波后的数据）
             input_data = self.get_input_data_for_step(dataset_id, subject_id, "resample")
             
-            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
-                raise ValueError(input_data.error)
+            if not input_data:
+                raise ValueError("无法获取输入数据")
+            
+            if not params.resample or params.resample_freq <= 0:
+                return input_data
+            
+            # 获取原始采样率和目标采样率
+            orig_freq = input_data.sampling_rate
+            target_freq = params.resample_freq
+            
+            # 如果原始采样率和目标采样率几乎相同，直接返回原始数据
+            if abs(orig_freq - target_freq) < 0.01:
+                print(f"原始采样率({orig_freq}Hz)和目标采样率({target_freq}Hz)几乎相同，跳过重采样")
+                return input_data
+            
+            # 为每个通道应用重采样
+            resampled_data = {}
+            process_channels = channels if channels else input_data.channels
+            
+            # 计算最优多项式分子/分母比例
+            def gcd(a, b):
+                while b:
+                    a, b = b, a % b
+                return a
+            
+            up = int(target_freq)
+            down = int(orig_freq)
+            g = gcd(up, down)
+            up = up // g
+            down = down // g
 
-            # 确保数据是有效的
-            if not input_data or not input_data.data or not input_data.channels:
-                raise ValueError(f"无法获取有效的EEG数据: dataset_id={dataset_id}, subject_id={subject_id}")
-
-            # 应用重采样
-            if params.resample and params.resample_freq > 0:
-                orig_freq = input_data.sampling_rate
-                target_freq = params.resample_freq
+            for channel in input_data.channels:
+                # 跳过不需要处理的通道
+                if channels and channel not in channels:
+                    resampled_data[channel] = input_data.data[channel]
+                    continue
                 
-                # 计算重采样因子
-                ratio = target_freq / orig_freq
+                # 获取通道数据
+                signal_data = np.array(input_data.data[channel])
                 
-                # 为每个通道应用重采样
-                resampled_data = {}
-                
-                # 设置要处理的通道
-                process_channels = channels if channels else input_data.channels
-                
-                for channel in input_data.channels:
-                    # 如果指定了通道列表，只处理列表中的通道
-                    if channels and channel not in channels:
-                        resampled_data[channel] = input_data.data[channel]
-                        continue
+                if len(signal_data) == 0:
+                    resampled_data[channel] = []
+                    continue
                     
-                    try:
-                        # 获取通道数据
-                        signal_data = np.array(input_data.data[channel])
+                # 使用resample_poly进行重采样 - 多相滤波方法，与EEGLAB类似
+                try:
+                    # 针对不同情况优化窗口参数
+                    if target_freq < orig_freq:
+                        # 降采样 - 使用较温和的窗口保留更多细节
+                        window = ('kaiser', 3.0)
+                    else:
+                        # 升采样
+                        window = ('kaiser', 5.0)
                         
-                        # 使用scipy的resample函数进行重采样
-                        n_samples = int(len(signal_data) * ratio)
-                        resampled_signal = signal.resample(signal_data, n_samples)
-                        
-                        # 保存重采样后的数据
-                        resampled_data[channel] = resampled_signal.tolist()
-                    except Exception as e:
-                        print(f"处理通道 {channel} 时出错: {str(e)}")
-                        # 如果处理失败，保留原始数据
-                        resampled_data[channel] = input_data.data[channel]
+                    # 执行多相重采样
+                    resampled_signal = signal.resample_poly(signal_data, up, down, window=window)
+                    resampled_data[channel] = resampled_signal.tolist()
+                except Exception as e:
+                    print(f"通道 {channel} 重采样失败: {str(e)}，使用备用方法")
+                    # 备用方法
+                    num_samples = int(len(signal_data) * target_freq / orig_freq)
+                    resampled_signal = signal.resample(signal_data, num_samples)
+                    resampled_data[channel] = resampled_signal.tolist()
                 
-                # 重新计算时间点
+            # 重新计算时间点 - 关键修复
+            if len(list(resampled_data.values())[0]) > 0:
+                n_samples = len(list(resampled_data.values())[0])
                 orig_duration = input_data.duration
-                resampled_times = np.linspace(0, orig_duration, n_samples).tolist()
+                
+                # 使用新采样率生成时间点
+                resampled_times = np.arange(0, n_samples) / target_freq
+                
+                # 截断超出原始持续时间的部分
+                if resampled_times[-1] > orig_duration:
+                    cutoff_index = np.searchsorted(resampled_times, orig_duration, side='right')
+                    resampled_times = resampled_times[:cutoff_index]
+                    # 同时截断数据
+                    for channel in resampled_data:
+                        resampled_data[channel] = resampled_data[channel][:cutoff_index]
+                    n_samples = len(resampled_times)
+                
+                # 转换为列表
+                resampled_times = resampled_times.tolist()
                 
                 # 创建结果数据
                 result = RawEEGData(
                     data=resampled_data,
                     times=resampled_times,
                     channels=input_data.channels,
-                    duration=input_data.duration,
+                    duration=resampled_times[-1] if resampled_times else orig_duration,
                     sampling_rate=params.resample_freq,
                     dataset_id=dataset_id,
                     subject_id=subject_id
                 )
             else:
-                # 如果不进行重采样，直接返回输入数据
-                result = input_data
+                # 如果没有有效数据，返回原始数据
+                return input_data
             
             # 计算处理时间
             process_time = time.time() - start_time
-            print(f"重采样处理完成，耗时: {process_time:.2f}秒")
             
             # 缓存处理结果
             params_dict = params.dict()
@@ -1025,7 +1062,7 @@ class PreprocessService:
             
             save_metadata(cache_meta_key, metadata)
             save_to_cache(cache_key, result)
-            print(f"已缓存重采样结果: {cache_key}")
+            print(f"重采样完成，用时:{process_time:.2f}秒")
             
             return result
         except Exception as e:

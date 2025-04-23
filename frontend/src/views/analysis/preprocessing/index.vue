@@ -272,7 +272,8 @@ const handleNextStep = async () => {
     activeStepIndex.value = nextStepIndex;
     activeProcessor.value = processingSteps.value[nextStepIndex].key;
     
-    console.log('切换到下一步，数据有效');
+    // 输出调试信息，查看数据内容
+    console.log('切换到下一步，数据采样率:', dataToPass.sampling_rate);
     
     // 强制刷新数据，确保Vue检测到变化
     refreshData(dataToPass);

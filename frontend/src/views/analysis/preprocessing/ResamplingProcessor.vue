@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import * as echarts from 'echarts';
 import analysisService from '@/services/analysisService';
 import { useLoading } from '@/composables/useLoading';
@@ -39,6 +39,10 @@ const showResampleEffects = ref(false);
 const resampleEffectsRef = ref(null);
 let resampleEffectsChart = null;
 
+// 添加已应用重采样状态
+const hasAppliedResampling = ref(false);
+const appliedSamplingRate = ref(0);
+
 // 计算当前采样率和数据大小
 const currentSamplingRate = computed(() => {
   return props.originalData?.sampling_rate || 0;
@@ -62,6 +66,11 @@ const resampledDataPoints = computed(() => {
 
 // 应用重采样
 const applyResampling = async () => {
+  if (!props.originalData) {
+    ElMessage.warning('请先加载数据');
+    return;
+  }
+
   try {
     // 参数验证
     if (props.preprocessParams.resample.resample && 
@@ -69,15 +78,43 @@ const applyResampling = async () => {
       throw new Error('重采样频率必须大于0Hz');
     }
     
-    // 检查是否降采样过度（Nyquist频率限制）
-    if (props.preprocessParams.resample.resample_freq < currentSamplingRate.value / 20) {
-      // 提示用户过度降采样可能导致信号失真
-      await ElMessage({
-        type: 'warning',
-        message: '警告：过度降低采样率可能导致信号失真，请确认您的选择',
-        duration: 5000
-      });
+    // 检查重采样率是否与当前采样率几乎相同
+    if (Math.abs(props.preprocessParams.resample.resample_freq - currentSamplingRate.value) < 0.01) {
+      ElMessage.info(`目标采样率 (${props.preprocessParams.resample.resample_freq.toFixed(2)}Hz) 与当前采样率 (${currentSamplingRate.value.toFixed(2)}Hz) 几乎相同，无需重采样`);
+      
+      // 直接使用当前数据作为结果
+      emit('process-complete', props.originalData);
+      return;
     }
+    
+    // 检查是否降采样过度 - 添加有意义的警告
+    const ratio = props.preprocessParams.resample.resample_freq / currentSamplingRate.value;
+    if (ratio < 0.25) { // 如果降采样率低于原采样率的1/4
+      try {
+        await ElMessageBox.confirm(
+          `您将把采样率从${currentSamplingRate.value}Hz降低到${props.preprocessParams.resample.resample_freq}Hz，` +
+          `这将显著减少数据点数量(${ratio.toFixed(2)}倍)。` +
+          `\n\n过度降低采样率可能导致频率在${props.preprocessParams.resample.resample_freq/2}Hz以上的信号特征丢失。确定要继续吗？`,
+          '降采样警告',
+          { confirmButtonText: '继续', cancelButtonText: '取消', type: 'warning' }
+        );
+      } catch (e) {
+        // 用户取消操作
+        return;
+      }
+    }
+    
+    // 验证处理通道不为空
+    if (!props.processingChannels || props.processingChannels.length === 0) {
+      throw new Error('请至少选择一个通道进行处理');
+    }
+
+    console.log('【重要调试】重采样请求参数:', {
+      原始采样率: currentSamplingRate.value,
+      目标采样率: props.preprocessParams.resample.resample_freq,
+      通道: props.processingChannels,
+      数据点数: currentDataPoints.value
+    });
 
     // 显示提示正在处理
     const loadingMessage = ElMessage({
@@ -91,7 +128,7 @@ const applyResampling = async () => {
         resample: props.preprocessParams.resample.resample,
         resample_freq: props.preprocessParams.resample.resample_freq,
         channels: props.processingChannels,
-        force_refresh: { timestamp: new Date().getTime() } // 避免缓存
+        force_refresh: { timestamp: new Date().getTime() }
       }),
       'processing'
     );
@@ -102,49 +139,23 @@ const applyResampling = async () => {
     if (!response || !response.data) {
       throw new Error('服务器返回数据无效');
     }
-
-    // 提取响应数据 - 修改这部分以处理嵌套结构
-    let processedData = response.data;
     
-    // 处理API响应的嵌套结构
-    if (processedData.status === 'success' && processedData.data) {
-      processedData = processedData.data;
-    }
+    // 记录重采样已应用状态
+    hasAppliedResampling.value = true;
+    appliedSamplingRate.value = response.data.sampling_rate;
     
-    console.log('重采样结果数据:', processedData);
-    
-    // 确保数据结构完整 - 如果缺少必要字段，尝试从原始数据构建
-    if (!processedData.times || !processedData.channels) {
-      console.warn('响应缺少必要字段，正在尝试从原始数据构建完整结构');
-      
-      // 创建完整的数据结构
-      const completeData = {
-        data: processedData.data || {},
-        times: processedData.times || props.originalData?.times || [],
-        channels: processedData.channels || Object.keys(processedData.data || {}),
-        sampling_rate: props.preprocessParams.resample.resample_freq,
-        duration: props.originalData?.duration || 0,
-        dataset_id: props.datasetId,
-        subject_id: props.subjectId
-      };
-      
-      processedData = completeData;
-    }
-    
-    // 验证结果数据
-    if (!processedData.data || Object.keys(processedData.data).length === 0) {
-      throw new Error('处理结果不包含有效数据');
-    }
+    // 记录重采样前后的对比信息
+    const originalRate = currentSamplingRate.value;
+    const newRate = response.data.sampling_rate;
     
     // 发送处理完成事件
-    emit('process-complete', processedData);
+    emit('process-complete', response.data);
     
-    // 根据是否从缓存获取，显示不同的成功消息
-    if (response.from_cache || processedData.from_cache) {
-      ElMessage.success('从缓存获取重采样结果成功');
-    } else {
-      ElMessage.success('重采样应用成功');
-    }
+    // 添加更有意义的成功消息
+    ElMessage.success(
+      `重采样成功: 采样率从 ${originalRate}Hz 变更为 ${newRate}Hz，` +
+      `数据点数量变化: ${currentDataPoints.value} → ${response.data.times.length}`
+    );
   } catch (error) {
     console.error('应用重采样失败:', error);
     const errorMessage = error.response?.data?.detail || error.message || '未知错误';
@@ -346,9 +357,13 @@ onBeforeUnmount(() => {
         <div class="info-panel" v-if="originalData">
           <div class="info-row">
             <div class="info-label">当前采样率:</div>
-            <div class="info-value">{{ currentSamplingRate.toFixed(1) }} Hz</div>
+            <div class="info-value">
+              {{ currentSamplingRate.toFixed(1) }} Hz
+              <el-tag v-if="hasAppliedResampling" size="mini" type="success">已重采样</el-tag>
+            </div>
           </div>
           <div class="info-row">
+            <div class="info-label">目标采样率:</div>
             <div class="info-label">重采样后:</div>
             <div class="info-value">{{ preprocessParams.resample.resample_freq.toFixed(1) }} Hz</div>
           </div>
