@@ -39,6 +39,14 @@ const props = defineProps({
   viewMode: {  // 新增：视图模式
     type: String,
     default: 'time' // 'time' 或 'frequency'
+  },
+  initialTimeRange: {
+    type: Array,
+    default: () => [0, 10]
+  },
+  persistTimeRange: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -65,6 +73,18 @@ const {
   openChannelSelect,
   renderChannelSelectDialog
 } = useChannelPositions()
+
+// 在setup函数中，修改timeRange的初始化
+const timeRange = ref(props.initialTimeRange || [0, 10]);
+
+// 确保时间范围变化时触发事件
+watch(timeRange, (newRange) => {
+  if (props.persistTimeRange) {
+    // 存储到localStorage以便跨组件持久化
+    localStorage.setItem('eeg_time_range', JSON.stringify(newRange));
+  }
+  emit('update:timeRange', newRange);
+}, { deep: true });
 
 // 导出组件设置函数供外部使用
 const setup = () => {

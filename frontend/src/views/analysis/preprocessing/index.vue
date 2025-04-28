@@ -374,6 +374,26 @@ onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', beforePageLeave);
   }
+  
+  // 读取之前保存的时间范围
+  const savedTimeRange = localStorage.getItem('selected_time_range');
+  if (savedTimeRange) {
+    try {
+      const parsedRange = JSON.parse(savedTimeRange);
+      // 更新请求参数中的时间范围
+      const params = {
+        start_time: parsedRange[0],
+        duration: parsedRange[1] - parsedRange[0]
+      };
+      // 更新获取原始数据的请求参数
+      fetchOptionsRef.value = {
+        ...fetchOptionsRef.value,
+        ...params
+      };
+    } catch (e) {
+      console.error('解析保存的时间范围失败:', e);
+    }
+  }
 });
 
 onBeforeUnmount(() => {

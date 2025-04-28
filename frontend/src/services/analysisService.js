@@ -325,6 +325,16 @@ const analysisService = {
   },
 
   /**
+   * 获取事件信息
+   * @param {string} datasetId - 数据集ID
+   * @param {string} subjectId - 受试者ID
+   * @returns {Promise<Object>} - 事件信息
+   */
+  getEvents(datasetId, subjectId) {
+    return api.get(`/api/preprocess/${datasetId}/subjects/${subjectId}/events`);
+  },
+
+  /**
    * 进行时域分析
    * @param {string} datasetId - 数据集ID
    * @param {string} subjectId - 受试者ID

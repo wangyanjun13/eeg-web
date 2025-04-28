@@ -328,4 +328,22 @@ async def apply_resample(dataset_id: str, subject_id: str, params: ResampleParam
     except Exception as e:
         error_msg = f"重采样处理失败: {str(e)}"
         print(error_msg)
-        raise HTTPException(status_code=500, detail=error_msg) 
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@router.get("/{dataset_id}/subjects/{subject_id}/events", response_model=APIResponse)
+async def get_events(dataset_id: str, subject_id: str):
+    """获取数据集中事件信息
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+    """
+    try:
+        events = dataset_service.get_events_info(dataset_id, subject_id)
+        return APIResponse(
+            message="获取事件信息成功",
+            data=events
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
+    

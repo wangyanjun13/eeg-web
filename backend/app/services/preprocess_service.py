@@ -379,201 +379,263 @@ class PreprocessService:
 
     def segment_data(self, dataset_id: str, subject_id: str, params: SegmentParams) -> RawEEGData:
         """数据分段处理"""
+        # 缓存键生成
+        cache_key = f"eeg:{dataset_id}:{subject_id}:segment:{params.json()}"
+        cache_meta_key = f"{cache_key}:meta"
+        
+        # 检查缓存
+        cached_result = get_from_cache(cache_key)
+        metadata = get_metadata(cache_meta_key)
+        if cached_result and metadata:
+            return cached_result
+        
         try:
-            # 检查缓存
-            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "segment")
-            cache_meta_key = f"{cache_key}:meta"
-            
-            # 首先检查元数据，比对参数判断缓存是否有效
-            cached_meta = get_metadata(cache_meta_key)
-            if cached_meta:
-                # 检查参数是否匹配
-                params_dict = params.dict()
-                
-                # 参数一致则返回缓存的结果
-                if cached_meta.get('params') == params_dict:
-                    print(f"找到有效的分段缓存: {cache_key}")
-                    cached_data = get_from_cache(cache_key)
-                    if cached_data:
-                        return cached_data
-
-            # 缓存无效或不存在，执行分段处理
-            print(f"没有找到有效的缓存，执行分段处理...")
-            start_time = time.time()
-            
-            # 获取输入数据（前一步的结果）
-            input_data = self.get_input_data_for_step(dataset_id, subject_id, "segment")
-            
-            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
-                raise ValueError(input_data.error)
-
-            # 实际分段处理逻辑
-            if params.segment_mode == "time":
-                # 时间窗口分段
-                start_sample = max(0, int(params.start_time * input_data.sampling_rate))
-                end_sample = min(len(input_data.times), int(params.end_time * input_data.sampling_rate))
-                
-                # 获取时间数据，确保是列表
-                if isinstance(input_data.times, np.ndarray):
-                    segmented_times = input_data.times[start_sample:end_sample].tolist()
+            # 获取输入数据 - 使用原始数据或之前处理结果
+            if params.use_original_full_data:
+                raw = self.dataset_service._read_eeg_file(dataset_id, subject_id)
+            else:
+                # 尝试获取之前的处理结果
+                input_data = self.get_input_data_for_step(dataset_id, subject_id, "filter")
+                if input_data:
+                    raw = self._construct_raw_from_data(input_data)
                 else:
-                    segmented_times = input_data.times[start_sample:end_sample]
+                    # 使用原始数据并切片到指定范围
+                    raw = self.dataset_service._read_eeg_file(dataset_id, subject_id)
+                    data, times = self.dataset_service._get_time_slice(
+                        raw, params.start_time, params.end_time - params.start_time
+                    )
+                    # 构建切片后的raw对象
+                    info = raw.info.copy()
+                    raw = mne.io.RawArray(data, info)
+            
+            # 分段处理逻辑
+            if params.segment_mode == "time":
+                # 简单时间窗口分段
+                data, times = self.dataset_service._get_time_slice(
+                    raw, params.start_time, params.end_time - params.start_time
+                )
                 
-                # 提取分段数据
-                segmented_data = {}
-                for channel in input_data.channels:
-                    # 获取通道数据，确保是列表
-                    if isinstance(input_data.data[channel], np.ndarray):
-                        segmented_data[channel] = input_data.data[channel][start_sample:end_sample].tolist()
-                    else:
-                        segmented_data[channel] = input_data.data[channel][start_sample:end_sample]
-                
-                # 基线校正
-                if params.apply_baseline:
-                    baseline_start_idx = int((params.baseline_start + params.start_time) * input_data.sampling_rate)
-                    baseline_end_idx = int((params.baseline_end + params.start_time) * input_data.sampling_rate)
-                    
-                    if baseline_start_idx >= 0 and baseline_end_idx <= len(segmented_times):
-                        # 对每个通道应用基线校正
-                        for channel in input_data.channels:
-                            baseline = np.mean(segmented_data[channel][baseline_start_idx:baseline_end_idx])
-                            segmented_data[channel] = [val - baseline for val in segmented_data[channel]]
-                
-                # 创建结果数据
+                # 构建结果
+                ch_names = raw.ch_names
+                data_dict = {ch_names[i]: data[i].tolist() for i in range(len(ch_names))}
                 result = RawEEGData(
-                    data=segmented_data,
-                    times=segmented_times,
-                    channels=input_data.channels,
-                    duration=params.end_time - params.start_time,
-                    sampling_rate=input_data.sampling_rate,
+                    data=data_dict,
+                    times=times.tolist(),
+                    channels=ch_names,
+                    duration=times[-1] - times[0],
+                    sampling_rate=raw.info['sfreq'],
                     dataset_id=dataset_id,
                     subject_id=subject_id,
                     segment_info={
                         "mode": "time",
                         "start": params.start_time,
-                        "end": params.end_time,
-                        "baseline": {
-                            "applied": params.apply_baseline,
-                            "start": params.baseline_start,
-                            "end": params.baseline_end
-                        }
+                        "end": params.end_time
+                    }
+                )
+                
+            elif params.segment_mode == "eeglab":
+                # EEGLAB风格分段
+                sfreq = raw.info['sfreq']
+                segment_length_samples = int(params.segment_length * sfreq)
+                overlap_samples = int(segment_length_samples * (params.segment_overlap / 100))
+                step_size = segment_length_samples - overlap_samples
+                
+                # 提取数据
+                all_data, all_times = raw[:, :]
+                
+                # 创建段
+                segments = []
+                for start_sample in range(0, len(all_times) - segment_length_samples + 1, step_size):
+                    end_sample = start_sample + segment_length_samples
+                    segment_data = all_data[:, start_sample:end_sample]
+                    segment_times = all_times[start_sample:end_sample]
+                    
+                    segments.append({
+                        "data": segment_data,
+                        "times": segment_times,
+                        "start_time": segment_times[0],
+                        "end_time": segment_times[-1]
+                    })
+                
+                if not segments:
+                    raise ValueError("分段处理未产生任何有效段")
+                    
+                # 使用第一段的数据结构构建结果
+                ch_names = raw.ch_names
+                data_dict = {ch_names[i]: segments[0]["data"][i].tolist() for i in range(len(ch_names))}
+                
+                result = RawEEGData(
+                    data=data_dict,
+                    times=segments[0]["times"].tolist(),
+                    channels=ch_names,
+                    duration=segments[0]["times"][-1] - segments[0]["times"][0],
+                    sampling_rate=sfreq,
+                    dataset_id=dataset_id,
+                    subject_id=subject_id,
+                    segment_info={
+                        "mode": "eeglab",
+                        "segments": [
+                            {
+                                "start": seg["start_time"],
+                                "end": seg["end_time"],
+                                "index": i
+                            } for i, seg in enumerate(segments)
+                        ],
+                        "current_segment_index": 0,
+                        "total_segments": len(segments),
+                        "segment_length": params.segment_length,
+                        "segment_overlap": params.segment_overlap
+                    }
+                )
+                
+            elif params.segment_mode == "event":
+                # 事件相关分段
+                # 获取事件信息
+                events = self._get_events(dataset_id, subject_id)
+                
+                # 筛选指定事件
+                target_events = [ev for ev in events if ev.get('id') == params.event_id]
+                if not target_events:
+                    raise ValueError(f"未找到指定事件ID: {params.event_id}")
+                
+                # 提取事件时间点
+                event_times = [ev.get('onset') for ev in target_events]
+                
+                # 提取数据
+                sfreq = raw.info['sfreq']
+                segments = []
+                
+                for event_time in event_times:
+                    # 计算事件窗口
+                    start_time = event_time - params.pre_event
+                    end_time = event_time + params.post_event
+                    
+                    # 提取数据
+                    try:
+                        data, times = self.dataset_service._get_time_slice(
+                            raw, start_time, end_time - start_time
+                        )
+                        
+                        segments.append({
+                            "data": data,
+                            "times": times,
+                            "event_time": event_time,
+                            "start_time": start_time,
+                            "end_time": end_time
+                        })
+                    except Exception as e:
+                        print(f"提取事件时间点 {event_time} 的数据失败: {str(e)}")
+                        continue
+                
+                if not segments:
+                    raise ValueError("未能提取任何有效的事件相关段")
+                    
+                # 使用第一段的数据结构构建结果
+                ch_names = raw.ch_names
+                data_dict = {ch_names[i]: segments[0]["data"][i].tolist() for i in range(len(ch_names))}
+                
+                result = RawEEGData(
+                    data=data_dict,
+                    times=segments[0]["times"].tolist(),
+                    channels=ch_names,
+                    duration=segments[0]["times"][-1] - segments[0]["times"][0],
+                    sampling_rate=sfreq,
+                    dataset_id=dataset_id,
+                    subject_id=subject_id,
+                    segment_info={
+                        "mode": "event",
+                        "segments": [
+                            {
+                                "start": seg["start_time"],
+                                "end": seg["end_time"],
+                                "event_time": seg["event_time"],
+                                "index": i
+                            } for i, seg in enumerate(segments)
+                        ],
+                        "current_segment_index": 0,
+                        "total_segments": len(segments),
+                        "event_id": params.event_id,
+                        "pre_event": params.pre_event,
+                        "post_event": params.post_event
                     }
                 )
             
-            elif params.segment_mode == "event":
-                # 事件相关分段
-                events = input_data.events or []
-                target_events = [e for e in events if e.name == params.event_name]
-                
-                if not target_events:
-                    raise ValueError(f"未找到名为 '{params.event_name}' 的事件")
-                
-                # 创建分段集合
-                segmented_datasets = []
-                
-                for event in target_events:
-                    event_time = event.time
-                    
-                    # 计算分段起止时间
-                    segment_start = event_time - params.pre_event
-                    segment_end = event_time + params.post_event
-                    
-                    # 确保分段在有效范围内
-                    if segment_start < 0:
-                        segment_start = 0
-                    if segment_end > input_data.duration:
-                        segment_end = input_data.duration
-                    
-                    # 转换为采样点索引
-                    start_sample = int(segment_start * input_data.sampling_rate)
-                    end_sample = int(segment_end * input_data.sampling_rate)
-                    
-                    # 提取分段数据
-                    segment_data = {}
-                    segment_times = input_data.times[start_sample:end_sample]
-                    
-                    for channel in input_data.channels:
-                        segment_data[channel] = input_data.data[channel][start_sample:end_sample]
-                    
-                    # 基线校正
-                    if params.apply_baseline:
-                        # 相对于事件的基线时间
-                        baseline_start = params.baseline_start  # 相对事件的时间，例如 -0.2 表示事件前200ms
-                        baseline_end = params.baseline_end      # 相对事件的时间，例如 0 表示事件发生时
-                        
-                        # 转换为相对分段起始的索引
-                        baseline_start_idx = int((baseline_start + params.pre_event) * input_data.sampling_rate)
-                        baseline_end_idx = int((baseline_end + params.pre_event) * input_data.sampling_rate)
-                        
-                        if baseline_start_idx >= 0 and baseline_end_idx <= len(segment_times):
-                            # 对每个通道应用基线校正
-                            for channel in input_data.channels:
-                                baseline = np.mean(segment_data[channel][baseline_start_idx:baseline_end_idx])
-                                segment_data[channel] = [val - baseline for val in segment_data[channel]]
-                    
-                    # 创建单个分段的数据
-                    segmented_datasets.append({
-                        "data": segment_data,
-                        "times": segment_times,
-                        "event": event.name,
-                        "event_time": event_time,
-                        "start": segment_start,
-                        "end": segment_end
-                    })
-                
-                # 合并所有分段 (此处简化处理，实际可能需要更复杂的逻辑)
-                # 对于事件相关的分段，我们可以选择只返回第一个分段，或者平均所有分段
-                # 这里我们简化为只返回第一个分段
-                if segmented_datasets:
-                    first_segment = segmented_datasets[0]
-                    
-                    result = RawEEGData(
-                        data=first_segment["data"],
-                        times=first_segment["times"],
-                        channels=input_data.channels,
-                        duration=first_segment["end"] - first_segment["start"],
-                        sampling_rate=input_data.sampling_rate,
-                        dataset_id=dataset_id,
-                        subject_id=subject_id,
-                        segment_info={
-                            "mode": "event",
-                            "event": params.event_name,
-                            "pre_event": params.pre_event,
-                            "post_event": params.post_event,
-                            "baseline": {
-                                "applied": params.apply_baseline,
-                                "start": params.baseline_start,
-                                "end": params.baseline_end
-                            },
-                            "segments_count": len(segmented_datasets)
-                        }
-                    )
-                else:
-                    raise ValueError("未能创建任何有效的分段")
             else:
                 raise ValueError(f"不支持的分段模式: {params.segment_mode}")
             
-            # 计算处理时间
-            process_time = time.time() - start_time
-            print(f"分段处理完成，耗时: {process_time:.2f}秒")
+            # 如果需要基线校正
+            if params.apply_baseline:
+                result = self._apply_baseline_correction(
+                    result, params.baseline_start, params.baseline_end
+                )
             
-            # 缓存处理结果
-            params_dict = params.dict()
+            # 保存元数据
             metadata = {
-                'params': params_dict,
-                'process_time': process_time,
-                'timestamp': time.time()
+                "params": params.dict(),
+                "segment_mode": params.segment_mode,
+                "process_time": time.time() - start_time
             }
-            
             save_metadata(cache_meta_key, metadata)
+            
+            # 缓存结果
             save_to_cache(cache_key, result)
-            print(f"已缓存分段结果: {cache_key}")
+            return result
+            
+        except Exception as e:
+            print(f"分段处理错误: {str(e)}")
+            raise e
+
+    def _apply_baseline_correction(self, raw_data: RawEEGData, start: float, end: float) -> RawEEGData:
+        """应用基线校正"""
+        try:
+            # 转换为numpy数组进行处理
+            data_dict = raw_data.data
+            times = raw_data.times
+            
+            # 找到基线范围的索引
+            start_idx = np.where(np.array(times) >= start)[0][0] if start > times[0] else 0
+            end_idx = np.where(np.array(times) <= end)[0][-1] if end < times[-1] else len(times) - 1
+            
+            # 对每个通道应用基线校正
+            for channel in data_dict.keys():
+                channel_data = np.array(data_dict[channel])
+                baseline_mean = np.mean(channel_data[start_idx:end_idx+1])
+                channel_data = channel_data - baseline_mean
+                data_dict[channel] = channel_data.tolist()
+            
+            # 创建新的RawEEGData对象
+            result = RawEEGData(
+                data=data_dict,
+                times=times,
+                channels=raw_data.channels,
+                duration=raw_data.duration,
+                sampling_rate=raw_data.sampling_rate,
+                dataset_id=raw_data.dataset_id,
+                subject_id=raw_data.subject_id,
+                segment_info=raw_data.segment_info
+            )
+            
+            # 添加基线校正信息
+            if result.segment_info:
+                result.segment_info["baseline_corrected"] = True
+                result.segment_info["baseline_start"] = start
+                result.segment_info["baseline_end"] = end
             
             return result
+            
         except Exception as e:
-            error_msg = f"分段处理失败: {str(e)}"
-            print(error_msg)
-            raise ValueError(error_msg)
+            print(f"基线校正错误: {str(e)}")
+            raise e
+
+    def _get_events(self, dataset_id: str, subject_id: str):
+        """获取事件信息"""
+        try:
+            # 从数据集服务获取事件信息
+            events_info = self.dataset_service.get_events_info(dataset_id, subject_id)
+            return events_info.get("events", [])
+        except Exception as e:
+            print(f"获取事件信息失败: {str(e)}")
+            return []
 
     def detect_bad_segments(self, dataset_id: str, subject_id: str, params: BadSegmentParams) -> RawEEGData:
         """检测并剔除坏段"""

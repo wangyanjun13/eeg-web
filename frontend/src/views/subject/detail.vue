@@ -25,6 +25,24 @@ const { isLoading: loading, withLoading } = useLoading({
 const timeRange = ref([0, 10]);
 const selectedChannels = ref([]);
 
+// 增加时间选择模式
+const timeSelectionMode = ref('default'); // 'default', 'full', 'custom'
+const customTimeRange = ref([0, 10]);
+
+// 根据模式计算实际时间范围
+const actualTimeRange = computed(() => {
+  switch(timeSelectionMode.value) {
+    case 'default':
+      return [0, 10];
+    case 'full':
+      return [0, subjectInfo.value?.duration || 10];
+    case 'custom':
+      return customTimeRange.value;
+    default:
+      return [0, 10];
+  }
+});
+
 // 获取受试者信息
 const fetchSubjectInfo = async () => {
   try {
@@ -67,8 +85,15 @@ const fetchEEGData = async () => {
 
 // 更新时间范围
 const updateTimeRange = (newRange) => {
+  // 存储选择的时间范围，以便在后续处理步骤中使用
+  localStorage.setItem('selected_time_range', JSON.stringify(newRange));
   timeRange.value = newRange;
   fetchEEGData(); // 获取新时间范围的数据
+};
+
+// 应用时间选择
+const applyTimeSelection = () => {
+  updateTimeRange(actualTimeRange.value);
 };
 
 // 更新选中的通道
@@ -80,6 +105,17 @@ const updateSelectedChannels = (channels) => {
 // 页面加载时获取数据
 onMounted(() => {
   fetchSubjectInfo();
+  
+  // 尝试从localStorage读取之前保存的时间范围
+  const savedTimeRange = localStorage.getItem('selected_time_range');
+  if (savedTimeRange) {
+    try {
+      timeRange.value = JSON.parse(savedTimeRange);
+    } catch (e) {
+      console.error('解析保存的时间范围失败:', e);
+    }
+  }
+  
   fetchEEGData();
 });
 
@@ -87,6 +123,7 @@ const workflowRef = ref(null);
 
 // 前往下一步
 function goToNextStep() {
+  localStorage.setItem('selected_time_range', JSON.stringify(timeRange.value));
   workflowRef.value?.goToNextStep();
 }
 </script>
@@ -131,24 +168,34 @@ function goToNextStep() {
           <div class="card-header">
             <h3>EEG原始时间序列可视化</h3>
             <div class="data-controls">
-              <el-input-number 
-                v-model="timeRange[0]" 
-                :min="0" 
-                :max="subjectInfo?.duration - 1" 
-                :step="1"
-                @change="updateTimeRange(timeRange)"
-                style="width: 120px; margin-right: 10px;"
-              />
-              <span>至</span>
-              <el-input-number 
-                v-model="timeRange[1]" 
-                :min="timeRange[0] + 1" 
-                :max="subjectInfo?.duration" 
-                :step="1"
-                @change="updateTimeRange(timeRange)"
-                style="width: 120px; margin-left: 10px;"
-              />
-              <span style="margin-left: 5px;">秒</span>
+              <el-radio-group v-model="timeSelectionMode" size="small" style="margin-bottom: 10px;">
+                <el-radio-button label="default">默认(0-10s)</el-radio-button>
+                <el-radio-button label="full">全部时间</el-radio-button>
+                <el-radio-button label="custom">自定义</el-radio-button>
+              </el-radio-group>
+              
+              <div v-if="timeSelectionMode === 'custom'" style="display: flex; align-items: center; margin: 8px 0;">
+                <el-input-number 
+                  v-model="customTimeRange[0]" 
+                  :min="0" 
+                  :max="subjectInfo?.duration - 1" 
+                  :step="1"
+                  style="width: 120px; margin-right: 10px;"
+                />
+                <span>至</span>
+                <el-input-number 
+                  v-model="customTimeRange[1]" 
+                  :min="customTimeRange[0] + 1" 
+                  :max="subjectInfo?.duration" 
+                  :step="1"
+                  style="width: 120px; margin-left: 10px;"
+                />
+                <span style="margin-left: 5px;">秒</span>
+              </div>
+              
+              <el-button type="primary" size="small" @click="applyTimeSelection" style="margin-left: 10px;">
+                应用时间选择
+              </el-button>
             </div>
           </div>
         </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import analysisService from '@/services/analysisService';
 import { useLoading } from '@/composables/useLoading';
@@ -52,24 +52,61 @@ const applyBaseline = ref(true);
 const baselineStart = ref(-0.2);
 const baselineEnd = ref(0);
 
+// 增加EEGLAB风格的分段选项
+const eegLabStyleSegmentation = ref(false);
+const segmentLength = ref(1); // 段长度(秒)
+const segmentOverlap = ref(0); // 段重叠(%)
+const removeIncomplete = ref(true); // 是否移除不完整段
+
+// 增加强制使用原始数据的选项
+const useOriginalFullData = ref(false);
+
+// 获取数据的实际长度
+const dataLength = computed(() => {
+  if (!props.originalData) return 0;
+  return props.originalData.duration || 10;
+});
+
+// 计算可能的段数
+const possibleSegments = computed(() => {
+  if (segmentLength.value <= 0) return 0;
+  
+  const effectiveLength = useOriginalFullData.value ? 
+    dataLength.value : 
+    timeSegmentEnd.value - timeSegmentStart.value;
+  
+  const overlapFactor = segmentOverlap.value / 100;
+  const effectiveSegmentLength = segmentLength.value * (1 - overlapFactor);
+  
+  return Math.floor((effectiveLength - (overlapFactor * segmentLength.value)) / effectiveSegmentLength);
+});
+
 // 获取可用事件列表
 const fetchAvailableEvents = async () => {
   try {
     if (!props.originalData) return;
     
-    // 实际情况下应通过API获取
-    availableEvents.value = props.originalData.events || [];
+    // 尝试从原始数据中提取事件信息
+    if (props.originalData.events && props.originalData.events.length > 0) {
+      availableEvents.value = props.originalData.events;
+    } else {
+      // 尝试通过API获取事件信息
+      const response = await analysisService.getEvents(props.datasetId, props.subjectId);
+      if (response && response.data) {
+        availableEvents.value = response.data;
+      }
+    }
     
     if (availableEvents.value.length > 0) {
-      selectedEvent.value = availableEvents.value[0].name;
+      selectedEvent.value = availableEvents.value[0].id || availableEvents.value[0].name;
     }
   } catch (error) {
     console.error('获取事件列表失败:', error);
-    ElMessage.error('获取事件列表失败');
+    ElMessage.warning('未能加载事件信息，事件相关分段可能无法使用');
   }
 };
 
-// 应用分段
+// 应用分段的实现
 const applySegmentation = async () => {
   if (!props.originalData) {
     ElMessage.warning('请先加载原始数据');
@@ -77,44 +114,38 @@ const applySegmentation = async () => {
   }
 
   try {
+    // 构建分段参数
     const params = {
       segment_mode: segmentMode.value,
+      // 基本参数
+      use_original_full_data: useOriginalFullData.value,
+      
       // 时间分段参数
       start_time: timeSegmentStart.value,
       end_time: timeSegmentEnd.value,
+      
+      // EEGLAB风格分段参数
+      eeglab_style: eegLabStyleSegmentation.value,
+      segment_length: segmentLength.value,
+      segment_overlap: segmentOverlap.value,
+      remove_incomplete: removeIncomplete.value,
+      
       // 事件分段参数
-      event_name: selectedEvent.value,
+      event_id: selectedEvent.value,
       pre_event: preEventTime.value,
       post_event: postEventTime.value,
-      // 额外是否应用基线校正
+      
+      // 基线校正参数
       apply_baseline: applyBaseline.value,
       baseline_start: baselineStart.value,
       baseline_end: baselineEnd.value
     };
 
-    // TODO: 实际API调用
-    // const response = await withLoading(
-    //   analysisService.segmentData(props.datasetId, props.subjectId, params),
-    //   'processing'
-    // );
-    
-    // 模拟响应
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const response = {
-      data: {
-        ...props.originalData,
-        // 模拟分段后的数据
-        segment_info: {
-          mode: segmentMode.value,
-          segments: segmentMode.value === 'time' 
-            ? [{ start: timeSegmentStart.value, end: timeSegmentEnd.value }]
-            : [{ event: selectedEvent.value, pre: preEventTime.value, post: postEventTime.value }]
-        },
-        from_cache: false,
-        process_time: 0.5
-      }
-    };
+    // 调用实际API
+    const response = await withLoading(
+      analysisService.segmentData(props.datasetId, props.subjectId, params),
+      'processing'
+    );
 
     emit('process-complete', response.data);
     ElMessage.success('数据分段应用成功');
@@ -125,18 +156,42 @@ const applySegmentation = async () => {
   }
 };
 
-// 组件挂载后获取事件列表
-onMounted(fetchAvailableEvents);
+// 初始化时从localStorage加载保存的时间范围
+onMounted(() => {
+  // 从localStorage读取之前保存的时间范围
+  const savedTimeRange = localStorage.getItem('selected_time_range');
+  if (savedTimeRange) {
+    try {
+      const parsedRange = JSON.parse(savedTimeRange);
+      timeSegmentStart.value = parsedRange[0];
+      timeSegmentEnd.value = parsedRange[1];
+    } catch (e) {
+      console.error('解析保存的时间范围失败:', e);
+    }
+  }
+  
+  fetchAvailableEvents();
+});
 </script>
 
 <template>
   <div class="segment-processor">
     <h3>数据分段设置</h3>
     
-    <el-form label-position="left" label-width="80px" class="compact-form">
+    <el-form label-position="left" label-width="100px" class="compact-form">
+      <!-- 使用原始全部数据的选项 -->
+      <el-form-item label="数据范围">
+        <el-switch
+          v-model="useOriginalFullData"
+          active-text="使用完整原始数据"
+          inactive-text="使用当前选择的时间段"
+        />
+      </el-form-item>
+      
       <el-form-item label="分段模式">
         <el-radio-group v-model="segmentMode" size="small">
           <el-radio-button label="time">时间窗口</el-radio-button>
+          <el-radio-button label="eeglab">EEGLAB风格</el-radio-button>
           <el-radio-button label="event">事件相关</el-radio-button>
         </el-radio-group>
       </el-form-item>
@@ -169,6 +224,41 @@ onMounted(fetchAvailableEvents);
         
         <el-form-item label="分段长度">
           <span>{{ segmentDuration.toFixed(2) }} 秒</span>
+        </el-form-item>
+      </template>
+      
+      <!-- EEGLAB风格分段 -->
+      <template v-else-if="segmentMode === 'eeglab'">
+        <el-form-item label="段长度">
+          <el-input-number 
+            v-model="segmentLength" 
+            :min="0.1" 
+            :max="dataLength" 
+            :step="0.1"
+            size="small"
+            class="small-input"
+          />
+          <span class="unit">秒</span>
+        </el-form-item>
+        
+        <el-form-item label="段重叠">
+          <el-input-number 
+            v-model="segmentOverlap" 
+            :min="0" 
+            :max="90" 
+            :step="5"
+            size="small"
+            class="small-input"
+          />
+          <span class="unit">%</span>
+        </el-form-item>
+        
+        <el-form-item label="移除不完整段">
+          <el-switch v-model="removeIncomplete" />
+        </el-form-item>
+        
+        <el-form-item label="预计段数">
+          <span>{{ possibleSegments }} 段</span>
         </el-form-item>
       </template>
       
