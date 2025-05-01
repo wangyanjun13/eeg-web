@@ -342,6 +342,16 @@ export function useAnalysis(datasetId, subjectId) {
       }
       saveResults(type, result);
       
+      // 在返回结果前，确保处理后的数据保持相同的时间范围
+      if (result && result.data) {
+        const timeRange = originalData.value?.timeRange || [0, 10];
+        result.data = {
+          ...result.data,
+          timeRange: timeRange,
+          duration: timeRange[1] - timeRange[0]
+        };
+      }
+      
       return result;
     } catch (e) {
       error.value = `运行${type}分析失败: ${e.message || e}`;
@@ -360,9 +370,45 @@ export function useAnalysis(datasetId, subjectId) {
       isLoading.value = true;
       error.value = null;
       
-      // 调用相应的API获取原始数据
-      const response = await analysisService.getRawData(datasetId, subjectId);
-      originalData.value = response.data;
+      // 获取保存的时间范围
+      let timeRange = [0, 10];
+      try {
+        const savedTimeRange = localStorage.getItem('selected_time_range');
+        if (savedTimeRange) {
+          timeRange = JSON.parse(savedTimeRange);
+          console.log('useAnalysis: Using saved time range:', timeRange);
+        }
+      } catch (e) {
+        console.error('useAnalysis: Error parsing saved time range:', e);
+      }
+      
+      // 使用保存的时间范围获取数据
+      const response = await analysisService.getRawData(
+        datasetId, 
+        subjectId,
+        timeRange[0],
+        timeRange[1] - timeRange[0]
+      );
+      
+      // 修改返回的数据结构，确保包含正确的时间范围信息
+      const data = {
+        ...response.data,
+        times: response.data.times.filter(t => t >= timeRange[0] && t <= timeRange[1]),
+        duration: timeRange[1] - timeRange[0],
+        timeRange: timeRange
+      };
+
+      // 对每个通道的数据进行裁剪
+      if (data.data) {
+        Object.keys(data.data).forEach(channel => {
+          const startIndex = Math.floor(timeRange[0] * response.data.sampling_rate);
+          const endIndex = Math.ceil(timeRange[1] * response.data.sampling_rate);
+          data.data[channel] = data.data[channel].slice(startIndex, endIndex);
+        });
+      }
+      
+      originalData.value = data;
+      console.log('useAnalysis: Original data fetched with time range:', timeRange);
       
       return originalData.value;
     } catch (e) {

@@ -89,16 +89,41 @@ const fetchAvailableEvents = async () => {
     // 尝试从原始数据中提取事件信息
     if (props.originalData.events && props.originalData.events.length > 0) {
       availableEvents.value = props.originalData.events;
+      console.log('从原始数据中获取到事件:', availableEvents.value);
     } else {
       // 尝试通过API获取事件信息
-      const response = await analysisService.getEvents(props.datasetId, props.subjectId);
-      if (response && response.data) {
-        availableEvents.value = response.data;
+      try {
+        console.log('尝试从API获取事件信息...');
+        const response = await analysisService.getEvents(props.datasetId, props.subjectId);
+        if (response && response.data && response.data.events) {
+          availableEvents.value = response.data.events;
+          console.log('从API获取到事件:', availableEvents.value);
+        } else {
+          console.log('API返回的事件数据为空');
+        }
+      } catch (apiError) {
+        console.error('API获取事件失败:', apiError);
+        // API失败时，生成一些虚拟事件用于测试（只在开发环境中）
+        if (import.meta.env.DEV) {
+          availableEvents.value = [
+            { id: "target", name: "目标刺激", onset: 2.5 },
+            { id: "non-target", name: "非目标刺激", onset: 5.0 },
+            { id: "response", name: "反应", onset: 7.5 }
+          ];
+          console.log('使用测试事件数据');
+        }
       }
     }
     
-    if (availableEvents.value.length > 0) {
+    if (availableEvents.value && availableEvents.value.length > 0) {
       selectedEvent.value = availableEvents.value[0].id || availableEvents.value[0].name;
+      console.log('选择事件:', selectedEvent.value);
+    } else {
+      // 如果没有找到事件，禁用事件相关选项
+      if (segmentMode.value === 'event') {
+        segmentMode.value = 'time';
+        ElMessage.warning('未找到事件数据，已切换到时间窗口模式');
+      }
     }
   } catch (error) {
     console.error('获取事件列表失败:', error);

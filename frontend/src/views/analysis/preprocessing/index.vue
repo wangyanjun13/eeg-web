@@ -260,6 +260,12 @@ const handleNextStep = async () => {
       return;
     }
     
+    // 确保timeRange存在
+    if (!dataToPass.timeRange && timeRange.value) {
+      console.log('添加缺失的时间范围信息:', timeRange.value);
+      dataToPass.timeRange = [...timeRange.value];
+    }
+    
     // 防止空数据
     if (!dataToPass || !dataToPass.channels || dataToPass.channels.length === 0) {
       console.error('数据无效，缺少通道信息');
@@ -380,16 +386,7 @@ onMounted(async () => {
   if (savedTimeRange) {
     try {
       const parsedRange = JSON.parse(savedTimeRange);
-      // 更新请求参数中的时间范围
-      const params = {
-        start_time: parsedRange[0],
-        duration: parsedRange[1] - parsedRange[0]
-      };
-      // 更新获取原始数据的请求参数
-      fetchOptionsRef.value = {
-        ...fetchOptionsRef.value,
-        ...params
-      };
+      timeRange.value = parsedRange;
     } catch (e) {
       console.error('解析保存的时间范围失败:', e);
     }

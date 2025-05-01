@@ -84,16 +84,23 @@ const fetchEEGData = async () => {
 };
 
 // 更新时间范围
-const updateTimeRange = (newRange) => {
-  // 存储选择的时间范围，以便在后续处理步骤中使用
+const updateTimeRange = async (newRange) => {
+  console.log('Updating time range:', newRange);
+  // 先更新本地状态
+  timeRange.value = [...newRange]; // 使用解构创建新数组，确保触发响应式更新
+  
+  // 存储选择的时间范围
   localStorage.setItem('selected_time_range', JSON.stringify(newRange));
-  timeRange.value = newRange;
-  fetchEEGData(); // 获取新时间范围的数据
+  
+  // 立即获取新时间范围的数据
+  await fetchEEGData();
+  console.log('Time range updated and data fetched');
 };
 
 // 应用时间选择
-const applyTimeSelection = () => {
-  updateTimeRange(actualTimeRange.value);
+const applyTimeSelection = async () => {
+  console.log('Applying time selection:', actualTimeRange.value);
+  await updateTimeRange([...actualTimeRange.value]); // 使用解构创建新数组
 };
 
 // 更新选中的通道
@@ -203,10 +210,12 @@ function goToNextStep() {
         <div v-if="eegData" class="eeg-viewer-container">
           <EEGViewer 
             :data="eegData" 
-            v-model:timeRange="timeRange"
-            v-model:selectedChannels="selectedChannels"
+            :timeRange="timeRange"
+            :selectedChannels="selectedChannels"
             @update:timeRange="updateTimeRange"
             @update:selectedChannels="updateSelectedChannels"
+            :initialTimeRange="timeRange"
+            :persistTimeRange="true"
           />
           <!-- 下一步按钮放到图表右下角 -->
           <div class="next-step-button">

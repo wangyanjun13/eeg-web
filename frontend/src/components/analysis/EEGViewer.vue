@@ -77,14 +77,16 @@ const {
 // 在setup函数中，修改timeRange的初始化
 const timeRange = ref(props.initialTimeRange || [0, 10]);
 
-// 确保时间范围变化时触发事件
-watch(timeRange, (newRange) => {
-  if (props.persistTimeRange) {
-    // 存储到localStorage以便跨组件持久化
-    localStorage.setItem('eeg_time_range', JSON.stringify(newRange));
+// 确保时间范围变化时触发事件和更新图表
+watch(() => props.timeRange, (newRange) => {
+  if (newRange && Array.isArray(newRange)) {
+    console.log('EEGViewer: time range changed:', newRange);
+    timeRange.value = [...newRange];
+    nextTick(() => {
+      updateChart();
+    });
   }
-  emit('update:timeRange', newRange);
-}, { deep: true });
+}, { deep: true, immediate: true });
 
 // 导出组件设置函数供外部使用
 const setup = () => {
@@ -135,7 +137,7 @@ const handleSeriesMouseover = (params) => {
 }
 
 // 生成图表配置
-const getChartOption = (series, legendStatus) => {
+const getChartOption = (series = [], legendStatus = {}) => {
   const baseOption = {
     legend: {
       type: 'scroll',
@@ -143,7 +145,7 @@ const getChartOption = (series, legendStatus) => {
       top: 0,
       left: 'center',
       width: '90%',
-      data: props.selectedChannels,
+      data: Array.isArray(series) ? series.map(s => s.name) : [],
       textStyle: { fontSize: 12 },
       pageButtonItemGap: 5,
       pageButtonPosition: 'end',
@@ -174,11 +176,12 @@ const getChartOption = (series, legendStatus) => {
   };
   
   if (localViewMode.value === 'time') {
+    const timeRange = props.data.timeRange || props.timeRange;
     baseOption.xAxis = {
       type: 'value',
       name: '时间 (s)',
-      min: props.timeRange[0],
-      max: props.timeRange[1]
+      min: timeRange[0],
+      max: timeRange[1]
     };
     baseOption.yAxis = {
       type: 'value',
@@ -370,7 +373,7 @@ const debouncedUpdateChart = useDebounceFn(() => {
         color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
         opacity: 0.8
       }
-    }));
+    })).filter(s => s.data.length > 0); // 只保留有数据的系列
   } else {
     // 频域表示
     series = validChannels.map((channel, index) => {
@@ -406,10 +409,18 @@ const debouncedUpdateChart = useDebounceFn(() => {
   chart.setOption(getChartOption(series, legendStatus), true);
 }, 100)
 
-// 替换原来的updateChart函数调用为防抖版本
+// 修改 updateChart 函数
 const updateChart = () => {
+  if (!chart || !props.data) return;
+  
+  console.log('EEGViewer: updating chart with time range:', timeRange.value);
+  
+  // 确保使用当前的时间范围
+  const currentTimeRange = timeRange.value;
+  
+  // 调用 debouncedUpdateChart 而不是直接设置选项
   debouncedUpdateChart();
-}
+};
 
 // 监听 selectedChannels 变化
 watch(() => props.selectedChannels, () => {

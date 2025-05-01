@@ -140,6 +140,10 @@ const applyResampling = async () => {
       throw new Error('服务器返回数据无效');
     }
     
+    // 确保处理后的数据保持与原始数据相同的时间范围
+    const timeRange = props.originalData.timeRange || [0, 10];
+    response.data.timeRange = timeRange;
+    
     // 记录重采样已应用状态
     hasAppliedResampling.value = true;
     appliedSamplingRate.value = response.data.sampling_rate;

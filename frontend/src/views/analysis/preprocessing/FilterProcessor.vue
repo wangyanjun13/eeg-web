@@ -269,6 +269,10 @@ const applyFilter = async () => {
       throw new Error('服务器返回数据无效');
     }
 
+    // 确保处理后的数据保持与原始数据相同的时间范围
+    const timeRange = props.originalData.timeRange || [0, 10];
+    response.data.timeRange = timeRange;
+
     emit('process-complete', response.data);
     
     // 根据是否从缓存获取，显示不同的成功消息
