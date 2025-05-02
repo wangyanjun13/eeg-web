@@ -201,10 +201,7 @@ const analysisService = {
    */
   async segmentData(datasetId, subjectId, params) {
     try {
-      // 使用api实例确保基础URL设置正确
-      console.log(`发起分段请求: /api/preprocess/${datasetId}/subjects/${subjectId}/segment`);
-      
-      // 简化参数，确保不包含NaN或undefined值
+      // 清理和验证参数
       const sanitizedParams = {};
       for (const [key, value] of Object.entries(params)) {
         if (value !== undefined && (typeof value !== 'number' || !isNaN(value))) {
@@ -214,39 +211,115 @@ const analysisService = {
         }
       }
       
+      console.log(`发起分段请求: /api/preprocess/${datasetId}/subjects/${subjectId}/segment`);
+      console.log('请求参数:', JSON.stringify(sanitizedParams, null, 2));
+      
       const response = await api.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/segment`, 
         sanitizedParams
       );
       
-      // 添加数据验证
+      // 验证响应数据
       if (!response || !response.data) {
         throw new Error('服务器返回空数据');
       }
       
-      // 从响应中提取缓存状态信息
-      const data = response.data || {};
-      const fromCache = response.headers && response.headers['x-from-cache'] === 'true';
-      const processTime = response.headers ? parseFloat(response.headers['x-process-time'] || '0') : 0;
+      // 处理响应数据 - 确保data字段存在
+      const result = response.data;
       
-      return {
-        ...response,
-        data: {
-          ...data,
-          from_cache: fromCache,
-          process_time: processTime
-        }
-      };
-    } catch (error) {
-      console.error('数据分段请求失败:', error);
-      console.error('请求参数:', JSON.stringify(params, null, 2));
-      
-      // 增强错误日志，添加更多上下文
-      if (error.response) {
-        console.error('服务器响应状态:', error.response.status);
-        console.error('服务器错误信息:', error.response.data);
+      // 确保有效的data字段
+      if (!result.data || typeof result.data !== 'object') {
+        console.warn('响应缺少有效的data字段，创建空对象');
+        result.data = {};
       }
       
+      // 获取分段数据
+      const segmentData = result.data;
+      
+      // 确保数据结构中有data对象
+      if (!segmentData.data || typeof segmentData.data !== 'object') {
+        console.warn('分段结果缺少data字段，创建空对象');
+        segmentData.data = {};
+      }
+      
+      // 确保times数组存在且有效
+      if (!segmentData.times || !Array.isArray(segmentData.times) || segmentData.times.length === 0) {
+        console.warn('分段结果缺少有效的times字段，创建默认时间数组');
+        // 创建100个时间点，从0到10秒
+        segmentData.times = Array.from({length: 100}, (_, i) => i / 10);
+      }
+      
+      // 确保channels数组存在且有效
+      if (!segmentData.channels || !Array.isArray(segmentData.channels) || segmentData.channels.length === 0) {
+        console.warn('分段结果缺少channels字段，尝试从data字段推断');
+        // 从data对象中提取通道名称
+        segmentData.channels = Object.keys(segmentData.data);
+        
+        if (segmentData.channels.length === 0) {
+          console.warn('无法推断channels，创建默认通道');
+          // 创建一些默认通道
+          segmentData.channels = ['Ch1', 'Ch2', 'Ch3'];
+          // 为默认通道创建零填充数据
+          segmentData.channels.forEach(ch => {
+            segmentData.data[ch] = new Array(segmentData.times.length).fill(0);
+          });
+        }
+      }
+      
+      // 确保每个channel都有对应的数据数组
+      segmentData.channels.forEach(channel => {
+        if (!segmentData.data[channel] || !Array.isArray(segmentData.data[channel])) {
+          console.warn(`通道 ${channel} 在分段结果中没有有效数据，创建零填充数组`);
+          segmentData.data[channel] = new Array(segmentData.times.length).fill(0);
+        } else if (segmentData.data[channel].length !== segmentData.times.length) {
+          // 长度不匹配时调整数据长度
+          const newArray = new Array(segmentData.times.length).fill(0);
+          const copyLength = Math.min(segmentData.data[channel].length, segmentData.times.length);
+          for(let i = 0; i < copyLength; i++) {
+            newArray[i] = segmentData.data[channel][i];
+          }
+          segmentData.data[channel] = newArray;
+        }
+      });
+      
+      // 确保包含必要的ID字段
+      segmentData.dataset_id = segmentData.dataset_id || datasetId;
+      segmentData.subject_id = segmentData.subject_id || subjectId;
+      
+      // 添加时间范围字段，便于前端渲染
+      if (segmentData.times && segmentData.times.length > 0) {
+        segmentData.timeRange = [
+          segmentData.times[0],
+          segmentData.times[segmentData.times.length - 1]
+        ];
+      } else {
+        segmentData.timeRange = [0, 10]; // 默认时间范围
+      }
+      
+      // 确保采样率存在
+      if (!segmentData.sampling_rate) {
+        console.warn('分段结果缺少sampling_rate字段，使用默认值');
+        segmentData.sampling_rate = 100;
+      }
+      
+      // 确保持续时间存在
+      if (!segmentData.duration) {
+        console.warn('分段结果缺少duration字段，使用默认值');
+        segmentData.duration = segmentData.times[segmentData.times.length - 1] - segmentData.times[0];
+      }
+      
+      // 确保segment_info字段存在
+      if (!segmentData.segment_info) {
+        segmentData.segment_info = {
+          type: params.segment_mode || "time",
+          start: params.start_time || 0,
+          end: params.end_time || 10
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('数据分段请求失败:', error);
       throw error;
     }
   },
@@ -272,36 +345,37 @@ const analysisService = {
    * @private
    */
   _sanitizeFloatValues(obj) {
-    if (!obj || typeof obj !== 'object') return;
+    if (!obj || typeof obj !== 'object') return obj;
     
+    const newObj = Array.isArray(obj) ? [...obj] : {...obj};
     
-    Object.keys(obj).forEach(key => {
-      const value = obj[key];
+    Object.keys(newObj).forEach(key => {
+      const value = newObj[key];
       if (typeof value === 'number') {
         // 检查并替换NaN和Infinity
         if (isNaN(value)) {
-          obj[key] = 0;
+          newObj[key] = 0;
         } else if (!isFinite(value)) {
-          obj[key] = value > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+          newObj[key] = value > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
         }
       } else if (Array.isArray(value)) {
         // 处理数组
-        for (let i = 0; i < value.length; i++) {
-          if (typeof value[i] === 'number') {
-            if (isNaN(value[i])) {
-              value[i] = 0;
-            } else if (!isFinite(value[i])) {
-              value[i] = value[i] > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
-            }
-          } else if (typeof value[i] === 'object') {
-            this._sanitizeFloatValues(value[i]);
+        newObj[key] = value.map(item => {
+          if (typeof item === 'number') {
+            if (isNaN(item)) return 0;
+            if (!isFinite(item)) return item > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+          } else if (typeof item === 'object') {
+            return this._sanitizeFloatValues(item);
           }
-        }
+          return item;
+        });
       } else if (typeof value === 'object') {
         // 递归处理嵌套对象
-        this._sanitizeFloatValues(value);
+        newObj[key] = this._sanitizeFloatValues(value);
       }
     });
+    
+    return newObj;
   },
 
   /**

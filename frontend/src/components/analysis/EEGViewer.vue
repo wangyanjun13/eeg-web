@@ -102,17 +102,29 @@ defineExpose({
 
 // 图表初始化和更新
 const initChart = () => {
-  if (chart) chart.dispose()
-  chart = echarts.init(chartRef.value, themeStyle.value)
+  if (!chartRef.value) {
+    // DOM 元素不存在，延迟初始化
+    setTimeout(() => initChart(), 50);
+    return;
+  }
   
-  // 事件监听统一设置
-  chart.on('legendselectchanged', ({selected}) => legendSelected.value = {...legendSelected.value, ...selected})
-  chart.on('mouseover', 'series', handleSeriesMouseover)
-  chart.on('mouseout', 'series', () => chart.setOption({tooltip: {showContent: false}}))
-  
-  window.addEventListener('resize', () => chart?.resize())
-  updateChart()
-}
+  if (chart) chart.dispose();
+  try {
+    chart = echarts.init(chartRef.value, themeStyle.value);
+    
+    // 事件监听统一设置
+    chart.on('legendselectchanged', ({selected}) => legendSelected.value = {...legendSelected.value, ...selected});
+    chart.on('mouseover', 'series', handleSeriesMouseover);
+    chart.on('mouseout', 'series', () => chart.setOption({tooltip: {showContent: false}}));
+    
+    window.addEventListener('resize', () => chart?.resize());
+    updateChart();
+  } catch (error) {
+    console.error('ECharts 初始化失败:', error);
+    // 如果初始化失败，延迟重试
+    setTimeout(() => initChart(), 100);
+  }
+};
 
 // 鼠标悬停处理
 const handleSeriesMouseover = (params) => {
@@ -356,27 +368,53 @@ const debouncedUpdateChart = useDebounceFn(() => {
   
   if (localViewMode.value === 'time') {
     // 时域表示
-    series = validChannels.map((channel, index) => ({
-      name: channel,
-      type: 'line',
-      showSymbol: false,
-      sampling: 'lttb',
-      data: props.data.data[channel]?.map((value, idx) => [
-        props.data.times[idx],
-        value
-      ]).filter(point => 
-        point && point[0] >= props.timeRange[0] && point[0] <= props.timeRange[1]
-      ) || [],
-      animationDuration: 0,
-      emphasis: { focus: 'none' },
-      itemStyle: {
-        color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
-        opacity: 0.8
-      }
-    })).filter(s => s.data.length > 0); // 只保留有数据的系列
-  } else {
-    // 频域表示
     series = validChannels.map((channel, index) => {
+      // 添加健壮性检查，确保通道数据存在
+      if (!props.data.data || !props.data.data[channel]) {
+        console.warn(`通道 ${channel} 数据不存在，将被跳过`);
+        return {
+          name: channel,
+          type: 'line',
+          showSymbol: false,
+          data: [],
+          animationDuration: 0
+        };
+      }
+      
+      return {
+        name: channel,
+        type: 'line',
+        showSymbol: false,
+        sampling: 'lttb',
+        data: props.data.data[channel]?.map((value, idx) => [
+          props.data.times[idx],
+          value
+        ]).filter(point => 
+          point && point[0] >= props.timeRange[0] && point[0] <= props.timeRange[1]
+        ) || [],
+        animationDuration: 0,
+        emphasis: { focus: 'none' },
+        itemStyle: {
+          color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
+          opacity: 0.8
+        }
+      };
+    }).filter(s => s.data && s.data.length > 0); // 只保留有数据的系列
+  } else {
+    // 频域表示 - 同样添加健壮性检查
+    series = validChannels.map((channel, index) => {
+      // 确保通道数据存在
+      if (!props.data.data || !props.data.data[channel]) {
+        console.warn(`通道 ${channel} 数据不存在，将被跳过`);
+        return {
+          name: channel,
+          type: 'line',
+          showSymbol: false,
+          data: [],
+          animationDuration: 0
+        };
+      }
+      
       const spectrumData = calculateSpectrumData(
         props.data.data[channel], 
         props.data.times
@@ -394,7 +432,7 @@ const debouncedUpdateChart = useDebounceFn(() => {
           opacity: 0.8
         }
       };
-    });
+    }).filter(s => s.data && s.data.length > 0); // 只保留有数据的系列
   }
 
   // 准备图例状态

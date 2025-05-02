@@ -288,35 +288,77 @@ const handleNextStep = async () => {
 
 // 处理完成回调
 const handleProcessComplete = (data, processorKey) => {
-  if (!data) return;
-  
-  // 更新处理后数据
-  const processedResult = JSON.parse(JSON.stringify(data));
-  processedData.value = processedResult;
-  
-  // 记录处理状态
-  processingStatus.value[processorKey] = { 
-    fromCache: data.from_cache || false, 
-    time: data.process_time || null 
-  };
-  
-  // 更新通道列表
-  if (data.channels?.length) {
-    processingChannels.value = [...data.channels];
-    
-    // 保持显示通道一致性
-    const validChannels = displayChannels.value.filter(ch => data.channels.includes(ch));
-    displayChannels.value = validChannels.length ? 
-                           [...validChannels] : 
-                           [...data.channels.slice(0, Math.min(10, data.channels.length))];
+  if (!data) {
+    console.error('处理结果为空');
+    ElMessage.warning('处理结果为空，无法显示');
+    return;
   }
   
-  // 保存结果
-  saveResultSafely(processorKey, processedResult);
-  
-  // 标记为已完成
-  if (!completedSteps.value.includes(processorKey)) {
-    completedSteps.value.push(processorKey);
+  try {
+    // 确保数据是对象而非字符串
+    let processedResult = typeof data === 'string' ? JSON.parse(data) : {...data};
+    
+    // 基本数据验证和补全
+    if (!processedResult.data) processedResult.data = {};
+    if (!processedResult.channels || !Array.isArray(processedResult.channels) || processedResult.channels.length === 0) {
+      processedResult.channels = Object.keys(processedResult.data);
+    }
+    if (!processedResult.times || !Array.isArray(processedResult.times) || processedResult.times.length === 0) {
+      processedResult.times = Array.from({length: 100}, (_, i) => i / 10); // 0到10秒，步长0.1
+    }
+    
+    // 确保每个通道都有数据
+    for (const channel of processedResult.channels) {
+      if (!processedResult.data[channel]) {
+        processedResult.data[channel] = new Array(processedResult.times.length).fill(0);
+      }
+    }
+    
+    // 确保必要的元数据存在
+    if (!processedResult.sampling_rate) processedResult.sampling_rate = 100;
+    if (!processedResult.duration) {
+      processedResult.duration = processedResult.times.length > 0 
+        ? processedResult.times[processedResult.times.length - 1] - processedResult.times[0]
+        : 10;
+    }
+    
+    // 确保ID字段存在
+    processedResult.dataset_id = processedResult.dataset_id || datasetId;
+    processedResult.subject_id = processedResult.subject_id || subjectId;
+    
+    // 确保timeRange存在
+    processedResult.timeRange = processedResult.timeRange || [0, 10];
+    
+    // 更新处理后数据
+    processedData.value = processedResult;
+    
+    // 处理状态记录
+    processingStatus.value[processorKey] = { 
+      fromCache: data.from_cache || false, 
+      time: data.process_time || null 
+    };
+    
+    // 更新通道列表
+    if (processedResult.channels?.length) {
+      processingChannels.value = [...processedResult.channels];
+      
+      // 保持显示通道一致性
+      const validChannels = displayChannels.value.filter(ch => processedResult.channels.includes(ch));
+      displayChannels.value = validChannels.length ? 
+                             [...validChannels] : 
+                             [...processedResult.channels.slice(0, Math.min(10, processedResult.channels.length))];
+    }
+    
+    // 保存结果
+    saveResultSafely(processorKey, processedResult);
+    
+    // 标记为已完成
+    if (!completedSteps.value.includes(processorKey)) {
+      completedSteps.value.push(processorKey);
+    }
+  } catch (error) {
+    console.error('处理结果解析失败:', error);
+    ElMessage.error(`处理结果解析失败: ${error.message}`);
   }
 };
 

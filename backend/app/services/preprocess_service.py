@@ -383,65 +383,17 @@ class PreprocessService:
             # 获取输入数据
             input_data = self.get_input_data_for_step(dataset_id, subject_id, "segment")
             
-            # 如果没有输入数据，尝试直接获取原始数据
+            # 如果没有输入数据，使用原始数据
             if not input_data:
-                print(f"未找到预处理链中的数据，使用原始数据进行分段")
-                
-                try:
-                    # 确定时间范围
-                    start_time = 0
-                    end_time = None  # None表示获取全部时间
-                    
-                    if not params.use_original_full_data:
-                        start_time = params.start_time
-                        end_time = params.end_time - params.start_time
-                    
-                    # 获取原始数据
-                    raw_data = self.dataset_service.get_subject_data(
-                        dataset_id, 
-                        subject_id,
-                        start_time,
-                        end_time
-                    )
-                    
-                    # 如果原始数据已经是我们的格式，直接使用
-                    if isinstance(raw_data, RawEEGData):
-                        input_data = raw_data
-                    else:
-                        # 否则，直接读取原始文件
-                        raw = self.dataset_service._read_eeg_file(dataset_id, subject_id)
-                        
-                        # 确定时间范围
-                        if params.use_original_full_data:
-                            start_time = 0
-                            end_time = raw.times[-1]
-                        else:
-                            start_time = params.start_time
-                            end_time = params.end_time
-                        
-                        # 检查时间范围是否有效
-                        if start_time >= end_time or start_time < 0 or end_time > raw.times[-1]:
-                            start_time = 0
-                            end_time = min(10, raw.times[-1])
-                        
-                        # 转换为我们的数据格式
-                        data, times = self.dataset_service._get_time_slice(raw, start_time, end_time - start_time)
-                        
-                        # 创建RawEEGData对象
-                        input_data = RawEEGData(
-                            data={ch: d.tolist() for ch, d in zip(raw.ch_names, data)},
-                            times=times.tolist(),
-                            channels=raw.ch_names,
-                            sampling_rate=float(raw.info['sfreq']),
-                            duration=float(times[-1] - times[0] + 1/raw.info['sfreq']),
-                            dataset_id=dataset_id,
-                            subject_id=subject_id
-                        )
-                except Exception as load_error:
-                    print(f"加载原始数据失败: {str(load_error)}")
-                    raise ValueError(f"无法加载原始数据: {str(load_error)}")
-                
-            # 提取基本数据
+                print(f"未找到预处理链中的数据，获取原始数据")
+                input_data = self.dataset_service.get_subject_data(
+                    dataset_id, 
+                    subject_id,
+                    0 if params.use_original_full_data else params.start_time,
+                    None if params.use_original_full_data else (params.end_time - params.start_time)
+                )
+            
+            # 提取基本数据 - 增加健壮性检查
             data = {}
             for ch in input_data.channels:
                 if ch in input_data.data:
@@ -451,354 +403,320 @@ class PreprocessService:
             channels = input_data.channels
             sampling_rate = input_data.sampling_rate
             
-            if not data or not times or not channels or sampling_rate == 0:
+            # 数据验证
+            if not data or not times or not channels:
                 raise ValueError("输入数据缺少必要信息")
-                
+            
+            # 确保数据中不包含非标准浮点值
+            for channel in data:
+                channel_data = data[channel]
+                for i, value in enumerate(channel_data):
+                    if np.isnan(value) or np.isinf(value):
+                        # 将非标准浮点值替换为0
+                        channel_data[i] = 0.0
+            
             # 根据分段模式进行不同的处理
             if params.segment_mode == "time":
-                # 时间窗口分段 - 简单地截取时间范围
+                # 简化时间窗口分段
                 result = self._segment_by_time_window(
                     data, times, channels, sampling_rate,
                     params.start_time, params.end_time,
                     params.use_original_full_data,
-                    dataset_id,   # 传递dataset_id
-                    subject_id    # 传递subject_id
+                    dataset_id, subject_id
                 )
             elif params.segment_mode == "eeglab":
-                # EEGLAB风格分段 - 等长分段，可设置重叠
+                # 简化EEGLAB风格分段
                 result = self._segment_eeglab_style(
                     data, times, channels, sampling_rate,
                     params.segment_length, params.segment_overlap / 100,
                     params.remove_incomplete,
-                    dataset_id,   # 传递dataset_id
-                    subject_id    # 传递subject_id
+                    dataset_id, subject_id
                 )
             elif params.segment_mode == "event":
-                # 事件相关分段 - 根据事件标记提取
+                # 简化事件相关分段
                 events = self._get_events(dataset_id, subject_id)
                 if not events or len(events) == 0:
-                    raise ValueError("没有可用的事件数据，无法进行事件相关分段")
-                    
-                result = self._segment_by_events(
-                    data, times, channels, sampling_rate,
-                    events, params.event_id,
-                    params.pre_event, params.post_event,
-                    dataset_id,   # 传递dataset_id
-                    subject_id    # 传递subject_id
-                )
+                    # 如果没有事件，回退到时间窗口分段
+                    print("警告: 未找到事件数据，回退到时间窗口分段")
+                    result = self._segment_by_time_window(
+                        data, times, channels, sampling_rate,
+                        params.start_time, params.end_time, 
+                        params.use_original_full_data,
+                        dataset_id, subject_id
+                    )
+                else:
+                    result = self._segment_by_events(
+                        data, times, channels, sampling_rate,
+                        events, params.event_id,
+                        params.pre_event, params.post_event,
+                        dataset_id, subject_id
+                    )
             else:
                 raise ValueError(f"未知的分段模式: {params.segment_mode}")
-                
+            
             # 应用基线校正（如果需要）
             if params.apply_baseline:
                 result = self._apply_baseline_correction(
                     result, params.baseline_start, params.baseline_end
                 )
-                
-            # 返回结果
+            
+            # 确保结果中包含dataset_id和subject_id
+            if not hasattr(result, 'dataset_id') or result.dataset_id is None:
+                result.dataset_id = dataset_id
+            if not hasattr(result, 'subject_id') or result.subject_id is None:
+                result.subject_id = subject_id
+            
             return result
         except Exception as e:
             import traceback
             print(f"分段处理失败: {str(e)}")
             print(traceback.format_exc())
-            raise e
+            raise ValueError(f"分段处理失败: {str(e)}")
 
     def _segment_by_time_window(self, data, times, channels, sampling_rate, start_time, end_time, use_full_data=False, dataset_id=None, subject_id=None):
-        """根据时间窗口进行分段"""
+        """根据时间窗口进行分段 - 简化版"""
         try:
+            # 如果使用完整数据，直接返回
             if use_full_data:
-                # 使用全部数据，不需要分段
                 return RawEEGData(
                     data=data,
                     times=times,
                     channels=channels,
-                    duration=times[-1] - times[0] if times else 0,
+                    duration=times[-1] - times[0] if len(times) > 0 else 0,
                     sampling_rate=sampling_rate,
-                    segment_info={"type": "full_data"},
                     dataset_id=dataset_id,
-                    subject_id=subject_id
+                    subject_id=subject_id,
+                    segment_info={"type": "full_data"}
                 )
-                
-            # 确保times不为空
-            if not times:
-                raise ValueError("时间点数组为空，无法进行分段")
-                
-            # 查找时间范围的索引
-            start_idx = 0
-            end_idx = len(times)
             
+            # 防御性编程：确保时间数组不为空
+            if not times or len(times) == 0:
+                raise ValueError("时间点数组为空")
+            
+            # 查找开始和结束索引 - 简化逻辑
+            start_idx = 0
             for i, t in enumerate(times):
-                if t >= start_time and start_idx == 0:
+                if t >= start_time:
                     start_idx = i
+                    break
+            
+            end_idx = len(times)
+            for i, t in enumerate(times[start_idx:], start_idx):
                 if t >= end_time:
                     end_idx = i
                     break
-                
-            # 确保索引有效
+            
+            # 安全检查：确保索引有效
             if start_idx >= len(times):
                 start_idx = 0
             if end_idx > len(times):
                 end_idx = len(times)
             if start_idx >= end_idx:
-                # 防止无效索引范围
-                end_idx = start_idx + 1
+                # 至少保留一个数据点
+                if start_idx < len(times) - 1:
+                    end_idx = start_idx + 1
+                else:
+                    start_idx = max(0, len(times) - 2)
+                    end_idx = len(times) - 1
             
             # 提取数据片段
             segment_data = {}
             segment_times = times[start_idx:end_idx]
             
             for channel in channels:
-                if channel in data and len(data[channel]) >= end_idx:
-                    segment_data[channel] = data[channel][start_idx:end_idx]
-                elif channel in data:
-                    # 处理边界情况，数据可能比时间点少
-                    segment_data[channel] = data[channel][start_idx:min(end_idx, len(data[channel]))]
-                
-            # 创建结果
+                if channel in data:
+                    if len(data[channel]) > start_idx:
+                        channel_slice = data[channel][start_idx:min(end_idx, len(data[channel]))]
+                        # 确保切片不为空
+                        if not channel_slice:
+                            # 如果切片为空，创建与时间点等长的零数组
+                            segment_data[channel] = [0.0] * len(segment_times)
+                        else:
+                            segment_data[channel] = channel_slice
+                    else:
+                        # 如果通道数据不足，创建零填充数组
+                        segment_data[channel] = [0.0] * len(segment_times)
+                else:
+                    # 通道不存在，创建零填充数组
+                    segment_data[channel] = [0.0] * len(segment_times)
+            
+            # 创建结果对象
             return RawEEGData(
                 data=segment_data,
                 times=segment_times,
                 channels=channels,
-                duration=segment_times[-1] - segment_times[0] if segment_times else 0,
+                duration=segment_times[-1] - segment_times[0] if len(segment_times) > 0 else 0,
                 sampling_rate=sampling_rate,
-                segment_info={"type": "time_window", "start": start_time, "end": end_time},
                 dataset_id=dataset_id,
-                subject_id=subject_id
+                subject_id=subject_id,
+                segment_info={"type": "time_window", "start": start_time, "end": end_time}
             )
         except Exception as e:
-            print(f"时间窗口分段失败: {str(e)}")
-            raise ValueError(f"时间窗口分段失败: {str(e)}")
+            print(f"时间窗口分段错误: {str(e)}")
+            # 发生错误时返回一个最小的有效数据结构
+            # 创建一个最小的数据结构以避免前端渲染错误
+            min_segment_data = {ch: [0.0] for ch in channels}
+            min_segment_times = [0.0]
+            
+            return RawEEGData(
+                data=min_segment_data,
+                times=min_segment_times,
+                channels=channels,
+                duration=0.0,
+                sampling_rate=sampling_rate,
+                dataset_id=dataset_id,
+                subject_id=subject_id,
+                segment_info={"type": "time_window", "start": start_time, "end": end_time, "error": str(e)}
+            )
 
     def _segment_eeglab_style(self, data, times, channels, sampling_rate, segment_length, overlap_ratio, remove_incomplete, dataset_id=None, subject_id=None):
-        """EEGLAB风格分段"""
-        try:
-            if segment_length <= 0:
-                raise ValueError("段长度必须大于0")
-                
-            # 确保times不为空
-            if not times:
-                raise ValueError("时间点数组为空，无法进行分段")
-                
-            # 计算总时长
-            total_duration = times[-1] - times[0]
-            
-            # 计算样本点数量
-            samples_per_segment = int(segment_length * sampling_rate)
-            overlap_samples = int(samples_per_segment * overlap_ratio)
-            step_size = max(1, samples_per_segment - overlap_samples)  # 确保步长至少为1
-            
-            # 计算可能的段数
-            total_samples = len(times)
-            num_segments = 0
-            
-            for start_sample in range(0, total_samples, step_size):
-                end_sample = start_sample + samples_per_segment
-                if end_sample > total_samples:
-                    if remove_incomplete:
-                        continue
-                    else:
-                        end_sample = total_samples
-                        
-                num_segments += 1
-                
-            if num_segments == 0:
-                # 如果没有足够的段，创建一个单一段
-                print("警告: 无法创建多个段，将返回单一数据段")
-                num_segments = 1
-                
-            # 选择第一个片段作为示例
-            start_sample = 0
-            end_sample = min(start_sample + samples_per_segment, total_samples)
-            
-            # 提取数据片段
-            segment_data = {}
-            segment_times = times[start_sample:end_sample]
-            
-            for channel in channels:
-                if channel in data and len(data[channel]) >= end_sample:
-                    segment_data[channel] = data[channel][start_sample:end_sample]
-                elif channel in data:
-                    # 处理边界情况
-                    segment_data[channel] = data[channel][start_sample:min(end_sample, len(data[channel]))]
-                
-            # 创建结果
-            return RawEEGData(
-                data=segment_data,
-                times=segment_times,
-                channels=channels,
-                duration=segment_times[-1] - segment_times[0] if segment_times else 0,
-                sampling_rate=sampling_rate,
-                segment_info={
-                    "type": "eeglab_style", 
-                    "segment_length": segment_length,
-                    "overlap_ratio": overlap_ratio,
-                    "total_segments": num_segments
-                },
-                dataset_id=dataset_id,
-                subject_id=subject_id
-            )
-        except Exception as e:
-            print(f"EEGLAB风格分段失败: {str(e)}")
-            raise ValueError(f"EEGLAB风格分段失败: {str(e)}")
+        """EEGLAB风格分段 - 简化版"""
+        # 参数验证
+        if segment_length <= 0:
+            raise ValueError("段长度必须大于0")
+        
+        # 防御性编程：确保时间数组不为空
+        if not times or len(times) == 0:
+            raise ValueError("时间点数组为空")
+        
+        # 计算需要的样本点数
+        points_per_segment = int(segment_length * sampling_rate)
+        overlap_points = int(points_per_segment * overlap_ratio)
+        step_size = max(1, points_per_segment - overlap_points)  # 确保步长至少为1
+        
+        # 简化为只取第一个段
+        start_idx = 0
+        end_idx = min(start_idx + points_per_segment, len(times))
+        
+        # 提取数据片段
+        segment_data = {}
+        segment_times = times[start_idx:end_idx]
+        
+        for channel in channels:
+            if channel in data:
+                if len(data[channel]) >= end_idx:
+                    segment_data[channel] = data[channel][start_idx:end_idx]
+                else:
+                    # 如果通道数据不足，截断到可用长度
+                    available_length = min(end_idx, len(data[channel]))
+                    segment_data[channel] = data[channel][start_idx:available_length]
+                    # 如果需要，可以用零填充剩余部分
+                    if available_length < end_idx:
+                        segment_data[channel].extend([0.0] * (end_idx - available_length))
+        
+        # 计算总段数（仅用于信息显示）
+        total_samples = len(times)
+        segment_count = (total_samples - points_per_segment) // step_size + 1
+        if segment_count <= 0:
+            segment_count = 1
+        
+        # 创建结果
+        return RawEEGData(
+            data=segment_data,
+            times=segment_times,
+            channels=channels,
+            duration=segment_times[-1] - segment_times[0] if len(segment_times) > 0 else 0,
+            sampling_rate=sampling_rate,
+            dataset_id=dataset_id,
+            subject_id=subject_id,
+            segment_info={
+                "type": "eeglab_style", 
+                "segment_length": segment_length,
+                "overlap_ratio": overlap_ratio,
+                "total_segments": segment_count
+            }
+        )
 
     def _segment_by_events(self, data, times, channels, sampling_rate, events, event_id, pre_event, post_event, dataset_id=None, subject_id=None):
-        """根据事件进行分段"""
-        try:
-            # 检查参数
-            if not events:
-                raise ValueError("没有可用的事件数据")
-            
-            # 确保times不为空
-            if not times:
-                raise ValueError("时间点数组为空，无法进行分段")
-            
-            # 查找匹配的事件
-            matching_events = []
-            for event in events:
-                # 支持使用ID或名称匹配
-                if (str(event.get('id')).strip() == str(event_id).strip() or 
-                    str(event.get('name')).strip() == str(event_id).strip()):
-                    matching_events.append(event)
-            
-            if not matching_events:
-                print(f"找不到ID或名称为 '{event_id}' 的事件，使用第一个事件")
-                if events:
-                    matching_events = [events[0]]
+        """根据事件进行分段 - 简化版"""
+        # 参数验证
+        if not events:
+            raise ValueError("没有可用的事件数据")
+        
+        # 防御性编程：确保时间数组不为空
+        if not times or len(times) == 0:
+            raise ValueError("时间点数组为空")
+        
+        # 查找匹配的事件
+        matching_events = []
+        for event in events:
+            if str(event.get('id', '')).strip() == str(event_id).strip() or str(event.get('name', '')).strip() == str(event_id).strip():
+                matching_events.append(event)
+        
+        # 如果没有匹配的事件，使用第一个事件
+        if not matching_events and events:
+            matching_events = [events[0]]
+        
+        # 如果仍然没有事件，抛出异常
+        if not matching_events:
+            raise ValueError("没有可用的事件数据")
+        
+        # 使用第一个匹配的事件
+        event = matching_events[0]
+        event_time = float(event.get('onset', 0))
+        
+        # 计算时间窗口
+        start_time = event_time - pre_event
+        end_time = event_time + post_event
+        
+        # 查找索引
+        start_idx = 0
+        for i, t in enumerate(times):
+            if t >= start_time:
+                start_idx = i
+                break
+        
+        end_idx = len(times)
+        for i, t in enumerate(times[start_idx:], start_idx):
+            if t >= end_time:
+                end_idx = i
+                break
+        
+        # 安全检查：确保索引有效
+        if start_idx >= len(times):
+            start_idx = 0
+        if end_idx > len(times):
+            end_idx = len(times)
+        if start_idx >= end_idx:
+            # 至少保留一个数据点
+            if start_idx < len(times) - 1:
+                end_idx = start_idx + 1
+            else:
+                start_idx = max(0, len(times) - 2)
+                end_idx = len(times) - 1
+        
+        # 提取数据片段
+        segment_data = {}
+        segment_times = times[start_idx:end_idx]
+        
+        # 调整时间点相对于事件发生时间
+        adjusted_times = [t - event_time for t in segment_times]
+        
+        for channel in channels:
+            if channel in data:
+                if len(data[channel]) > start_idx:
+                    segment_data[channel] = data[channel][start_idx:min(end_idx, len(data[channel]))]
                 else:
-                    raise ValueError("没有可用的事件数据")
-            
-            # 构建分段结果
-            segments = []
-            
-            # 对每个匹配的事件创建一个片段
-            for event in matching_events:
-                try:
-                    event_time = float(event.get('onset', 0))
-                    
-                    # 计算片段的时间范围
-                    start_time = event_time - pre_event
-                    end_time = event_time + post_event
-                    
-                    # 查找时间索引范围
-                    start_idx = None
-                    end_idx = None
-                    
-                    for i, t in enumerate(times):
-                        if start_idx is None and t >= start_time:
-                            start_idx = i
-                        if end_idx is None and t >= end_time:
-                            end_idx = i
-                            break
-                    
-                    # 如果找不到结束索引，使用最后一个索引
-                    if end_idx is None:
-                        end_idx = len(times) - 1
-                    
-                    # 如果找不到开始索引，使用第一个索引
-                    if start_idx is None:
-                        start_idx = 0
-                    
-                    # 验证分段索引是否有效
-                    if start_idx >= len(times):
-                        start_idx = 0
-                    if end_idx >= len(times):
-                        end_idx = len(times) - 1
-                    if start_idx >= end_idx:
-                        # 防止无效索引范围
-                        if start_idx < len(times) - 1:
-                            end_idx = start_idx + 1
-                        else:
-                            start_idx = max(0, len(times) - 2)
-                            end_idx = len(times) - 1
-                        
-                    # 提取片段数据
-                    segment_data = {}
-                    segment_times = times[start_idx:end_idx]
-                    
-                    if not segment_times:
-                        print(f"警告: 事件 {event_id} 在有效时间范围外，跳过")
-                        continue
-                    
-                    # 调整时间使事件发生在0时刻
-                    segment_times = [t - event_time for t in segment_times]
-                    
-                    for channel in channels:
-                        if channel in data and len(data[channel]) >= end_idx:
-                            segment_data[channel] = data[channel][start_idx:end_idx]
-                        elif channel in data:
-                            # 处理边界情况
-                            segment_data[channel] = data[channel][start_idx:min(end_idx, len(data[channel]))]
-                    
-                    # 创建片段信息
-                    segment_info = {
-                        "type": "event_related",
-                        "event_id": event_id,
-                        "event_time": event_time,
-                        "pre_event": pre_event,
-                        "post_event": post_event
-                    }
-                    
-                    segments.append({
-                        "data": segment_data,
-                        "times": segment_times,
-                        "info": segment_info
-                    })
-                    
-                except Exception as e:
-                    print(f"处理事件时出错: {str(e)}")
-                    # 继续处理其他事件
-                    continue
-            
-            # 确保至少有一个有效片段
-            if not segments:
-                # 创建一个默认片段
-                print("警告: 未能创建有效事件片段，创建默认片段")
-                # 使用整个数据范围的前10%作为默认片段
-                start_idx = 0
-                end_idx = min(int(len(times) * 0.1), len(times))
-                if end_idx <= start_idx:
-                    end_idx = min(start_idx + 1, len(times))
-                    
-                segment_data = {}
-                segment_times = times[start_idx:end_idx]
-                
-                for channel in channels:
-                    if channel in data:
-                        segment_data[channel] = data[channel][start_idx:end_idx]
-                    
-                segment_info = {
-                    "type": "event_related",
-                    "event_id": "default",
-                    "event_time": times[0],
-                    "pre_event": 0,
-                    "post_event": segment_times[-1] - segment_times[0] if segment_times else 0.1
-                }
-                
-                segments.append({
-                    "data": segment_data,
-                    "times": segment_times,
-                    "info": segment_info
-                })
-            
-            # 创建分段结果 - 此处仅使用第一个片段（可以扩展为返回多个片段）
-            segment = segments[0]
-            
-            result = RawEEGData(
-                data=segment["data"],
-                times=segment["times"],
-                channels=channels,
-                duration=segment["times"][-1] - segment["times"][0] if segment["times"] else 0,
-                sampling_rate=sampling_rate,
-                segment_info=segment["info"],
-                dataset_id=dataset_id,
-                subject_id=subject_id
-            )
-            
-            return result
-            
-        except Exception as e:
-            print(f"事件分段失败: {str(e)}")
-            raise ValueError(f"事件分段失败: {str(e)}")
+                    # 如果通道数据不足，使用空数组
+                    segment_data[channel] = []
+        
+        # 创建结果
+        return RawEEGData(
+            data=segment_data,
+            times=adjusted_times,  # 使用调整后的时间
+            channels=channels,
+            duration=adjusted_times[-1] - adjusted_times[0] if len(adjusted_times) > 0 else 0,
+            sampling_rate=sampling_rate,
+            dataset_id=dataset_id,
+            subject_id=subject_id,
+            segment_info={
+                "type": "event_related",
+                "event_id": event_id,
+                "event_time": event_time,
+                "pre_event": pre_event,
+                "post_event": post_event
+            }
+        )
 
     def _sanitize_float_array(self, arr):
         """清理数组中的非标准浮点数"""

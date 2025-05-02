@@ -24,8 +24,9 @@ class RawEEGData(BaseModel):
     channels: List[str]
     duration: float
     sampling_rate: float
-    dataset_id: str
-    subject_id: str
+    dataset_id: Optional[str] = None
+    subject_id: Optional[str] = None
+    segment_info: Optional[Dict] = None
 
 class ParticipantInfo(BaseModel):
     """参与者信息"""

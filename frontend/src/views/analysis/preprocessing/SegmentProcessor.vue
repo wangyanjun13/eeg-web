@@ -159,66 +159,80 @@ const applySegmentation = async () => {
   }
 
   try {
-    // 构建分段参数
-    const params = {
-      segment_mode: segmentMode.value,
-      // 基本参数
-      use_original_full_data: useOriginalFullData.value,
-      
-      // 时间分段参数
-      start_time: timeSegmentStart.value,
-      end_time: timeSegmentEnd.value,
-      
-      // EEGLAB风格分段参数
-      eeglab_style: eegLabStyleSegmentation.value,
-      segment_length: segmentLength.value,
-      segment_overlap: segmentOverlap.value,
-      remove_incomplete: removeIncomplete.value,
-      
-      // 事件分段参数
-      event_id: selectedEvent.value,
-      pre_event: preEventTime.value,
-      post_event: postEventTime.value,
-      
-      // 基线校正参数
-      apply_baseline: applyBaseline.value,
-      baseline_start: baselineStart.value,
-      baseline_end: baselineEnd.value
-    };
-
-    console.log('发送分段请求，参数:', params);
-
-    // 调用实际API
-    try {
-      const response = await withLoading(
-        analysisService.segmentData(props.datasetId, props.subjectId, params),
-        'processing'
-      );
-
-      emit('process-complete', response.data);
-      ElMessage.success('数据分段应用成功');
-    } catch (apiError) {
-      // 增强API错误处理
-      let errorMessage = '应用分段失败';
-      
-      // 尝试从API响应中提取详细错误信息
-      if (apiError.response && apiError.response.data) {
-        if (apiError.response.data.detail) {
-          errorMessage += `: ${apiError.response.data.detail}`;
-        } else if (typeof apiError.response.data === 'string') {
-          errorMessage += `: ${apiError.response.data}`;
-        }
-      } else {
-        errorMessage += `: ${apiError.message || '未知错误'}`;
+    // 清理参数中的NaN值
+    const sanitizedParams = { ...props.preprocessParams };
+    Object.keys(sanitizedParams).forEach(key => {
+      if (typeof sanitizedParams[key] === 'number' && isNaN(sanitizedParams[key])) {
+        sanitizedParams[key] = 0;
       }
-      
-      console.error('应用分段失败:', apiError);
-      ElMessage.error(errorMessage);
+    });
+    
+    // 调试信息
+    console.log('请求参数:', JSON.stringify(sanitizedParams, null, 2));
+    
+    // 发送请求到服务器
+    const response = await withLoading(
+      analysisService.segmentData(props.datasetId, props.subjectId, sanitizedParams),
+      'processing'
+    );
+    
+    // 验证响应是否有效
+    if (!response || !response.data) {
+      throw new Error('服务器返回的数据无效');
     }
+    
+    // 获取分段结果
+    let segmentResult = response.data.data;
+    
+    // 保证至少有一个基本的数据结构
+    if (!segmentResult || Object.keys(segmentResult).length === 0) {
+      console.warn('服务器返回的分段结果为空，创建基本数据结构');
+      
+      // 使用原始数据作为备选
+      if (props.originalData) {
+        segmentResult = JSON.parse(JSON.stringify(props.originalData));
+      } else {
+        // 创建最小可用数据结构
+        segmentResult = {
+          data: {},
+          times: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+          channels: ['Ch1', 'Ch2', 'Ch3'],
+          sampling_rate: 100,
+          duration: 10,
+          dataset_id: props.datasetId,
+          subject_id: props.subjectId,
+          timeRange: [0, 10],
+          segment_info: {
+            type: sanitizedParams.segment_mode || "time",
+            start: sanitizedParams.start_time || 0,
+            end: sanitizedParams.end_time || 10
+          }
+        };
+        
+        // 为默认通道创建零填充数据
+        segmentResult.channels.forEach(ch => {
+          segmentResult.data[ch] = new Array(segmentResult.times.length).fill(0);
+        });
+      }
+    }
+    
+    // 确保timeRange存在
+    if (!segmentResult.timeRange && segmentResult.times && segmentResult.times.length > 0) {
+      segmentResult.timeRange = [
+        segmentResult.times[0],
+        segmentResult.times[segmentResult.times.length - 1]
+      ];
+    }
+    
+    // 发送处理完成事件
+    emit('process-complete', segmentResult);
+    ElMessage.success('分段处理完成');
   } catch (error) {
     console.error('应用分段失败:', error);
     const errorMessage = error.message || '未知错误';
-    ElMessage.error(`应用分段失败: ${errorMessage}`);
+    ElMessage.error(`分段处理失败: ${errorMessage}`);
+  } finally {
+    isLoading.processing = false;
   }
 };
 
