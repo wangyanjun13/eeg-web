@@ -440,4 +440,170 @@ class DatasetService:
                 # 让出控制权
                 await asyncio.sleep(0.01)
 
+    def get_events_info(self, dataset_id: str, subject_id: str) -> Dict:
+        """获取受试者的事件信息
+        
+        Args:
+            dataset_id: 数据集ID
+            subject_id: 受试者ID
+            
+        Returns:
+            包含事件信息的字典
+        """
+        try:
+            # 首先尝试从events.tsv文件读取 - 标准BIDS格式
+            events_file = None
+            
+            # 搜索可能的事件文件位置
+            events_pattern = f"sub-{subject_id}_task-*_events.tsv"
+            
+            dataset_dir = self.data_dir / dataset_id
+            subject_dir = dataset_dir / f"sub-{subject_id}" if not subject_id.startswith("sub-") else dataset_dir / subject_id
+            eeg_dir = subject_dir / "eeg"
+            
+            # 在eeg目录中搜索
+            if eeg_dir.exists():
+                matching_files = list(eeg_dir.glob(events_pattern))
+                if matching_files:
+                    events_file = matching_files[0]
+            
+            # 如果没找到则在subject目录搜索
+            if not events_file and subject_dir.exists():
+                matching_files = list(subject_dir.glob(events_pattern))
+                if matching_files:
+                    events_file = matching_files[0]
+            
+            if events_file and events_file.exists():
+                print(f"找到事件文件: {events_file}")
+                # 读取TSV文件
+                events = []
+                
+                try:
+                    import pandas as pd
+                    events_df = pd.read_csv(events_file, sep='\t')
+                    
+                    # 确保events_df不为空
+                    if not events_df.empty:
+                        # 添加必要的列
+                        if 'onset' not in events_df.columns and 'time' in events_df.columns:
+                            events_df['onset'] = events_df['time']
+                        
+                        if 'duration' not in events_df.columns:
+                            events_df['duration'] = 0.0
+                            
+                        if 'trial_type' not in events_df.columns and 'type' in events_df.columns:
+                            events_df['trial_type'] = events_df['type']
+                        elif 'trial_type' not in events_df.columns and 'value' in events_df.columns:
+                            events_df['trial_type'] = events_df['value']
+                        elif 'trial_type' not in events_df.columns:
+                            events_df['trial_type'] = 'unknown'
+                            
+                        # 确保数据类型正确
+                        events_df['onset'] = events_df['onset'].astype(float)
+                        events_df['duration'] = events_df['duration'].astype(float)
+                        events_df['trial_type'] = events_df['trial_type'].astype(str)
+                        
+                        # 移除NaN和无穷值
+                        events_df = events_df.fillna({
+                            'onset': 0.0,
+                            'duration': 0.0,
+                            'trial_type': 'unknown'
+                        })
+                        
+                        # 按onset排序
+                        events_df = events_df.sort_values('onset')
+                        
+                        # 构建事件列表
+                        for _, row in events_df.iterrows():
+                            event = {
+                                'id': str(row['trial_type']),
+                                'name': str(row['trial_type']),
+                                'onset': float(row['onset']),
+                                'duration': float(row['duration'])
+                            }
+                            events.append(event)
+                except Exception as e:
+                    print(f"解析事件文件出错: {str(e)}，尝试手动解析")
+                    
+                    # 手动解析TSV文件
+                    with open(events_file, 'r') as f:
+                        lines = f.readlines()
+                    
+                    if len(lines) > 1:  # 至少有header和一行数据
+                        header = lines[0].strip().split('\t')
+                        
+                        # 查找列索引
+                        onset_idx = -1
+                        duration_idx = -1
+                        type_idx = -1
+                        
+                        for i, col in enumerate(header):
+                            if col.lower() in ['onset', 'time']:
+                                onset_idx = i
+                            elif col.lower() == 'duration':
+                                duration_idx = i
+                            elif col.lower() in ['trial_type', 'type', 'value']:
+                                type_idx = i
+                        
+                        # 如果找不到onset列，无法处理
+                        if onset_idx == -1:
+                            raise ValueError("找不到onset或time列")
+                        
+                        # 处理数据行
+                        for i in range(1, len(lines)):
+                            row = lines[i].strip().split('\t')
+                            if len(row) <= max(onset_idx, duration_idx if duration_idx != -1 else 0, type_idx if type_idx != -1 else 0):
+                                continue  # 跳过不完整的行
+                                
+                            try:
+                                onset = float(row[onset_idx])
+                                duration = float(row[duration_idx]) if duration_idx != -1 and row[duration_idx] else 0.0
+                                event_type = row[type_idx] if type_idx != -1 and row[type_idx] else f"event_{i}"
+                                
+                                event = {
+                                    'id': str(event_type),
+                                    'name': str(event_type),
+                                    'onset': onset,
+                                    'duration': duration
+                                }
+                                events.append(event)
+                            except (ValueError, IndexError) as e:
+                                print(f"解析行 {i} 出错: {str(e)}")
+                
+                return {'events': events}
+                
+            # 如果找不到TSV文件，尝试从EEG文件中提取事件信息
+            try:
+                raw = self._read_eeg_file(dataset_id, subject_id)
+                if raw.annotations and len(raw.annotations) > 0:
+                    print(f"从EEG文件中提取到{len(raw.annotations)}个事件")
+                    events = []
+                    for i, annot in enumerate(raw.annotations):
+                        event_type = str(annot['description']) if 'description' in annot else f"event_{i}"
+                        onset = float(annot['onset']) if 'onset' in annot else 0.0
+                        duration = float(annot['duration']) if 'duration' in annot else 0.0
+                        
+                        event = {
+                            'id': event_type,
+                            'name': event_type,
+                            'onset': onset,
+                            'duration': duration
+                        }
+                        events.append(event)
+                    
+                    return {'events': events}
+            except Exception as e:
+                print(f"从EEG文件提取事件失败: {str(e)}")
+            
+            # 如果没有事件，返回空列表
+            print("未找到任何事件数据，返回空列表")
+            return {'events': []}
+            
+        except Exception as e:
+            import traceback
+            print(f"获取事件信息失败: {str(e)}")
+            print(traceback.format_exc())
+            # 返回空列表而不是抛出异常，确保API仍能返回有效响应
+            return {'events': []}
+
     # ... 其他辅助方法 ... 

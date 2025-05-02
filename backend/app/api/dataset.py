@@ -145,3 +145,20 @@ async def export_subject_data(dataset_id: str, subject_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{dataset_id}/subjects/{subject_id}/events", response_model=APIResponse)
+async def get_subject_events(dataset_id: str, subject_id: str):
+    """获取受试者的事件信息
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+    """
+    try:
+        events = dataset_service.get_events_info(dataset_id, subject_id)
+        return APIResponse(
+            message="获取事件信息成功",
+            data=events
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

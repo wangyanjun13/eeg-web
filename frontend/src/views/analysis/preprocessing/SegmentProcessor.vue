@@ -86,36 +86,53 @@ const fetchAvailableEvents = async () => {
   try {
     if (!props.originalData) return;
     
+    console.log('尝试获取事件数据...');
+    let foundEvents = false;
+    
     // 尝试从原始数据中提取事件信息
     if (props.originalData.events && props.originalData.events.length > 0) {
       availableEvents.value = props.originalData.events;
       console.log('从原始数据中获取到事件:', availableEvents.value);
+      foundEvents = true;
     } else {
       // 尝试通过API获取事件信息
       try {
         console.log('尝试从API获取事件信息...');
         const response = await analysisService.getEvents(props.datasetId, props.subjectId);
-        if (response && response.data && response.data.events) {
+        if (response && response.data && response.data.events && response.data.events.length > 0) {
           availableEvents.value = response.data.events;
           console.log('从API获取到事件:', availableEvents.value);
+          foundEvents = true;
         } else {
-          console.log('API返回的事件数据为空');
+          console.log('API返回的事件数据为空或无效');
+          // 如果API返回空数据，使用测试数据
+          if (import.meta.env.DEV) {
+            availableEvents.value = [
+              { id: "target", name: "目标刺激", onset: 2.5, duration: 0.2 },
+              { id: "non-target", name: "非目标刺激", onset: 5.0, duration: 0.2 },
+              { id: "response", name: "反应", onset: 7.5, duration: 0.1 }
+            ];
+            console.log('使用测试事件数据');
+            foundEvents = true;
+          }
         }
       } catch (apiError) {
         console.error('API获取事件失败:', apiError);
-        // API失败时，生成一些虚拟事件用于测试（只在开发环境中）
+        
+        // API失败时，使用测试事件数据
         if (import.meta.env.DEV) {
           availableEvents.value = [
-            { id: "target", name: "目标刺激", onset: 2.5 },
-            { id: "non-target", name: "非目标刺激", onset: 5.0 },
-            { id: "response", name: "反应", onset: 7.5 }
+            { id: "target", name: "目标刺激", onset: 2.5, duration: 0.2 },
+            { id: "non-target", name: "非目标刺激", onset: 5.0, duration: 0.2 },
+            { id: "response", name: "反应", onset: 7.5, duration: 0.1 }
           ];
           console.log('使用测试事件数据');
+          foundEvents = true;
         }
       }
     }
     
-    if (availableEvents.value && availableEvents.value.length > 0) {
+    if (foundEvents && availableEvents.value && availableEvents.value.length > 0) {
       selectedEvent.value = availableEvents.value[0].id || availableEvents.value[0].name;
       console.log('选择事件:', selectedEvent.value);
     } else {
@@ -128,6 +145,9 @@ const fetchAvailableEvents = async () => {
   } catch (error) {
     console.error('获取事件列表失败:', error);
     ElMessage.warning('未能加载事件信息，事件相关分段可能无法使用');
+    
+    // 出错时始终切换到时间窗口模式
+    segmentMode.value = 'time';
   }
 };
 
@@ -166,17 +186,38 @@ const applySegmentation = async () => {
       baseline_end: baselineEnd.value
     };
 
-    // 调用实际API
-    const response = await withLoading(
-      analysisService.segmentData(props.datasetId, props.subjectId, params),
-      'processing'
-    );
+    console.log('发送分段请求，参数:', params);
 
-    emit('process-complete', response.data);
-    ElMessage.success('数据分段应用成功');
+    // 调用实际API
+    try {
+      const response = await withLoading(
+        analysisService.segmentData(props.datasetId, props.subjectId, params),
+        'processing'
+      );
+
+      emit('process-complete', response.data);
+      ElMessage.success('数据分段应用成功');
+    } catch (apiError) {
+      // 增强API错误处理
+      let errorMessage = '应用分段失败';
+      
+      // 尝试从API响应中提取详细错误信息
+      if (apiError.response && apiError.response.data) {
+        if (apiError.response.data.detail) {
+          errorMessage += `: ${apiError.response.data.detail}`;
+        } else if (typeof apiError.response.data === 'string') {
+          errorMessage += `: ${apiError.response.data}`;
+        }
+      } else {
+        errorMessage += `: ${apiError.message || '未知错误'}`;
+      }
+      
+      console.error('应用分段失败:', apiError);
+      ElMessage.error(errorMessage);
+    }
   } catch (error) {
     console.error('应用分段失败:', error);
-    const errorMessage = error.response?.data?.detail || error.message || '未知错误';
+    const errorMessage = error.message || '未知错误';
     ElMessage.error(`应用分段失败: ${errorMessage}`);
   }
 };

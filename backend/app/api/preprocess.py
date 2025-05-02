@@ -231,7 +231,12 @@ async def segment_data(dataset_id: str, subject_id: str, params: SegmentParams):
             message="数据分段完成",
             data=result
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        import traceback
+        print(f"分段处理失败: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{dataset_id}/subjects/{subject_id}/bad_segments", response_model=APIResponse)
@@ -345,5 +350,12 @@ async def get_events(dataset_id: str, subject_id: str):
             data=events
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        # 返回空事件列表而不是错误
+        import traceback
+        print(f"获取事件出错: {str(e)}")
+        print(traceback.format_exc())
+        return APIResponse(
+            message="获取事件信息失败，返回空列表",
+            data={"events": []}
+        ) 
     

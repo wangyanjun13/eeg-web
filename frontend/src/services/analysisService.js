@@ -201,18 +201,36 @@ const analysisService = {
    */
   async segmentData(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      // 使用api实例确保基础URL设置正确
+      console.log(`发起分段请求: /api/preprocess/${datasetId}/subjects/${subjectId}/segment`);
+      
+      // 简化参数，确保不包含NaN或undefined值
+      const sanitizedParams = {};
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && (typeof value !== 'number' || !isNaN(value))) {
+          sanitizedParams[key] = value;
+        } else if (typeof value === 'number' && isNaN(value)) {
+          sanitizedParams[key] = 0; // 将NaN替换为0
+        }
+      }
+      
+      const response = await api.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/segment`, 
-        params
+        sanitizedParams
       );
       
+      // 添加数据验证
+      if (!response || !response.data) {
+        throw new Error('服务器返回空数据');
+      }
+      
       // 从响应中提取缓存状态信息
-      const data = response.data?.data || {};
-      const fromCache = response.headers['x-from-cache'] === 'true';
-      const processTime = parseFloat(response.headers['x-process-time'] || '0');
+      const data = response.data || {};
+      const fromCache = response.headers && response.headers['x-from-cache'] === 'true';
+      const processTime = response.headers ? parseFloat(response.headers['x-process-time'] || '0') : 0;
       
       return {
-        ...response.data,
+        ...response,
         data: {
           ...data,
           from_cache: fromCache,
@@ -221,8 +239,69 @@ const analysisService = {
       };
     } catch (error) {
       console.error('数据分段请求失败:', error);
+      console.error('请求参数:', JSON.stringify(params, null, 2));
+      
+      // 增强错误日志，添加更多上下文
+      if (error.response) {
+        console.error('服务器响应状态:', error.response.status);
+        console.error('服务器错误信息:', error.response.data);
+      }
+      
       throw error;
     }
+  },
+
+  /**
+   * 验证响应数据的有效性
+   * @private
+   */
+  _validateResponseData(data) {
+    // 检查数据的基本结构
+    if (!data) {
+      throw new Error('响应数据为空');
+    }
+    
+    // 递归替换特殊浮点值
+    this._sanitizeFloatValues(data);
+    
+    return data;
+  },
+
+  /**
+   * 递归清理对象中的特殊浮点值
+   * @private
+   */
+  _sanitizeFloatValues(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    
+    
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      if (typeof value === 'number') {
+        // 检查并替换NaN和Infinity
+        if (isNaN(value)) {
+          obj[key] = 0;
+        } else if (!isFinite(value)) {
+          obj[key] = value > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+        }
+      } else if (Array.isArray(value)) {
+        // 处理数组
+        for (let i = 0; i < value.length; i++) {
+          if (typeof value[i] === 'number') {
+            if (isNaN(value[i])) {
+              value[i] = 0;
+            } else if (!isFinite(value[i])) {
+              value[i] = value[i] > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+            }
+          } else if (typeof value[i] === 'object') {
+            this._sanitizeFloatValues(value[i]);
+          }
+        }
+      } else if (typeof value === 'object') {
+        // 递归处理嵌套对象
+        this._sanitizeFloatValues(value);
+      }
+    });
   },
 
   /**
@@ -331,7 +410,18 @@ const analysisService = {
    * @returns {Promise<Object>} - 事件信息
    */
   getEvents(datasetId, subjectId) {
-    return api.get(`/api/preprocess/${datasetId}/subjects/${subjectId}/events`);
+    // 首先尝试从preprocess API获取事件
+    return api.get(`/api/preprocess/${datasetId}/subjects/${subjectId}/events`)
+      .catch(error => {
+        console.warn('从预处理API获取事件失败，尝试从dataset API获取:', error);
+        // 如果预处理API失败，尝试从dataset API获取
+        return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/events`)
+          .catch(secondError => {
+            console.warn('从dataset API获取事件也失败:', secondError);
+            // 如果两个API都失败，返回空的事件数据
+            return {data: {events: []}};
+          });
+      });
   },
 
   /**

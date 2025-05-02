@@ -40,16 +40,28 @@ class ArtifactParams(BaseModel):
     reject_by_annotation: bool = True
 
 class SegmentParams(BaseModel):
-    """分段参数"""
-    segment_mode: str = "time"  # "time", "event", "epoch"
-    # 时间窗口分段
+    """数据分段参数"""
+    segment_mode: str = "time"  # 分段模式: time, eeglab, event
+    
+    # 通用参数
+    use_original_full_data: bool = False  # 是否使用原始完整数据
+    
+    # 时间窗口分段参数
     start_time: float = 0.0
     end_time: float = 10.0
-    # 事件相关分段
-    event_name: Optional[str] = None
+    
+    # EEGLAB风格分段参数
+    eeglab_style: bool = False
+    segment_length: float = 1.0
+    segment_overlap: float = 0.0
+    remove_incomplete: bool = True
+    
+    # 事件相关分段参数
+    event_id: Optional[str] = None
     pre_event: float = 0.2
     post_event: float = 0.8
-    # 基线校正
+    
+    # 基线校正参数
     apply_baseline: bool = True
     baseline_start: float = -0.2
     baseline_end: float = 0.0
