@@ -211,6 +211,10 @@ const analysisService = {
         }
       }
       
+      // 保存分段参数，用于后续处理
+      const segmentStartTime = sanitizedParams.start_time || 0;
+      const segmentEndTime = sanitizedParams.end_time || 10;
+      
       // 发起请求
       console.log(`发起分段请求: /api/preprocess/${datasetId}/subjects/${subjectId}/segment`);
       const response = await api.post(
@@ -239,7 +243,7 @@ const analysisService = {
         subject_id: subjectId
       };
       
-      // 1. 处理data字段 - 服务器可能将通道数据直接放在data中，而不是data.data中
+      // 1. 处理data字段
       if (responseData.data) {
         if (typeof responseData.data === 'object') {
           // 检查是否有通道数据
@@ -275,44 +279,52 @@ const analysisService = {
         }
       }
       
-      // 2. 如果没有找到通道数据，尝试直接在response中查找
-      if (Object.keys(segmentResult.data).length === 0) {
-        // 查找类似通道名称的键
-        const channelPattern = /^(Fp[12]|F[pz378]|C[z346]|P[z3478]|O[z12]|T[3-8]|LE|I[12]|M[12]|A[12])$/;
-        const possibleChannels = Object.keys(responseData).filter(
-          key => channelPattern.test(key) && Array.isArray(responseData[key])
-        );
-        
-        if (possibleChannels.length > 0) {
-          // 提取通道数据
-          possibleChannels.forEach(channel => {
-            segmentResult.data[channel] = responseData[channel];
-          });
-          segmentResult.channels = possibleChannels;
-        }
-      }
-      
-      // 3. 确保times字段存在
+      // 2. 确保times字段存在并正确映射到分段时间窗口
       if (!segmentResult.times || segmentResult.times.length === 0) {
         // 找到任何一个通道数据来确定长度
         const anyChannel = Object.keys(segmentResult.data)[0];
         const timeLength = anyChannel && segmentResult.data[anyChannel] ? 
                            segmentResult.data[anyChannel].length : 100;
         
-        // 创建默认时间数组
+        // 创建映射到选定时间窗口的新时间数组
+        const segmentDuration = segmentEndTime - segmentStartTime;
         segmentResult.times = Array.from(
           {length: timeLength}, 
-          (_, i) => i / (segmentResult.sampling_rate || 100)
+          (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1))
         );
+        
+        console.log(`创建了新的时间数组，范围从 ${segmentResult.times[0]} 到 ${segmentResult.times[segmentResult.times.length-1]}`);
+      } else {
+        // 检查时间数组是否与预期的分段时间窗口匹配
+        const firstTime = segmentResult.times[0];
+        const lastTime = segmentResult.times[segmentResult.times.length - 1];
+        
+        // 如果时间范围与预期不符，应进行调整
+        if (Math.abs(firstTime - segmentStartTime) > 0.1 || Math.abs(lastTime - (segmentEndTime - segmentStartTime)) > 0.1) {
+          console.warn(`时间数组范围不匹配: ${firstTime}-${lastTime}, 预期: ${segmentStartTime}-${segmentEndTime}`);
+          
+          // 调整时间数组，保持相对间隔比例不变
+          const timeLength = segmentResult.times.length;
+          const segmentDuration = segmentEndTime - segmentStartTime;
+          
+          segmentResult.times = Array.from(
+            {length: timeLength}, 
+            (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1))
+          );
+          
+          console.log(`已调整时间数组，新范围从 ${segmentResult.times[0]} 到 ${segmentResult.times[segmentResult.times.length-1]}`);
+        }
       }
       
-      // 4. 确保所有通道都有数据
+      // 3. 确保所有通道都有数据
       segmentResult.channels.forEach(channel => {
         if (!segmentResult.data[channel] || !Array.isArray(segmentResult.data[channel])) {
           console.warn(`通道 ${channel} 缺少数据，创建默认数据`);
           segmentResult.data[channel] = new Array(segmentResult.times.length).fill(0);
         } else if (segmentResult.data[channel].length !== segmentResult.times.length) {
-          // 调整数据长度
+          // 调整数据长度以匹配时间数组
+          console.warn(`通道 ${channel} 数据长度(${segmentResult.data[channel].length})与时间数组长度(${segmentResult.times.length})不匹配，调整中`);
+          
           const newData = new Array(segmentResult.times.length).fill(0);
           const copyLength = Math.min(segmentResult.times.length, segmentResult.data[channel].length);
           
@@ -324,21 +336,14 @@ const analysisService = {
         }
       });
       
-      // 5. 设置默认值（如果需要）
-      if (!segmentResult.sampling_rate) {
-        segmentResult.sampling_rate = 100;
-      }
+      // 4. 设置元数据字段
+      segmentResult.sampling_rate = segmentResult.sampling_rate || responseData.data.sampling_rate || 100;
+      segmentResult.duration = segmentEndTime - segmentStartTime;
       
-      if (!segmentResult.duration) {
-        segmentResult.duration = segmentResult.times.length > 0 ? 
-          segmentResult.times[segmentResult.times.length - 1] : 10;
-      }
+      // 5. 设置正确的timeRange字段
+      segmentResult.timeRange = [segmentStartTime, segmentEndTime];
       
-      // 6. 设置timeRange字段
-      segmentResult.timeRange = [
-        segmentResult.times[0] || 0,
-        segmentResult.times[segmentResult.times.length - 1] || 10
-      ];
+      console.log(`最终分段结果: 时间范围=${segmentResult.timeRange}, 数据长度=${segmentResult.times.length}`);
       
       return { data: segmentResult };
     } catch (error) {

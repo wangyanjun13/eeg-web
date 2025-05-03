@@ -398,12 +398,42 @@ class PreprocessService:
                     channel_data = input_data.data[channel]
                     sanitized_data[channel] = [0.0 if (np.isnan(x) or np.isinf(x)) else float(x) for x in channel_data]
             
-            # 创建结果数据结构 - 注意这里我们需要明确设置data字段包含通道数据
+            # 计算时间范围和对应索引
+            time_array = input_data.times
+            sampling_rate = input_data.sampling_rate
+            
+            # 找到开始和结束时间对应的索引
+            start_idx = 0
+            end_idx = len(time_array) - 1
+            
+            for i, t in enumerate(time_array):
+                if t >= params.start_time:
+                    start_idx = i
+                    break
+            
+            for i in range(start_idx, len(time_array)):
+                if time_array[i] >= params.end_time:
+                    end_idx = i
+                    break
+            
+            # 提取所选时间窗口的数据
+            segmented_data = {}
+            for channel in input_data.channels:
+                if channel in sanitized_data:
+                    segmented_data[channel] = sanitized_data[channel][start_idx:end_idx]
+            
+            # 创建新的时间数组，保持相对于起始时间的偏移
+            segmented_times = []
+            for i in range(start_idx, end_idx):
+                # 将时间点调整为相对于分段起始时间的值
+                segmented_times.append(time_array[i] - params.start_time)
+            
+            # 创建结果数据结构
             result = RawEEGData(
-                data=sanitized_data,  # 这是正确的通道数据字典
-                times=input_data.times,
+                data=segmented_data,
+                times=segmented_times,
                 channels=input_data.channels,
-                duration=input_data.duration,
+                duration=params.end_time - params.start_time,
                 sampling_rate=input_data.sampling_rate,
                 dataset_id=dataset_id,
                 subject_id=subject_id,
@@ -425,6 +455,7 @@ class PreprocessService:
             print(f"分段返回数据检查：channels={len(result.channels)}, times={len(result.times)}")
             print(f"第一个通道：{result.channels[0] if result.channels else 'None'}")
             print(f"第一个通道数据长度：{len(result.data[result.channels[0]]) if result.channels and result.data and result.channels[0] in result.data else 0}")
+            print(f"时间范围：{result.times[0]} - {result.times[-1] if result.times else 0}")
             
             return result
         except Exception as e:
