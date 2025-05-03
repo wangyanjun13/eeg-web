@@ -355,30 +355,95 @@ const performFFT = (timeData, samplingRate) => {
 
 // 使用防抖函数优化图表更新
 const debouncedUpdateChart = useDebounceFn(() => {
-  if (!chart || !props.data) return;
+  if (!chart || !props.data) {
+    console.warn('Chart或数据不存在，无法更新图表');
+    return;
+  }
   
-  // 过滤确保只使用可用通道
-  const validChannels = props.selectedChannels.filter(channel => 
-    props.availableChannels.length > 0 
+  // 过滤确保只使用可用通道，并添加额外检查
+  const allDataChannels = props.data.channels || [];
+  const availableDataChannels = props.data.data ? Object.keys(props.data.data) : [];
+  
+  console.log('EEGViewer 数据检查:', {
+    selectedChannels: props.selectedChannels.length,
+    availableInProps: props.availableChannels.length,
+    channelsInData: allDataChannels.length,
+    channelsWithData: availableDataChannels.length
+  });
+  
+  // 确保只使用真正可用的通道
+  let validChannels = props.selectedChannels.filter(channel => 
+    // 通道必须存在于props.availableChannels或者data.channels中
+    (props.availableChannels.length > 0 
       ? props.availableChannels.includes(channel) 
-      : props.data.channels?.includes(channel)
+      : allDataChannels.includes(channel))
+    // 同时通道必须在data.data中有数据
+    && availableDataChannels.includes(channel)
   );
   
-  let series;
+  if (validChannels.length === 0) {
+    console.warn('没有有效的通道数据，尝试从data.data中获取可用通道');
+    // 如果没有有效通道，尝试使用availableDataChannels的前几个
+    validChannels = availableDataChannels.slice(0, Math.min(5, availableDataChannels.length));
+  }
+  
+  // 添加对数据结构的详细检查
+  if (validChannels.length > 0) {
+    const firstChannel = validChannels[0];
+    console.log(`检查第一个通道 ${firstChannel} 的数据:`, {
+      hasChannel: props.data.data && props.data.data[firstChannel] ? 'yes' : 'no',
+      dataType: props.data.data && props.data.data[firstChannel] ? 
+                typeof props.data.data[firstChannel] : 'unknown',
+      isArray: props.data.data && props.data.data[firstChannel] ? 
+               Array.isArray(props.data.data[firstChannel]) : 'unknown',
+      dataLength: props.data.data && props.data.data[firstChannel] && 
+                 Array.isArray(props.data.data[firstChannel]) ? 
+                 props.data.data[firstChannel].length : 0,
+      timesLength: props.data.times ? props.data.times.length : 0,
+      firstFewValues: props.data.data && props.data.data[firstChannel] && 
+                     Array.isArray(props.data.data[firstChannel]) ? 
+                     props.data.data[firstChannel].slice(0, 5) : []
+    });
+  }
+  
+  let series = [];
   
   if (localViewMode.value === 'time') {
     // 时域表示
     series = validChannels.map((channel, index) => {
-      // 添加健壮性检查，确保通道数据存在
-      if (!props.data.data || !props.data.data[channel]) {
-        console.warn(`通道 ${channel} 数据不存在，将被跳过`);
+      // 增强健壮性检查
+      if (!props.data.data || !props.data.data[channel] || !Array.isArray(props.data.data[channel])) {
+        console.warn(`通道 ${channel} 数据不存在或无效，将被跳过`);
         return {
           name: channel,
           type: 'line',
           showSymbol: false,
-          data: [],
+          data: [[0, 0]], // 至少有一个点以避免错误
           animationDuration: 0
         };
+      }
+      
+      // 确保数据和时间点长度匹配
+      let dataPoints = [];
+      const channelData = props.data.data[channel];
+      const times = props.data.times || [];
+      
+      if (channelData && times && channelData.length > 0 && times.length > 0) {
+        const minLength = Math.min(channelData.length, times.length);
+        
+        for (let i = 0; i < minLength; i++) {
+          if (times[i] >= props.timeRange[0] && times[i] <= props.timeRange[1]) {
+            // 确保数据是有效的数值
+            const value = typeof channelData[i] === 'number' && !isNaN(channelData[i]) ? 
+                          channelData[i] : 0;
+            dataPoints.push([times[i], value]);
+          }
+        }
+      }
+      
+      // 如果没有有效点，添加一个0点
+      if (dataPoints.length === 0) {
+        dataPoints.push([props.timeRange[0], 0]);
       }
       
       return {
@@ -386,12 +451,7 @@ const debouncedUpdateChart = useDebounceFn(() => {
         type: 'line',
         showSymbol: false,
         sampling: 'lttb',
-        data: props.data.data[channel]?.map((value, idx) => [
-          props.data.times[idx],
-          value
-        ]).filter(point => 
-          point && point[0] >= props.timeRange[0] && point[0] <= props.timeRange[1]
-        ) || [],
+        data: dataPoints,
         animationDuration: 0,
         emphasis: { focus: 'none' },
         itemStyle: {
@@ -399,9 +459,9 @@ const debouncedUpdateChart = useDebounceFn(() => {
           opacity: 0.8
         }
       };
-    }).filter(s => s.data && s.data.length > 0); // 只保留有数据的系列
+    });
   } else {
-    // 频域表示 - 同样添加健壮性检查
+    // 这里保留频域表示处理逻辑，但我们暂时不修改它，因为它不是当前问题
     series = validChannels.map((channel, index) => {
       // 确保通道数据存在
       if (!props.data.data || !props.data.data[channel]) {
@@ -410,15 +470,33 @@ const debouncedUpdateChart = useDebounceFn(() => {
           name: channel,
           type: 'line',
           showSymbol: false,
-          data: [],
+          data: [[0, 0]],
           animationDuration: 0
         };
       }
       
+      // 只需调用现有的函数，不做修改
       const spectrumData = calculateSpectrumData(
         props.data.data[channel], 
         props.data.times
       );
+      
+      // 确保至少有一个点
+      if (!spectrumData || spectrumData.length === 0) {
+        return {
+          name: channel,
+          type: 'line',
+          showSymbol: false,
+          data: [[0, 0]],
+          animationDuration: 0,
+          emphasis: { focus: 'none' },
+          itemStyle: {
+            color: chart?.getOption()?.series?.[index]?.itemStyle?.color,
+            opacity: 0.8
+          }
+        };
+      }
+      
       return {
         name: channel,
         type: 'line',
@@ -432,7 +510,18 @@ const debouncedUpdateChart = useDebounceFn(() => {
           opacity: 0.8
         }
       };
-    }).filter(s => s.data && s.data.length > 0); // 只保留有数据的系列
+    });
+  }
+
+  // 如果系列为空，显示警告
+  if (!series || series.length === 0) {
+    console.warn('没有有效的数据系列可以显示');
+    series = [{
+      name: '无数据',
+      type: 'line',
+      data: [[0, 0]],
+      lineStyle: { color: '#ccc', type: 'dashed' }
+    }];
   }
 
   // 准备图例状态
@@ -444,8 +533,12 @@ const debouncedUpdateChart = useDebounceFn(() => {
   }, {});
   
   // 设置图表选项
-  chart.setOption(getChartOption(series, legendStatus), true);
-}, 100)
+  try {
+    chart.setOption(getChartOption(series, legendStatus), true);
+  } catch (error) {
+    console.error('设置图表选项失败:', error);
+  }
+}, 100);
 
 // 修改 updateChart 函数
 const updateChart = () => {

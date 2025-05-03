@@ -159,69 +159,84 @@ const applySegmentation = async () => {
   }
 
   try {
-    // 清理参数中的NaN值
-    const sanitizedParams = { ...props.preprocessParams };
-    Object.keys(sanitizedParams).forEach(key => {
-      if (typeof sanitizedParams[key] === 'number' && isNaN(sanitizedParams[key])) {
-        sanitizedParams[key] = 0;
-      }
-    });
+    // 收集分段参数
+    const segmentParams = {
+      segment_mode: 'time',
+      use_original_full_data: useOriginalFullData.value,
+      start_time: timeSegmentStart.value,
+      end_time: timeSegmentEnd.value,
+      apply_baseline: applyBaseline.value,
+      baseline_start: applyBaseline.value ? baselineStart.value : 0,
+      baseline_end: applyBaseline.value ? baselineEnd.value : 0
+    };
     
-    // 调试信息
-    console.log('请求参数:', JSON.stringify(sanitizedParams, null, 2));
+    console.log('发送分段参数:', segmentParams);
     
     // 发送请求到服务器
     const response = await withLoading(
-      analysisService.segmentData(props.datasetId, props.subjectId, sanitizedParams),
+      analysisService.segmentData(props.datasetId, props.subjectId, segmentParams),
       'processing'
     );
     
-    // 验证响应是否有效
     if (!response || !response.data) {
+      console.error('服务器返回的数据无效:', response);
       throw new Error('服务器返回的数据无效');
     }
     
     // 获取分段结果
-    let segmentResult = response.data.data;
+    const segmentResult = response.data;
     
-    // 保证至少有一个基本的数据结构
-    if (!segmentResult || Object.keys(segmentResult).length === 0) {
-      console.warn('服务器返回的分段结果为空，创建基本数据结构');
-      
-      // 使用原始数据作为备选
-      if (props.originalData) {
-        segmentResult = JSON.parse(JSON.stringify(props.originalData));
-      } else {
-        // 创建最小可用数据结构
-        segmentResult = {
-          data: {},
-          times: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-          channels: ['Ch1', 'Ch2', 'Ch3'],
-          sampling_rate: 100,
-          duration: 10,
-          dataset_id: props.datasetId,
-          subject_id: props.subjectId,
-          timeRange: [0, 10],
-          segment_info: {
-            type: sanitizedParams.segment_mode || "time",
-            start: sanitizedParams.start_time || 0,
-            end: sanitizedParams.end_time || 10
-          }
-        };
-        
-        // 为默认通道创建零填充数据
-        segmentResult.channels.forEach(ch => {
-          segmentResult.data[ch] = new Array(segmentResult.times.length).fill(0);
-        });
+    // 数据完整性检查
+    console.log('分段结果数据检查:', {
+      hasData: segmentResult && typeof segmentResult === 'object',
+      channelsLength: segmentResult?.channels?.length || 0,
+      timesLength: segmentResult?.times?.length || 0,
+      firstChannel: segmentResult?.channels?.[0] || 'none',
+      dataKeys: segmentResult?.data ? Object.keys(segmentResult.data) : []
+    });
+    
+    // 验证第一个通道数据
+    if (segmentResult?.channels?.length > 0) {
+      const firstChannel = segmentResult.channels[0];
+      console.log(`第一个通道 ${firstChannel} 数据:`, {
+        hasData: segmentResult.data && segmentResult.data[firstChannel] ? true : false,
+        isArray: segmentResult.data && Array.isArray(segmentResult.data[firstChannel]),
+        length: segmentResult.data && segmentResult.data[firstChannel] ? 
+                segmentResult.data[firstChannel].length : 0,
+        firstFew: segmentResult.data && segmentResult.data[firstChannel] ? 
+                 segmentResult.data[firstChannel].slice(0, 5) : []
+      });
+    }
+    
+    // 确保基本字段存在
+    if (!segmentResult.data) {
+      segmentResult.data = {};
+    }
+    
+    if (!segmentResult.channels || !Array.isArray(segmentResult.channels) || segmentResult.channels.length === 0) {
+      segmentResult.channels = props.processingChannels || [];
+    }
+    
+    if (!segmentResult.times || !Array.isArray(segmentResult.times)) {
+      const dataLength = Object.values(segmentResult.data)[0]?.length || 100;
+      segmentResult.times = Array.from({length: dataLength}, (_, i) => i / 100);
+    }
+    
+    // 确保每个通道有数据
+    for (const channel of segmentResult.channels) {
+      if (!segmentResult.data[channel] || !Array.isArray(segmentResult.data[channel])) {
+        console.warn(`通道 ${channel} 没有数据，创建零填充数据`);
+        segmentResult.data[channel] = new Array(segmentResult.times.length).fill(0);
       }
     }
     
-    // 确保timeRange存在
-    if (!segmentResult.timeRange && segmentResult.times && segmentResult.times.length > 0) {
-      segmentResult.timeRange = [
-        segmentResult.times[0],
-        segmentResult.times[segmentResult.times.length - 1]
-      ];
+    // 确保元数据
+    if (!segmentResult.sampling_rate) {
+      segmentResult.sampling_rate = props.originalData.sampling_rate || 100;
+    }
+    
+    if (!segmentResult.duration) {
+      segmentResult.duration = segmentResult.times[segmentResult.times.length - 1] || 10;
     }
     
     // 发送处理完成事件
@@ -229,8 +244,7 @@ const applySegmentation = async () => {
     ElMessage.success('分段处理完成');
   } catch (error) {
     console.error('应用分段失败:', error);
-    const errorMessage = error.message || '未知错误';
-    ElMessage.error(`分段处理失败: ${errorMessage}`);
+    ElMessage.error(`分段处理失败: ${error.message || '未知错误'}`);
   } finally {
     isLoading.processing = false;
   }
@@ -268,121 +282,34 @@ onMounted(() => {
         />
       </el-form-item>
       
-      <el-form-item label="分段模式">
-        <el-radio-group v-model="segmentMode" size="small">
-          <el-radio-button label="time">时间窗口</el-radio-button>
-          <el-radio-button label="eeglab">EEGLAB风格</el-radio-button>
-          <el-radio-button label="event">事件相关</el-radio-button>
-        </el-radio-group>
+      <!-- 时间窗口分段 -->
+      <el-form-item label="起始时间" v-if="!useOriginalFullData">
+        <el-input-number 
+          v-model="timeSegmentStart" 
+          :min="0" 
+          :max="originalData?.duration - 1 || 100" 
+          :step="0.1"
+          size="small"
+          class="small-input"
+        />
+        <span class="unit">秒</span>
       </el-form-item>
       
-      <!-- 时间窗口分段 -->
-      <template v-if="segmentMode === 'time'">
-        <el-form-item label="起始时间">
-          <el-input-number 
-            v-model="timeSegmentStart" 
-            :min="0" 
-            :max="originalData?.duration - 1 || 100" 
-            :step="0.1"
-            size="small"
-            class="small-input"
-          />
-          <span class="unit">秒</span>
-        </el-form-item>
-        
-        <el-form-item label="结束时间">
-          <el-input-number 
-            v-model="timeSegmentEnd" 
-            :min="timeSegmentStart + 0.1" 
-            :max="originalData?.duration || 100" 
-            :step="0.1"
-            size="small"
-            class="small-input"
-          />
-          <span class="unit">秒</span>
-        </el-form-item>
-        
-        <el-form-item label="分段长度">
-          <span>{{ segmentDuration.toFixed(2) }} 秒</span>
-        </el-form-item>
-      </template>
+      <el-form-item label="结束时间" v-if="!useOriginalFullData">
+        <el-input-number 
+          v-model="timeSegmentEnd" 
+          :min="timeSegmentStart + 0.1" 
+          :max="originalData?.duration || 100" 
+          :step="0.1"
+          size="small"
+          class="small-input"
+        />
+        <span class="unit">秒</span>
+      </el-form-item>
       
-      <!-- EEGLAB风格分段 -->
-      <template v-else-if="segmentMode === 'eeglab'">
-        <el-form-item label="段长度">
-          <el-input-number 
-            v-model="segmentLength" 
-            :min="0.1" 
-            :max="dataLength" 
-            :step="0.1"
-            size="small"
-            class="small-input"
-          />
-          <span class="unit">秒</span>
-        </el-form-item>
-        
-        <el-form-item label="段重叠">
-          <el-input-number 
-            v-model="segmentOverlap" 
-            :min="0" 
-            :max="90" 
-            :step="5"
-            size="small"
-            class="small-input"
-          />
-          <span class="unit">%</span>
-        </el-form-item>
-        
-        <el-form-item label="移除不完整段">
-          <el-switch v-model="removeIncomplete" />
-        </el-form-item>
-        
-        <el-form-item label="预计段数">
-          <span>{{ possibleSegments }} 段</span>
-        </el-form-item>
-      </template>
-      
-      <!-- 事件相关分段 -->
-      <template v-else-if="segmentMode === 'event'">
-        <el-form-item label="选择事件">
-          <el-select v-model="selectedEvent" size="small">
-            <el-option 
-              v-for="event in availableEvents" 
-              :key="event.name" 
-              :label="event.name" 
-              :value="event.name"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="事件前">
-          <el-input-number 
-            v-model="preEventTime" 
-            :min="0" 
-            :max="10" 
-            :step="0.1"
-            size="small"
-            class="small-input"
-          />
-          <span class="unit">秒</span>
-        </el-form-item>
-        
-        <el-form-item label="事件后">
-          <el-input-number 
-            v-model="postEventTime" 
-            :min="0" 
-            :max="10" 
-            :step="0.1"
-            size="small"
-            class="small-input"
-          />
-          <span class="unit">秒</span>
-        </el-form-item>
-        
-        <el-form-item label="分段长度">
-          <span>{{ (preEventTime + postEventTime).toFixed(2) }} 秒</span>
-        </el-form-item>
-      </template>
+      <el-form-item label="分段长度" v-if="!useOriginalFullData">
+        <span>{{ segmentDuration.toFixed(2) }} 秒</span>
+      </el-form-item>
       
       <!-- 基线校正 -->
       <el-form-item label="基线校正">

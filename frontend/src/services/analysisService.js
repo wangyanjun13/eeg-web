@@ -207,117 +207,140 @@ const analysisService = {
         if (value !== undefined && (typeof value !== 'number' || !isNaN(value))) {
           sanitizedParams[key] = value;
         } else if (typeof value === 'number' && isNaN(value)) {
-          sanitizedParams[key] = 0; // 将NaN替换为0
+          sanitizedParams[key] = 0;
         }
       }
       
+      // 发起请求
       console.log(`发起分段请求: /api/preprocess/${datasetId}/subjects/${subjectId}/segment`);
-      console.log('请求参数:', JSON.stringify(sanitizedParams, null, 2));
-      
       const response = await api.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/segment`, 
         sanitizedParams
       );
       
-      // 验证响应数据
+      // 添加详细日志查看响应结构
+      console.log("分段响应结构:", JSON.stringify(response.data));
+      
       if (!response || !response.data) {
         throw new Error('服务器返回空数据');
       }
       
-      // 处理响应数据 - 确保data字段存在
-      const result = response.data;
+      // 提取和处理分段结果
+      const responseData = response.data;
       
-      // 确保有效的data字段
-      if (!result.data || typeof result.data !== 'object') {
-        console.warn('响应缺少有效的data字段，创建空对象');
-        result.data = {};
-      }
+      // 创建标准化的结果对象
+      const segmentResult = {
+        data: {},  // 通道数据
+        times: [], // 时间点
+        channels: [],  // 通道列表
+        sampling_rate: 0,  // 采样率
+        duration: 0,   // 持续时间
+        dataset_id: datasetId,
+        subject_id: subjectId
+      };
       
-      // 获取分段数据
-      const segmentData = result.data;
-      
-      // 确保数据结构中有data对象
-      if (!segmentData.data || typeof segmentData.data !== 'object') {
-        console.warn('分段结果缺少data字段，创建空对象');
-        segmentData.data = {};
-      }
-      
-      // 确保times数组存在且有效
-      if (!segmentData.times || !Array.isArray(segmentData.times) || segmentData.times.length === 0) {
-        console.warn('分段结果缺少有效的times字段，创建默认时间数组');
-        // 创建100个时间点，从0到10秒
-        segmentData.times = Array.from({length: 100}, (_, i) => i / 10);
-      }
-      
-      // 确保channels数组存在且有效
-      if (!segmentData.channels || !Array.isArray(segmentData.channels) || segmentData.channels.length === 0) {
-        console.warn('分段结果缺少channels字段，尝试从data字段推断');
-        // 从data对象中提取通道名称
-        segmentData.channels = Object.keys(segmentData.data);
-        
-        if (segmentData.channels.length === 0) {
-          console.warn('无法推断channels，创建默认通道');
-          // 创建一些默认通道
-          segmentData.channels = ['Ch1', 'Ch2', 'Ch3'];
-          // 为默认通道创建零填充数据
-          segmentData.channels.forEach(ch => {
-            segmentData.data[ch] = new Array(segmentData.times.length).fill(0);
-          });
+      // 1. 处理data字段 - 服务器可能将通道数据直接放在data中，而不是data.data中
+      if (responseData.data) {
+        if (typeof responseData.data === 'object') {
+          // 检查是否有通道数据
+          const possibleChannels = Object.keys(responseData.data).filter(
+            key => Array.isArray(responseData.data[key])
+          );
+          
+          if (possibleChannels.length > 0) {
+            // 直接使用responseData.data作为通道数据
+            segmentResult.data = responseData.data;
+            segmentResult.channels = possibleChannels;
+          } else if (responseData.data.data && typeof responseData.data.data === 'object') {
+            // 嵌套的data.data结构
+            segmentResult.data = responseData.data.data;
+            
+            // 从嵌套结构中提取其他字段
+            if (Array.isArray(responseData.data.channels)) {
+              segmentResult.channels = responseData.data.channels;
+            }
+            
+            if (Array.isArray(responseData.data.times)) {
+              segmentResult.times = responseData.data.times;
+            }
+            
+            if (responseData.data.sampling_rate) {
+              segmentResult.sampling_rate = responseData.data.sampling_rate;
+            }
+            
+            if (responseData.data.duration) {
+              segmentResult.duration = responseData.data.duration;
+            }
+          }
         }
       }
       
-      // 确保每个channel都有对应的数据数组
-      segmentData.channels.forEach(channel => {
-        if (!segmentData.data[channel] || !Array.isArray(segmentData.data[channel])) {
-          console.warn(`通道 ${channel} 在分段结果中没有有效数据，创建零填充数组`);
-          segmentData.data[channel] = new Array(segmentData.times.length).fill(0);
-        } else if (segmentData.data[channel].length !== segmentData.times.length) {
-          // 长度不匹配时调整数据长度
-          const newArray = new Array(segmentData.times.length).fill(0);
-          const copyLength = Math.min(segmentData.data[channel].length, segmentData.times.length);
-          for(let i = 0; i < copyLength; i++) {
-            newArray[i] = segmentData.data[channel][i];
+      // 2. 如果没有找到通道数据，尝试直接在response中查找
+      if (Object.keys(segmentResult.data).length === 0) {
+        // 查找类似通道名称的键
+        const channelPattern = /^(Fp[12]|F[pz378]|C[z346]|P[z3478]|O[z12]|T[3-8]|LE|I[12]|M[12]|A[12])$/;
+        const possibleChannels = Object.keys(responseData).filter(
+          key => channelPattern.test(key) && Array.isArray(responseData[key])
+        );
+        
+        if (possibleChannels.length > 0) {
+          // 提取通道数据
+          possibleChannels.forEach(channel => {
+            segmentResult.data[channel] = responseData[channel];
+          });
+          segmentResult.channels = possibleChannels;
+        }
+      }
+      
+      // 3. 确保times字段存在
+      if (!segmentResult.times || segmentResult.times.length === 0) {
+        // 找到任何一个通道数据来确定长度
+        const anyChannel = Object.keys(segmentResult.data)[0];
+        const timeLength = anyChannel && segmentResult.data[anyChannel] ? 
+                           segmentResult.data[anyChannel].length : 100;
+        
+        // 创建默认时间数组
+        segmentResult.times = Array.from(
+          {length: timeLength}, 
+          (_, i) => i / (segmentResult.sampling_rate || 100)
+        );
+      }
+      
+      // 4. 确保所有通道都有数据
+      segmentResult.channels.forEach(channel => {
+        if (!segmentResult.data[channel] || !Array.isArray(segmentResult.data[channel])) {
+          console.warn(`通道 ${channel} 缺少数据，创建默认数据`);
+          segmentResult.data[channel] = new Array(segmentResult.times.length).fill(0);
+        } else if (segmentResult.data[channel].length !== segmentResult.times.length) {
+          // 调整数据长度
+          const newData = new Array(segmentResult.times.length).fill(0);
+          const copyLength = Math.min(segmentResult.times.length, segmentResult.data[channel].length);
+          
+          for (let i = 0; i < copyLength; i++) {
+            newData[i] = segmentResult.data[channel][i];
           }
-          segmentData.data[channel] = newArray;
+          
+          segmentResult.data[channel] = newData;
         }
       });
       
-      // 确保包含必要的ID字段
-      segmentData.dataset_id = segmentData.dataset_id || datasetId;
-      segmentData.subject_id = segmentData.subject_id || subjectId;
-      
-      // 添加时间范围字段，便于前端渲染
-      if (segmentData.times && segmentData.times.length > 0) {
-        segmentData.timeRange = [
-          segmentData.times[0],
-          segmentData.times[segmentData.times.length - 1]
-        ];
-      } else {
-        segmentData.timeRange = [0, 10]; // 默认时间范围
+      // 5. 设置默认值（如果需要）
+      if (!segmentResult.sampling_rate) {
+        segmentResult.sampling_rate = 100;
       }
       
-      // 确保采样率存在
-      if (!segmentData.sampling_rate) {
-        console.warn('分段结果缺少sampling_rate字段，使用默认值');
-        segmentData.sampling_rate = 100;
+      if (!segmentResult.duration) {
+        segmentResult.duration = segmentResult.times.length > 0 ? 
+          segmentResult.times[segmentResult.times.length - 1] : 10;
       }
       
-      // 确保持续时间存在
-      if (!segmentData.duration) {
-        console.warn('分段结果缺少duration字段，使用默认值');
-        segmentData.duration = segmentData.times[segmentData.times.length - 1] - segmentData.times[0];
-      }
+      // 6. 设置timeRange字段
+      segmentResult.timeRange = [
+        segmentResult.times[0] || 0,
+        segmentResult.times[segmentResult.times.length - 1] || 10
+      ];
       
-      // 确保segment_info字段存在
-      if (!segmentData.segment_info) {
-        segmentData.segment_info = {
-          type: params.segment_mode || "time",
-          start: params.start_time || 0,
-          end: params.end_time || 10
-        };
-      }
-      
-      return result;
+      return { data: segmentResult };
     } catch (error) {
       console.error('数据分段请求失败:', error);
       throw error;

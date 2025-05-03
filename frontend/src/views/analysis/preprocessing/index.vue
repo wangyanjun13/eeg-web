@@ -260,7 +260,7 @@ const handleNextStep = async () => {
       return;
     }
     
-    // 确保timeRange存在
+    // 确保timeRange存在                                                                                                                                                                                                                                                                                                                                                      
     if (!dataToPass.timeRange && timeRange.value) {
       console.log('添加缺失的时间范围信息:', timeRange.value);
       dataToPass.timeRange = [...timeRange.value];
@@ -298,45 +298,43 @@ const handleProcessComplete = (data, processorKey) => {
     // 确保数据是对象而非字符串
     let processedResult = typeof data === 'string' ? JSON.parse(data) : {...data};
     
-    // 基本数据验证和补全
+    // 基本数据验证和补全 - 保持简单
     if (!processedResult.data) processedResult.data = {};
-    if (!processedResult.channels || !Array.isArray(processedResult.channels) || processedResult.channels.length === 0) {
-      processedResult.channels = Object.keys(processedResult.data);
-    }
-    if (!processedResult.times || !Array.isArray(processedResult.times) || processedResult.times.length === 0) {
-      processedResult.times = Array.from({length: 100}, (_, i) => i / 10); // 0到10秒，步长0.1
-    }
     
-    // 确保每个通道都有数据
-    for (const channel of processedResult.channels) {
-      if (!processedResult.data[channel]) {
-        processedResult.data[channel] = new Array(processedResult.times.length).fill(0);
+    // 确保channels数组存在
+    if (!processedResult.channels || !Array.isArray(processedResult.channels)) {
+      processedResult.channels = Object.keys(processedResult.data);
+      if (processedResult.channels.length === 0 && originalData.value?.channels) {
+        processedResult.channels = [...originalData.value.channels];
       }
     }
     
-    // 确保必要的元数据存在
-    if (!processedResult.sampling_rate) processedResult.sampling_rate = 100;
-    if (!processedResult.duration) {
-      processedResult.duration = processedResult.times.length > 0 
-        ? processedResult.times[processedResult.times.length - 1] - processedResult.times[0]
-        : 10;
+    // 确保times数组存在
+    if (!processedResult.times || !Array.isArray(processedResult.times)) {
+      const timeLength = processedResult.data && Object.keys(processedResult.data).length > 0 
+        ? processedResult.data[Object.keys(processedResult.data)[0]].length 
+        : 100;
+      processedResult.times = Array.from({length: timeLength}, (_, i) => i / 10);
     }
     
-    // 确保ID字段存在
+    // 确保每个通道都有数据 - 保持简单的填充
+    processedResult.channels.forEach(channel => {
+      if (!processedResult.data[channel]) {
+        processedResult.data[channel] = Array(processedResult.times.length).fill(0);
+      }
+    });
+    
+    // 确保必要的元数据存在
+    processedResult.sampling_rate = processedResult.sampling_rate || 100;
+    processedResult.duration = processedResult.duration || 10;
     processedResult.dataset_id = processedResult.dataset_id || datasetId;
     processedResult.subject_id = processedResult.subject_id || subjectId;
     
     // 确保timeRange存在
-    processedResult.timeRange = processedResult.timeRange || [0, 10];
+    processedResult.timeRange = processedResult.timeRange || [0, processedResult.duration];
     
     // 更新处理后数据
     processedData.value = processedResult;
-    
-    // 处理状态记录
-    processingStatus.value[processorKey] = { 
-      fromCache: data.from_cache || false, 
-      time: data.process_time || null 
-    };
     
     // 更新通道列表
     if (processedResult.channels?.length) {
@@ -345,11 +343,11 @@ const handleProcessComplete = (data, processorKey) => {
       // 保持显示通道一致性
       const validChannels = displayChannels.value.filter(ch => processedResult.channels.includes(ch));
       displayChannels.value = validChannels.length ? 
-                             [...validChannels] : 
-                             [...processedResult.channels.slice(0, Math.min(10, processedResult.channels.length))];
-    }
-    
-    // 保存结果
+                            [...validChannels] : 
+                            [...processedResult.channels.slice(0, Math.min(10, processedResult.channels.length))];
+  }
+  
+  // 保存结果
     saveResultSafely(processorKey, processedResult);
     
     // 标记为已完成
