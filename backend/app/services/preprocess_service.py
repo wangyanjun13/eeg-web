@@ -378,7 +378,7 @@ class PreprocessService:
         return eog_indices 
 
     def segment_data(self, dataset_id: str, subject_id: str, params: SegmentParams) -> RawEEGData:
-        """对数据进行时间窗口分段"""
+        """对数据进行分段"""
         try:
             # 获取输入数据
             input_data = self.dataset_service.get_subject_data(
@@ -391,71 +391,176 @@ class PreprocessService:
             if not input_data or not input_data.data:
                 raise ValueError("无法获取有效的输入数据")
             
-            # 确保数据中不包含非标准浮点值，并保持数据结构不变
+            # 确保数据中不包含非标准浮点值
             sanitized_data = {}
             for channel in input_data.channels:
                 if channel in input_data.data:
                     channel_data = input_data.data[channel]
                     sanitized_data[channel] = [0.0 if (np.isnan(x) or np.isinf(x)) else float(x) for x in channel_data]
             
-            # 计算时间范围和对应索引
-            time_array = input_data.times
-            sampling_rate = input_data.sampling_rate
-            
-            # 找到开始和结束时间对应的索引
-            start_idx = 0
-            end_idx = len(time_array) - 1
-            
-            for i, t in enumerate(time_array):
-                if t >= params.start_time:
-                    start_idx = i
-                    break
-            
-            for i in range(start_idx, len(time_array)):
-                if time_array[i] >= params.end_time:
-                    end_idx = i
-                    break
-            
-            # 提取所选时间窗口的数据
-            segmented_data = {}
-            for channel in input_data.channels:
-                if channel in sanitized_data:
-                    segmented_data[channel] = sanitized_data[channel][start_idx:end_idx]
-            
-            # 创建新的时间数组，保持相对于起始时间的偏移
-            segmented_times = []
-            for i in range(start_idx, end_idx):
-                # 将时间点调整为相对于分段起始时间的值
-                segmented_times.append(time_array[i] - params.start_time)
-            
-            # 创建结果数据结构
-            result = RawEEGData(
-                data=segmented_data,
-                times=segmented_times,
-                channels=input_data.channels,
-                duration=params.end_time - params.start_time,
-                sampling_rate=input_data.sampling_rate,
-                dataset_id=dataset_id,
-                subject_id=subject_id,
-                segment_info={
-                    "type": "time_window",
-                    "start": params.start_time,
-                    "end": params.end_time,
-                    "use_original_full_data": params.use_original_full_data
-                }
-            )
+            # 基于分段模式选择不同处理
+            if params.segment_mode == "time":
+                # 时间窗口分段 - 现有逻辑
+                # ... [现有时间窗口分段代码保持不变] ...
+                
+                # 计算时间范围和对应索引
+                time_array = input_data.times
+                sampling_rate = input_data.sampling_rate
+                
+                # 找到开始和结束时间对应的索引
+                start_idx = 0
+                end_idx = len(time_array) - 1
+                
+                for i, t in enumerate(time_array):
+                    if t >= params.start_time:
+                        start_idx = i
+                        break
+                
+                for i in range(start_idx, len(time_array)):
+                    if time_array[i] >= params.end_time:
+                        end_idx = i
+                        break
+                
+                # 提取所选时间窗口的数据
+                segmented_data = {}
+                for channel in input_data.channels:
+                    if channel in sanitized_data:
+                        segmented_data[channel] = sanitized_data[channel][start_idx:end_idx]
+                
+                # 创建新的时间数组，相对于分段起始时间
+                segmented_times = []
+                for i in range(start_idx, end_idx):
+                    segmented_times.append(time_array[i] - params.start_time)
+                
+                # 创建结果
+                result = RawEEGData(
+                    data=segmented_data,
+                    times=segmented_times,
+                    channels=input_data.channels,
+                    duration=params.end_time - params.start_time,
+                    sampling_rate=input_data.sampling_rate,
+                    dataset_id=dataset_id,
+                    subject_id=subject_id,
+                    segment_info={
+                        "type": "time_window",
+                        "start": params.start_time,
+                        "end": params.end_time,
+                        "use_original_full_data": params.use_original_full_data
+                    }
+                )
+                
+            elif params.segment_mode == "event":
+                # 新增：基于事件的分段
+                if not params.event_id:
+                    raise ValueError("事件分段模式下必须指定event_id")
+                    
+                # 获取事件信息
+                events_info = self.dataset_service.get_events_info(dataset_id, subject_id)
+                events = events_info.get("events", [])
+                
+                # 如果不使用完整原始数据，则过滤当前时间窗口内的事件
+                if not params.use_original_full_data and params.start_time is not None and params.end_time is not None:
+                    time_window_events = []
+                    for event in events:
+                        event_onset = float(event.get("onset", 0))
+                        if params.start_time <= event_onset <= params.end_time:
+                            time_window_events.append(event)
+                    events = time_window_events
+                
+                # 查找目标事件
+                target_events = []
+                for event in events:
+                    if str(event.get("id")) == str(params.event_id):
+                        target_events.append(event)
+                
+                if not target_events:
+                    if not params.use_original_full_data and params.start_time is not None and params.end_time is not None:
+                        error_msg = f"在时间窗口 {params.start_time}-{params.end_time}s 内未找到指定的事件类型: {params.event_id}"
+                    else:
+                        error_msg = f"未找到指定的事件类型: {params.event_id}"
+                    raise ValueError(error_msg)
+                    
+                # 计算每个事件的时间窗口并合并
+                time_array = input_data.times
+                sampling_rate = input_data.sampling_rate
+                duration = params.time_before + params.time_after
+                
+                # 创建空的合并数据结构
+                segmented_data = {channel: [] for channel in input_data.channels if channel in sanitized_data}
+                segmented_times = []
+                
+                # 对每个事件进行处理
+                for event in target_events:
+                    event_onset = float(event.get("onset", 0))
+                    seg_start = event_onset - params.time_before
+                    seg_end = event_onset + params.time_after
+                    
+                    # 找到对应的索引
+                    start_idx = 0
+                    end_idx = len(time_array) - 1
+                    
+                    for i, t in enumerate(time_array):
+                        if t >= seg_start:
+                            start_idx = i
+                            break
+                    
+                    for i in range(start_idx, len(time_array)):
+                        if time_array[i] >= seg_end:
+                            end_idx = i
+                            break
+                    
+                    # 提取数据
+                    event_times = [t - seg_start for t in time_array[start_idx:end_idx]]
+                    
+                    # 如果是第一个事件，设置时间数组
+                    if not segmented_times:
+                        segmented_times = event_times
+                    
+                    # 只有时间数组长度匹配时才合并数据（确保所有事件片段长度一致）
+                    if len(event_times) == len(segmented_times):
+                        for channel in input_data.channels:
+                            if channel in sanitized_data:
+                                channel_data = sanitized_data[channel][start_idx:end_idx]
+                                # 如果是第一个事件，直接设置数据
+                                if not segmented_data[channel]:
+                                    segmented_data[channel] = channel_data
+                                else:
+                                    # 累加数据进行平均
+                                    for i in range(len(channel_data)):
+                                        segmented_data[channel][i] += channel_data[i]
+                
+                # 计算平均值
+                if target_events:
+                    for channel in segmented_data:
+                        segmented_data[channel] = [x / len(target_events) for x in segmented_data[channel]]
+                
+                # 创建结果
+                result = RawEEGData(
+                    data=segmented_data,
+                    times=segmented_times,
+                    channels=input_data.channels,
+                    duration=duration,
+                    sampling_rate=input_data.sampling_rate,
+                    dataset_id=dataset_id,
+                    subject_id=subject_id,
+                    segment_info={
+                        "type": "event_related",
+                        "event_id": params.event_id,
+                        "time_before": params.time_before,
+                        "time_after": params.time_after,
+                        "event_count": len(target_events),
+                        "original_events": [float(event.get("onset", 0)) for event in target_events],
+                        "original_time_window": [params.start_time, params.end_time] if not params.use_original_full_data else None
+                    }
+                )
+            else:
+                raise ValueError(f"不支持的分段模式: {params.segment_mode}")
             
             # 应用基线校正（如果需要）
             if params.apply_baseline:
                 result = self._apply_baseline_correction(
                     result, params.baseline_start, params.baseline_end
                 )
-            
-            # 打印数据结构以进行检查
-            print(f"分段返回数据检查：channels={len(result.channels)}, times={len(result.times)}")
-            print(f"第一个通道：{result.channels[0] if result.channels else 'None'}")
-            print(f"第一个通道数据长度：{len(result.data[result.channels[0]]) if result.channels and result.data and result.channels[0] in result.data else 0}")
-            print(f"时间范围：{result.times[0]} - {result.times[-1] if result.times else 0}")
             
             return result
         except Exception as e:

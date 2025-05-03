@@ -188,13 +188,58 @@ const getChartOption = (series = [], legendStatus = {}) => {
   };
   
   if (localViewMode.value === 'time') {
-    const timeRange = props.data.timeRange || props.timeRange;
-    baseOption.xAxis = {
-      type: 'value',
-      name: '时间 (s)',
-      min: timeRange[0],
-      max: timeRange[1]
-    };
+    let xAxisConfig = {};
+    
+    if (props.data?.segment_info?.type === 'event_related') {
+      // 对于事件相关数据，显示相对事件的时间
+      xAxisConfig = {
+        type: 'value',
+        name: '事件相对时间 (s)',
+        min: props.data.timeRange[0],
+        max: props.data.timeRange[1],
+        axisLabel: {
+          formatter: '{value} s'
+        }
+      };
+      
+      // 添加事件发生时刻的标记线
+      series.push({
+        type: 'line',
+        name: '事件标记',
+        silent: true,
+        symbolSize: 0,
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          label: { show: true, position: 'middle', formatter: '事件' },
+          lineStyle: { color: '#ff9800', type: 'solid', width: 2 },
+          data: [{ xAxis: 0, name: '事件' }]
+        }
+      });
+      
+      // 添加事件相关信息为标题
+      if (props.data.segment_info.event_count > 0) {
+        baseOption.title = {
+          show: true,
+          text: `事件类型: ${props.data.segment_info.event_id} (${props.data.segment_info.event_count}个事件平均)`,
+          textStyle: { fontSize: 12, color: '#606266' },
+          left: 'center',
+          top: 0,
+          padding: [0, 0, 10, 0]
+        };
+        baseOption.grid.top = '60px';
+      }
+    } else {
+      // 普通时间模式
+      xAxisConfig = {
+        type: 'value',
+        name: '时间 (s)',
+        min: props.timeRange[0],
+        max: props.timeRange[1]
+      };
+    }
+    
+    baseOption.xAxis = xAxisConfig;
     baseOption.yAxis = {
       type: 'value',
       name: '电压 (μV)',

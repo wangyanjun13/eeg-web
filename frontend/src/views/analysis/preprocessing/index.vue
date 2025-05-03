@@ -403,6 +403,32 @@ const beforePageLeave = async (e) => {
   }
 };
 
+// 添加当前数据集和受试者ID
+const currentDatasetId = ref('');
+const currentSubjectId = ref('');
+
+// 获取 URL 参数或从其他存储中获取当前选择的数据集和受试者
+onMounted(() => {
+  // 示例：从 URL 中获取参数
+  const urlParams = new URLSearchParams(window.location.search);
+  currentDatasetId.value = urlParams.get('dataset') || '';
+  currentSubjectId.value = urlParams.get('subject') || '';
+  
+  // 如果 URL 中没有，可以尝试从 localStorage 获取最近选择的
+  if (!currentDatasetId.value || !currentSubjectId.value) {
+    currentDatasetId.value = localStorage.getItem('currentDatasetId') || '';
+    currentSubjectId.value = localStorage.getItem('currentSubjectId') || '';
+  }
+});
+
+// 处理更新后的数据
+const handleProcessedData = (data) => {
+  // 根据你的应用逻辑处理数据
+  console.log('处理后的数据:', data);
+  // 例如：更新图表数据等
+  // updateChartData(data);
+};
+
 // 组件生命周期
 onMounted(async () => {
   await fetchOriginalData();

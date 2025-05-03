@@ -223,7 +223,7 @@ const analysisService = {
       );
       
       // 添加详细日志查看响应结构
-      console.log("分段响应结构:", JSON.stringify(response.data));
+      // console.log("分段响应结构:", JSON.stringify(response.data));
       
       if (!response || !response.data) {
         throw new Error('服务器返回空数据');
@@ -292,8 +292,6 @@ const analysisService = {
           {length: timeLength}, 
           (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1))
         );
-        
-        console.log(`创建了新的时间数组，范围从 ${segmentResult.times[0]} 到 ${segmentResult.times[segmentResult.times.length-1]}`);
       } else {
         // 检查时间数组是否与预期的分段时间窗口匹配
         const firstTime = segmentResult.times[0];
@@ -311,8 +309,6 @@ const analysisService = {
             {length: timeLength}, 
             (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1))
           );
-          
-          console.log(`已调整时间数组，新范围从 ${segmentResult.times[0]} 到 ${segmentResult.times[segmentResult.times.length-1]}`);
         }
       }
       
@@ -341,9 +337,35 @@ const analysisService = {
       segmentResult.duration = segmentEndTime - segmentStartTime;
       
       // 5. 设置正确的timeRange字段
-      segmentResult.timeRange = [segmentStartTime, segmentEndTime];
-      
-      console.log(`最终分段结果: 时间范围=${segmentResult.timeRange}, 数据长度=${segmentResult.times.length}`);
+      if (sanitizedParams.segment_mode === 'event') {
+        // 对于事件相关，时间窗口应该是 [-time_before, time_after]
+        const totalDuration = sanitizedParams.time_before + sanitizedParams.time_after;
+        segmentResult.timeRange = [-sanitizedParams.time_before, sanitizedParams.time_after];
+        segmentResult.duration = totalDuration;
+        
+        // 设置段信息以便于用户了解
+        segmentResult.segment_info = {
+          type: "event_related",
+          event_id: sanitizedParams.event_id,
+          time_before: sanitizedParams.time_before,
+          time_after: sanitizedParams.time_after,
+          events_processed: responseData.data.segment_info?.event_count || 0,
+          original_time_range: sanitizedParams.use_original_full_data ? 
+            [0, responseData.data.duration || 0] : 
+            [sanitizedParams.start_time || 0, sanitizedParams.end_time || 10]
+        };
+        
+        // 调整时间数组以反映事件为中心的时间窗口
+        if (segmentResult.times && segmentResult.times.length > 0) {
+          const timeLength = segmentResult.times.length;
+          segmentResult.times = Array.from(
+            {length: timeLength}, 
+            (_, i) => -sanitizedParams.time_before + (i * totalDuration / (timeLength - 1))
+          );
+        }
+      } else {
+        segmentResult.timeRange = [segmentStartTime, segmentEndTime];
+      }
       
       return { data: segmentResult };
     } catch (error) {
@@ -512,18 +534,7 @@ const analysisService = {
    * @returns {Promise<Object>} - 事件信息
    */
   getEvents(datasetId, subjectId) {
-    // 首先尝试从preprocess API获取事件
-    return api.get(`/api/preprocess/${datasetId}/subjects/${subjectId}/events`)
-      .catch(error => {
-        console.warn('从预处理API获取事件失败，尝试从dataset API获取:', error);
-        // 如果预处理API失败，尝试从dataset API获取
-        return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/events`)
-          .catch(secondError => {
-            console.warn('从dataset API获取事件也失败:', secondError);
-            // 如果两个API都失败，返回空的事件数据
-            return {data: {events: []}};
-          });
-      });
+    return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/events`);
   },
 
   /**
