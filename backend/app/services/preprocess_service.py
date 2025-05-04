@@ -1097,23 +1097,13 @@ class PreprocessService:
                         resampled_data[channel] = resampled_data[channel][:cutoff_index]
                     n_samples = len(resampled_times)
                 
-                # 创建新的时间数组，均匀分布在整个时间窗口中
-                segmented_times = []
-                total_points = n_samples
-                segment_duration = orig_duration
-                
-                # 确保均匀覆盖整个选定时间窗口
-                for i in range(total_points):
-                    if total_points > 1:
-                        relative_position = i / (total_points - 1)
-                    else:
-                        relative_position = 0
-                    segmented_times.append(relative_position * segment_duration)
+                # 转换为列表
+                resampled_times = resampled_times.tolist()
                 
                 # 创建结果数据
                 result = RawEEGData(
                     data=resampled_data,
-                    times=segmented_times,
+                    times=resampled_times,
                     channels=input_data.channels,
                     duration=resampled_times[-1] if resampled_times else orig_duration,
                     sampling_rate=params.resample_freq,
