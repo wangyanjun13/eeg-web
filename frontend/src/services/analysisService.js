@@ -168,6 +168,7 @@ const analysisService = {
    */
   async detectBadChannels(datasetId, subjectId, params) {
     try {
+      console.log('发送坏通道检测请求:', params);
       const response = await axios.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/bad_channels`, 
         params

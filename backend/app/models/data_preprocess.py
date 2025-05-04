@@ -30,7 +30,11 @@ class ICAParams(BaseModel):
 class BadChannelParams(BaseModel):
     """坏通道检测参数"""
     detect_bad_channels: bool = True
-    bad_channel_method: str = "correlation"
+    bad_channel_method: str = "correlation"  # "correlation", "variance", "spectrum"
+    threshold: Optional[float] = None  # 检测阈值，None表示使用默认值
+    rejection_mode: str = "zero"  # "zero", "interpolate", "remove"
+    use_custom_bads: bool = False  # 是否使用自定义坏通道列表
+    custom_bad_channels: Optional[List[str]] = None  # 自定义坏通道列表
 
 class ArtifactParams(BaseModel):
     """伪迹处理参数"""

@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessedData, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessedData, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams, BadChannelParams
 from scipy import signal
 from app.models.data_dataset import RawEEGData
 from mne.preprocessing import ICA
@@ -338,17 +338,129 @@ class PreprocessService:
         
         return raw, params, applied_methods
     
-    def _detect_bad_channels(self, raw, method="correlation"):
-        """检测坏通道"""
-        # 简化实现，实际应根据method参数使用不同的检测方法
-        if method == "correlation":
-            # 使用相关性方法检测坏通道
-            from mne.preprocessing import find_bad_channels_maxwell
-            bads, _ = find_bad_channels_maxwell(raw, cross_talk=None, calibration=None)
-            return bads
-        else:
+    def _detect_bad_channels(self, data, method="correlation", threshold=None):
+        """检测坏通道
+        
+        Args:
+            data: EEG数据
+            method: 检测方法 ('correlation', 'variance', 'spectrum')
+            threshold: 阈值 (如果为None则使用自动阈值)
+            
+        Returns:
+            检测到的坏通道列表
+        """
+        if not data or not data.data or not data.channels:
+            print("无效的EEG数据输入")
             return []
-    
+        
+        print(f"开始坏通道检测: 方法={method}, 自定义阈值={threshold}")
+        
+        # 确保数据预处理
+        channels = data.channels
+        # 将数据转换为numpy数组，便于计算
+        eeg_data = np.zeros((len(channels), len(data.times)))
+        for i, ch in enumerate(channels):
+            if ch in data.data:
+                # 截取匹配长度
+                ch_data = data.data[ch][:len(data.times)] if len(data.data[ch]) > len(data.times) else data.data[ch]
+                # 填充数据
+                eeg_data[i, :len(ch_data)] = ch_data
+            
+        bad_channels = []
+        
+        # 根据不同方法检测坏通道
+        if method == "correlation":
+            # 使用更敏感的默认阈值 
+            corr_threshold = threshold if threshold is not None else 0.2  # 从0.3降低到0.2
+            
+            # 计算通道间相关性矩阵
+            correlation_matrix = np.corrcoef(eeg_data)
+            np.fill_diagonal(correlation_matrix, 0)  # 忽略自相关
+            
+            # 计算每个通道与其他通道的平均相关性
+            mean_correlations = np.nanmean(correlation_matrix, axis=1)
+            
+            # 打印每个通道的相关性值，便于调试
+            for i, ch in enumerate(channels):
+                print(f"通道 {ch} 的平均相关性: {mean_correlations[i]:.4f}")
+            
+            # 寻找平均相关性低于阈值的通道
+            for i, corr in enumerate(mean_correlations):
+                if corr < corr_threshold:
+                    bad_channels.append(channels[i])
+                    print(f"检测到坏通道(相关性方法): {channels[i]}, 相关性值: {corr:.4f}")
+            
+        elif method == "variance":
+            # 方差方法：检测方差异常高或异常低的通道
+            # 降低阈值倍数，使检测更敏感
+            z_threshold = threshold if threshold is not None else 2.0  # 从2.5降低到2.0
+            
+            # 计算每个通道的方差
+            variances = np.var(eeg_data, axis=1)
+            
+            # 计算方差的均值和标准差
+            mean_var = np.mean(variances)
+            std_var = np.std(variances)
+            
+            # 打印每个通道的方差值，便于调试
+            for i, ch in enumerate(channels):
+                z_score = abs(variances[i] - mean_var) / (std_var + 1e-10)
+                print(f"通道 {ch} 的方差: {variances[i]:.4f}, Z分数: {z_score:.4f}")
+            
+            # 检测方差异常的通道
+            for i, var in enumerate(variances):
+                z_score = abs(var - mean_var) / (std_var + 1e-10)  # 避免除零
+                if z_score > z_threshold:
+                    bad_channels.append(channels[i])
+                    print(f"检测到坏通道(方差方法): {channels[i]}, Z分数: {z_score:.4f}")
+            
+        elif method == "spectrum":
+            # 功率谱方法：检测频谱特性异常的通道
+            from scipy import signal
+            
+            # 采样率
+            fs = data.sampling_rate
+            
+            # 计算每个通道的功率谱
+            psds = []
+            for i in range(len(channels)):
+                # 使用Welch方法计算功率谱密度
+                f, psd = signal.welch(eeg_data[i], fs, nperseg=min(256, len(eeg_data[i])))
+                psds.append(psd)
+            
+            psds = np.array(psds)
+            
+            # 计算平均功率谱
+            mean_psd = np.mean(psds, axis=0)
+            
+            # 为每个通道计算与平均功率谱的差异
+            psd_diffs = []
+            for i in range(len(channels)):
+                # 计算对数功率谱差异
+                diff = np.mean(np.abs(np.log10(psds[i] + 1e-10) - np.log10(mean_psd + 1e-10)))
+                psd_diffs.append(diff)
+            
+            # 设置自动阈值 - 降低阈值使检测更敏感
+            spec_threshold = threshold if threshold is not None else 0.4  # 从0.5降低到0.4
+            
+            # 打印每个通道的频谱差异，便于调试
+            for i, ch in enumerate(channels):
+                print(f"通道 {ch} 的频谱差异: {psd_diffs[i]:.4f}")
+            
+            # 检测频谱异常的通道
+            for i, diff in enumerate(psd_diffs):
+                if diff > spec_threshold:
+                    bad_channels.append(channels[i])
+                    print(f"检测到坏通道(频谱方法): {channels[i]}, 差异值: {diff:.4f}")
+        
+        # 输出检测结果
+        if bad_channels:
+            print(f"检测到 {len(bad_channels)} 个坏通道: {bad_channels}")
+        else:
+            print(f"使用 {method} 方法未检测到坏通道，考虑调低阈值重试")
+        
+        return bad_channels
+
     def _run_ica(self, raw, n_components=None, method="fastica"):
         """运行ICA分析"""
         from mne.preprocessing import ICA
@@ -1137,3 +1249,195 @@ class PreprocessService:
             error_msg = f"重采样处理失败: {str(e)}"
             print(error_msg)
             raise ValueError(error_msg)
+
+    def process_bad_channels(self, dataset_id: str, subject_id: str, params: BadChannelParams) -> RawEEGData:
+        """处理坏通道 - 检测并应用处理方法
+        
+        Args:
+            dataset_id: 数据集ID
+            subject_id: 受试者ID
+            params: 坏通道检测与处理参数
+            
+        Returns:
+            处理后的数据对象
+        """
+        try:
+            # 检查缓存
+            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "bad_channels")
+            cache_meta_key = f"{cache_key}:meta"
+            
+            # 首先检查元数据，比对参数判断缓存是否有效
+            cached_meta = get_metadata(cache_meta_key)
+            if cached_meta:
+                # 检查参数是否匹配
+                params_dict = params.dict()
+                
+                # 参数一致则返回缓存的结果
+                if cached_meta.get('params') == params_dict:
+                    print(f"找到有效的坏通道处理缓存: {cache_key}")
+                    cached_data = get_from_cache(cache_key)
+                    if cached_data:
+                        return cached_data
+
+            print(f"执行坏通道检测和处理")
+            start_time = time.time()
+            
+            # 获取输入数据（应该是前一步骤的结果）
+            input_data = self.get_input_data_for_step(dataset_id, subject_id, "badChannels")
+            
+            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
+                raise ValueError(input_data.error)
+            
+            # 如果不需要检测坏通道，直接返回输入数据
+            if not params.detect_bad_channels:
+                return input_data
+            
+            # 检测坏通道
+            bad_channels = []
+            
+            # 如果提供了自定义坏通道列表，直接使用
+            if params.use_custom_bads and params.custom_bad_channels:
+                bad_channels = params.custom_bad_channels
+            else:
+                # 根据参数选择的方法检测坏通道
+                bad_channels = self._detect_bad_channels(
+                    input_data, 
+                    method=params.bad_channel_method,
+                    threshold=params.threshold
+                )
+            
+            # 记录检测到的坏通道数量和名称 (用于日志)
+            print(f"检测到 {len(bad_channels)} 个坏通道: {', '.join(bad_channels) if bad_channels else '无'}")
+            
+            # 处理检测到的坏通道
+            processed_data = {}
+            result_channels = input_data.channels.copy()
+            
+            # 使用不同的处理模式
+            if params.rejection_mode == "zero":
+                # 将坏通道数据清零
+                for channel in input_data.channels:
+                    if channel in bad_channels:
+                        # 创建与原始数据等长的零数组
+                        channel_length = len(input_data.data[channel])
+                        processed_data[channel] = [0.0] * channel_length
+                    else:
+                        # 保留良好通道的原始数据
+                        processed_data[channel] = input_data.data[channel]
+                    
+            elif params.rejection_mode == "interpolate":
+                # 尝试插值坏通道
+                try:
+                    # 转换为MNE-Python的Raw对象
+                    raw_mne = self._convert_to_mne_raw(input_data)
+                    
+                    # 设置坏通道
+                    raw_mne.info['bads'] = bad_channels
+                    
+                    # 使用球面样条插值
+                    raw_mne.interpolate_bads(reset_bads=True)
+                    
+                    # 从Raw对象中提取数据
+                    data_array, _ = raw_mne[:, :]
+                    
+                    # 重新格式化为字典格式
+                    for i, ch in enumerate(raw_mne.ch_names):
+                        processed_data[ch] = data_array[i, :].tolist()
+                    
+                    # 更新通道列表，确保与MNE处理后一致
+                    result_channels = raw_mne.ch_names
+                    
+                except Exception as interp_error:
+                    print(f"插值失败: {str(interp_error)}，回退到零填充")
+                    # 如果插值失败，回退到零填充
+                    for channel in input_data.channels:
+                        if channel in bad_channels:
+                            channel_length = len(input_data.data[channel])
+                            processed_data[channel] = [0.0] * channel_length
+                        else:
+                            processed_data[channel] = input_data.data[channel]
+                
+            elif params.rejection_mode == "remove":
+                # 从数据集中移除坏通道
+                for channel in input_data.channels:
+                    if channel not in bad_channels:
+                        processed_data[channel] = input_data.data[channel]
+                    
+                # 更新通道列表，移除坏通道
+                result_channels = [ch for ch in input_data.channels if ch not in bad_channels]
+            
+            else:
+                # 未知的处理模式，保持原始数据不变
+                processed_data = input_data.data
+            
+            # 创建结果对象
+            result = RawEEGData(
+                data=processed_data,
+                times=input_data.times,
+                channels=result_channels,
+                duration=input_data.duration,
+                sampling_rate=input_data.sampling_rate,
+                dataset_id=dataset_id,
+                subject_id=subject_id,
+                bad_channels=bad_channels
+            )
+            
+            # 计算处理时间
+            process_time = time.time() - start_time
+            print(f"坏通道处理完成，耗时: {process_time:.2f}秒")
+            
+            # 缓存处理结果
+            params_dict = params.dict()
+            metadata = {
+                'params': params_dict,
+                'process_time': process_time,
+                'timestamp': time.time()
+            }
+            
+            save_metadata(cache_meta_key, metadata)
+            save_to_cache(cache_key, result)
+            print(f"已缓存坏通道处理结果: {cache_key}")
+            
+            return result
+        
+        except Exception as e:
+            error_msg = f"坏通道处理失败: {str(e)}"
+            print(error_msg)
+            raise ValueError(error_msg)
+
+    def _convert_to_mne_raw(self, raw_eeg_data):
+        """将RawEEGData转换为MNE Raw对象，便于进行高级处理
+        
+        Args:
+            raw_eeg_data: 自定义EEG数据对象
+            
+        Returns:
+            mne.io.Raw: MNE Raw对象
+        """
+        import mne
+        import numpy as np
+        
+        # 从数据中提取通道和采样率
+        channels = raw_eeg_data.channels
+        sampling_rate = raw_eeg_data.sampling_rate
+        
+        # 将数据转换为numpy数组
+        data = np.zeros((len(channels), len(raw_eeg_data.times)))
+        for i, ch in enumerate(channels):
+            if ch in raw_eeg_data.data:
+                # 确保数据长度匹配
+                channel_data = raw_eeg_data.data[ch]
+                data_length = min(len(channel_data), len(raw_eeg_data.times))
+                data[i, :data_length] = channel_data[:data_length]
+        
+        # 创建Info对象
+        info = mne.create_info(
+            ch_names=channels,
+            sfreq=sampling_rate,
+            ch_types=['eeg'] * len(channels)
+        )
+        
+        # 创建Raw对象
+        raw = mne.io.RawArray(data, info)
+        
+        return raw

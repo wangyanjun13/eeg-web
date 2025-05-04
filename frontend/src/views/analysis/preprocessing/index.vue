@@ -336,18 +336,16 @@ const handleProcessComplete = (data, processorKey) => {
     // 更新处理后数据
     processedData.value = processedResult;
     
-    // 更新通道列表
+    // 只更新显示通道，保留原始处理通道
     if (processedResult.channels?.length) {
-      processingChannels.value = [...processedResult.channels];
-      
       // 保持显示通道一致性
       const validChannels = displayChannels.value.filter(ch => processedResult.channels.includes(ch));
       displayChannels.value = validChannels.length ? 
                             [...validChannels] : 
                             [...processedResult.channels.slice(0, Math.min(10, processedResult.channels.length))];
-  }
-  
-  // 保存结果
+    }
+    
+    // 保存结果
     saveResultSafely(processorKey, processedResult);
     
     // 标记为已完成

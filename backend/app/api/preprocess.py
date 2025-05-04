@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams, BadChannelParams
 from app.models.common import APIResponse
 from app.services.preprocess_service import PreprocessService
 from app.services.dataset_service import DatasetService
@@ -357,5 +357,86 @@ async def get_events(dataset_id: str, subject_id: str):
         return APIResponse(
             message="获取事件信息失败，返回空列表",
             data={"events": []}
-        ) 
+        )
+
+@router.post("/{dataset_id}/subjects/{subject_id}/bad_channels", response_model=APIResponse)
+async def detect_bad_channels(dataset_id: str, subject_id: str, params: BadChannelParams):
+    """检测坏通道
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+        params: 坏通道检测参数
+    """
+    try:
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "bad_channels")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        from_cache = False
+        process_time = 0
+        
+        # 检查元数据
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta:
+            # 检查参数是否匹配
+            params_dict = params.dict()
+            
+            # 参数一致则标记为从缓存获取
+            if cached_meta.get('params') == params_dict:
+                from_cache = True
+                process_time = cached_meta.get('process_time', 0)
+                cached_data = get_from_cache(cache_key)
+                if cached_data:
+                    print(f"使用缓存的坏通道检测结果: {cache_key}")
+                    
+                    # 创建响应
+                    response = APIResponse(
+                        success=True,
+                        message="坏通道检测完成",
+                        data=cached_data
+                    )
+                    
+                    return Response(
+                        content=response.json(),
+                        media_type="application/json",
+                        headers={
+                            "X-From-Cache": "true",
+                            "X-Process-Time": str(process_time)
+                        }
+                    )
+        
+        # 没有有效缓存，执行处理
+        start_time = time.time()
+        
+        # 执行坏通道检测
+        result = preprocess_service.process_bad_channels(dataset_id, subject_id, params)
+        
+        # 计算处理时间
+        process_time = time.time() - start_time
+        
+        # 创建响应
+        response = APIResponse(
+            success=True,
+            message="坏通道检测完成",
+            data=result
+        )
+        
+        # 返回响应，添加自定义头信息
+        return Response(
+            content=response.json(),
+            media_type="application/json",
+            headers={
+                "X-From-Cache": "false",
+                "X-Process-Time": str(process_time)
+            }
+        )
+    except ValueError as e:
+        error_msg = f"参数错误: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        error_msg = f"坏通道检测失败: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) 
     
