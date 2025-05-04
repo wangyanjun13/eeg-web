@@ -20,6 +20,10 @@ const props = defineProps({
   processingChannels: {
     type: Array,
     default: () => []
+  },
+  processedData: {
+    type: Object,
+    default: null
   }
 });
 

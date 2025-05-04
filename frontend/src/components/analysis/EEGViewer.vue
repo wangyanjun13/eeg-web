@@ -80,7 +80,6 @@ const timeRange = ref(props.initialTimeRange || [0, 10]);
 // 确保时间范围变化时触发事件和更新图表
 watch(() => props.timeRange, (newRange) => {
   if (newRange && Array.isArray(newRange)) {
-    console.log('EEGViewer: time range changed:', newRange);
     timeRange.value = [...newRange];
     nextTick(() => {
       updateChart();
@@ -195,8 +194,8 @@ const getChartOption = (series = [], legendStatus = {}) => {
       xAxisConfig = {
         type: 'value',
         name: '事件相对时间 (s)',
-        min: props.data.timeRange[0],
-        max: props.data.timeRange[1],
+        min: props.data.timeRange ? props.data.timeRange[0] : props.timeRange[0],
+        max: props.data.timeRange ? props.data.timeRange[1] : props.timeRange[1],
         axisLabel: {
           formatter: '{value} s'
         }
@@ -230,12 +229,13 @@ const getChartOption = (series = [], legendStatus = {}) => {
         baseOption.grid.top = '60px';
       }
     } else {
-      // 普通时间模式
+      // 只修改这一行 - 确保使用数据中的时间范围
+      const dataTimeRange = props.data.timeRange || timeRange.value;
       xAxisConfig = {
         type: 'value',
         name: '时间 (s)',
-        min: props.timeRange[0],
-        max: props.timeRange[1]
+        min: dataTimeRange[0],
+        max: dataTimeRange[1]
       };
     }
     
@@ -409,13 +409,6 @@ const debouncedUpdateChart = useDebounceFn(() => {
   const allDataChannels = props.data.channels || [];
   const availableDataChannels = props.data.data ? Object.keys(props.data.data) : [];
   
-  console.log('EEGViewer 数据检查:', {
-    selectedChannels: props.selectedChannels.length,
-    availableInProps: props.availableChannels.length,
-    channelsInData: allDataChannels.length,
-    channelsWithData: availableDataChannels.length
-  });
-  
   // 确保只使用真正可用的通道
   let validChannels = props.selectedChannels.filter(channel => 
     // 通道必须存在于props.availableChannels或者data.channels中
@@ -435,20 +428,6 @@ const debouncedUpdateChart = useDebounceFn(() => {
   // 添加对数据结构的详细检查
   if (validChannels.length > 0) {
     const firstChannel = validChannels[0];
-    console.log(`检查第一个通道 ${firstChannel} 的数据:`, {
-      hasChannel: props.data.data && props.data.data[firstChannel] ? 'yes' : 'no',
-      dataType: props.data.data && props.data.data[firstChannel] ? 
-                typeof props.data.data[firstChannel] : 'unknown',
-      isArray: props.data.data && props.data.data[firstChannel] ? 
-               Array.isArray(props.data.data[firstChannel]) : 'unknown',
-      dataLength: props.data.data && props.data.data[firstChannel] && 
-                 Array.isArray(props.data.data[firstChannel]) ? 
-                 props.data.data[firstChannel].length : 0,
-      timesLength: props.data.times ? props.data.times.length : 0,
-      firstFewValues: props.data.data && props.data.data[firstChannel] && 
-                     Array.isArray(props.data.data[firstChannel]) ? 
-                     props.data.data[firstChannel].slice(0, 5) : []
-    });
   }
   
   let series = [];
@@ -588,8 +567,6 @@ const debouncedUpdateChart = useDebounceFn(() => {
 // 修改 updateChart 函数
 const updateChart = () => {
   if (!chart || !props.data) return;
-  
-  console.log('EEGViewer: updating chart with time range:', timeRange.value);
   
   // 确保使用当前的时间范围
   const currentTimeRange = timeRange.value;

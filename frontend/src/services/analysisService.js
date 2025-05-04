@@ -290,24 +290,22 @@ const analysisService = {
         const segmentDuration = segmentEndTime - segmentStartTime;
         segmentResult.times = Array.from(
           {length: timeLength}, 
-          (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1))
+          (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1 || 1))
         );
       } else {
         // 检查时间数组是否与预期的分段时间窗口匹配
         const firstTime = segmentResult.times[0];
         const lastTime = segmentResult.times[segmentResult.times.length - 1];
         
-        // 如果时间范围与预期不符，应进行调整
-        if (Math.abs(firstTime - segmentStartTime) > 0.1 || Math.abs(lastTime - (segmentEndTime - segmentStartTime)) > 0.1) {
-          console.warn(`时间数组范围不匹配: ${firstTime}-${lastTime}, 预期: ${segmentStartTime}-${segmentEndTime}`);
-          
-          // 调整时间数组，保持相对间隔比例不变
+        // 如果时间范围与预期差距较大，则重新生成时间数组
+        if (Math.abs(firstTime - segmentStartTime) > 0.1 || Math.abs(lastTime - segmentEndTime) > 0.1) {
+          // 调整时间数组以完全覆盖选定的时间窗口
           const timeLength = segmentResult.times.length;
           const segmentDuration = segmentEndTime - segmentStartTime;
           
           segmentResult.times = Array.from(
             {length: timeLength}, 
-            (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1))
+            (_, i) => segmentStartTime + (i * segmentDuration / (timeLength - 1 || 1))
           );
         }
       }
@@ -364,7 +362,16 @@ const analysisService = {
           );
         }
       } else {
+        // 时间窗口模式 - 确保明确设置timeRange
         segmentResult.timeRange = [segmentStartTime, segmentEndTime];
+        
+        // 明确告知前端这是时间窗口分段
+        segmentResult.segment_info = {
+          type: "time_window",
+          start_time: segmentStartTime,
+          end_time: segmentEndTime,
+          duration: segmentEndTime - segmentStartTime
+        };
       }
       
       return { data: segmentResult };
