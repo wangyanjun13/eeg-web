@@ -4,9 +4,9 @@ from app.models.common import APIResponse
 from app.services.analysis_service import AnalysisService
 from app.services.dataset_service import DatasetService
 from pathlib import Path
-
+from app.core.config import DATA_DIR
 # 创建服务实例
-DATA_DIR = Path("/app/data/eeg_samples")
+# DATA_DIR = Path("/app/data/eeg_samples")
 dataset_service = DatasetService(DATA_DIR)
 analysis_service = AnalysisService(dataset_service)
 

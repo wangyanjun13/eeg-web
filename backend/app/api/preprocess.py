@@ -10,9 +10,9 @@ from fastapi.responses import Response
 # 导入缓存相关函数
 from app.core.config import get_preprocess_cache_key
 from app.core.redis import get_metadata, save_metadata, get_from_cache, save_to_cache
-
+from app.core.config import DATA_DIR
 # 创建服务实例
-DATA_DIR = Path("/app/data/eeg_samples")
+# DATA_DIR = Path("/app/data/eeg_samples")
 dataset_service = DatasetService(DATA_DIR)
 preprocess_service = PreprocessService(dataset_service)
 
