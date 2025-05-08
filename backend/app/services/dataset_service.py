@@ -606,4 +606,53 @@ class DatasetService:
             # 返回空列表而不是抛出异常，确保API仍能返回有效响应
             return {'events': []}
 
-    # ... 其他辅助方法 ... 
+    def record_visit(self) -> int:
+        """记录一次网站访问，并返回总访问量"""
+        try:
+            visit_file = self.data_dir / "visit_count.txt"
+            
+            # 如果文件不存在，创建文件并设置初始值为 1
+            if not visit_file.exists():
+                with open(visit_file, 'w') as f:
+                    f.write('1')
+                return 1
+            
+            # 读取当前访问量
+            with open(visit_file, 'r') as f:
+                try:
+                    count = int(f.read().strip())
+                except ValueError:
+                    count = 0
+                
+            # 增加访问量并保存
+            count += 1
+            with open(visit_file, 'w') as f:
+                f.write(str(count))
+            
+            return count
+        except Exception as e:
+            print(f"记录访问量失败: {str(e)}")
+            return 0
+
+    def get_visit_count(self) -> int:
+        """获取网站总访问量"""
+        try:
+            visit_file = self.data_dir / "visit_count.txt"
+            
+            # 如果文件不存在，返回 0
+            if not visit_file.exists():
+                return 0
+            
+            # 读取当前访问量
+            with open(visit_file, 'r') as f:
+                try:
+                    count = int(f.read().strip())
+                except ValueError:
+                    count = 0
+                
+            return count
+        except Exception as e:
+            print(f"获取访问量失败: {str(e)}")
+            return 0
+
+    # ... 其他辅助方法 ... .. 其他辅助方法 ... 

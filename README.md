@@ -26,13 +26,30 @@
 
 4. **查看服务状态**:
    ```bash
-   sudo ./eeg-service.sh status
+   ./eeg-service.sh status
    ```
 
 5. **查看日志**:
    ```bash
-   sudo ./eeg-service.sh logs
+   ./eeg-service.sh logs
    ```
+
+## 前端代码更新流程 (简化版)
+
+每次修改前端代码后，只需一条命令即可完成构建、部署和配置更新：
+
+```bash
+sudo ./eeg-service.sh deploy
+```
+
+这个命令将自动：
+1. 使用合适的 Node.js 版本构建前端
+2. 确保 Nginx 配置正确
+3. 重启 Nginx 服务
+4. 更新 Cloudflared 隧道配置
+5. 完成所有必要的设置
+
+**注意**：必须使用 `sudo` 运行此命令，才能正确配置所有服务。
 
 ## Cloudflare 隧道管理
 
@@ -57,23 +74,22 @@
    sudo systemctl restart cloudflared
    ```
 
-## 开发流程
+## 常见问题解决
 
-1. **代码修改**:
-   - 直接修改前端或后端代码
-   - 修改不会影响正在运行的服务
-
-2. **前端构建**:
+1. **502 Bad Gateway 错误**:
    ```bash
-   sudo ./eeg-service.sh build
+   sudo ./eeg-service.sh update-cf prod
+   sudo systemctl restart cloudflared
    ```
-   _注: 此命令会构建前端代码生成生产版本_
 
-3. **应用更改**:
+2. **前端不显示最新更改**:
    ```bash
-   sudo ./eeg-service.sh restart-prod
+   sudo ./eeg-service.sh deploy
    ```
-   _注: 执行此命令后新代码才会生效_
+
+3. **中国网络访问问题**:
+   - 确保 Cloudflare 路由设置为亚太区域 (ap)
+   - 如需手动修改, 登录 Cloudflare 控制台，在 "一步完成所有操作" > "网络" > "隧道" 中更新路由设置
 
 访问地址:
 - 前端: https://eeg-visualization-platform.site

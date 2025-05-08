@@ -30,6 +30,7 @@ show_help() {
     echo "  setup           - 安装依赖项"
     echo "  update-cf       - 更新Cloudflared配置"
     echo "  build           - 构建前端生产版本"
+    echo "  deploy          - 一键部署前端更新"
     echo "  nginx-setup     - 设置Nginx配置文件"
     echo "  help            - 显示帮助信息"
 }
@@ -264,30 +265,159 @@ EOF
     fi
 }
 
-# 构建前端生产版本
+# 构建前端生产版本（安全且可靠的方法）
 build_frontend() {
     echo "===== 构建前端生产版本 ====="
     echo "时间: $(date)"
     
-    # 进入前端目录
-    cd $FRONTEND_DIR
-    
-    # 设置npm镜像
-    npm config set registry https://registry.npmmirror.com
-    
-    # 安装依赖
-    echo "安装依赖..."
-    npm install
-    
-    # 构建生产版本
-    echo "构建生产版本..."
-    npm run build
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ 前端构建成功，输出目录: $FRONTEND_DIR/dist"
+    # 检查是否以 root 用户运行
+    if [ "$EUID" -eq 0 ]; then
+        echo "检测到您正在使用 root 权限运行构建命令"
+        echo "为确保使用正确的 Node.js 版本，将使用临时目录构建方法"
+        
+        # 获取非 root 用户
+        ACTUAL_USER=$(logname 2>/dev/null || echo "${SUDO_USER:-${USER}}")
+        ACTUAL_HOME=$(eval echo ~$ACTUAL_USER)
+        
+        # 创建临时构建目录
+        BUILD_DIR="/tmp/eeg-build-$(date +%s)"
+        mkdir -p $BUILD_DIR
+        cp -r $FRONTEND_DIR/* $BUILD_DIR/
+        chown -R $ACTUAL_USER:$ACTUAL_USER $BUILD_DIR
+        
+        echo "使用用户 $ACTUAL_USER 的环境构建前端"
+        
+        # 使用实际用户构建
+        su - $ACTUAL_USER -c "cd $BUILD_DIR && \
+            export NVM_DIR=\"$ACTUAL_HOME/.nvm\" && \
+            [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && \
+            npm config set registry https://registry.npmmirror.com && \
+            npm install && \
+            npm run build"
+        
+        BUILD_STATUS=$?
+        
+        if [ $BUILD_STATUS -eq 0 ]; then
+            echo "✅ 前端构建成功，复制构建结果..."
+            
+            # 如果 dist 目录存在，先备份
+            if [ -d "$FRONTEND_DIR/dist" ]; then
+                echo "备份现有的 dist 目录..."
+                mv $FRONTEND_DIR/dist $FRONTEND_DIR/dist.bak.$(date +%s)
+            fi
+            
+            # 复制构建结果
+            cp -r $BUILD_DIR/dist $FRONTEND_DIR/
+            echo "✅ 前端构建完成，输出目录: $FRONTEND_DIR/dist"
+            
+            # 清理临时目录
+            rm -rf $BUILD_DIR
+            return 0
+        else
+            echo "❌ 前端构建失败，请查看上面的错误信息"
+            rm -rf $BUILD_DIR
+            return 1
+        fi
     else
-        echo "❌ 前端构建失败，请查看错误信息"
+        # 非 root 用户直接构建
+        echo "非 root 用户构建模式"
+        
+        # 设置 Node.js 环境
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        
+        # 检查 Node.js 版本
+        NODE_VERSION=$(node -v)
+        echo "使用 Node.js 版本: $NODE_VERSION"
+        
+        # 检查 Node.js 版本是否满足要求
+        if [[ "$NODE_VERSION" =~ ^v([0-9]+) ]] && [ "${BASH_REMATCH[1]}" -lt 14 ]; then
+            echo "⚠️ 警告: 当前 Node.js 版本 ($NODE_VERSION) 低于项目所需的最低版本 (v14.18.0)"
+            echo "尝试使用 nvm 切换到合适的版本..."
+            
+            if command -v nvm &> /dev/null; then
+                nvm use 14 2>/dev/null || nvm use 16 2>/dev/null || nvm use 18 2>/dev/null || true
+                NODE_VERSION=$(node -v)
+                echo "现在使用 Node.js 版本: $NODE_VERSION"
+            else
+                echo "⚠️ nvm 未安装或未正确配置，继续使用当前版本"
+            fi
+        fi
+        
+        # 进入前端目录
+        cd $FRONTEND_DIR
+        
+        # 设置 npm 镜像
+        npm config set registry https://registry.npmmirror.com
+        
+        # 安装依赖
+        echo "安装依赖..."
+        npm install
+        
+        # 构建生产版本
+        echo "构建生产版本..."
+        npm run build
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ 前端构建成功，输出目录: $FRONTEND_DIR/dist"
+            return 0
+        else
+            echo "❌ 前端构建失败，请查看错误信息"
+            return 1
+        fi
     fi
+}
+
+# 部署前端和更新所有服务（一步完成所有操作）
+deploy_frontend() {
+    echo "===== 一键部署前端更新 ====="
+    echo "时间: $(date)"
+    
+    # 1. 构建前端
+    build_frontend
+    if [ $? -ne 0 ]; then
+        echo "❌ 前端构建失败，部署中止"
+        return 1
+    fi
+    
+    # 2. 确保 Nginx 配置正确
+    if [ "$EUID" -eq 0 ]; then
+        if [ ! -f "/etc/nginx/conf.d/eeg-frontend.conf" ]; then
+            echo "配置 Nginx..."
+            setup_nginx
+        fi
+    else
+        echo "⚠️ 需要 root 权限配置 Nginx"
+        echo "请使用 sudo $0 deploy 命令进行完整部署"
+        return 1
+    fi
+    
+    # 3. 重启 Nginx
+    if [ "$EUID" -eq 0 ]; then
+        echo "重启 Nginx..."
+        systemctl restart nginx
+    else
+        echo "⚠️ 需要 root 权限重启 Nginx"
+        echo "请使用 sudo $0 deploy 命令进行完整部署"
+        return 1
+    fi
+    
+    # 4. 更新 Cloudflared 配置
+    if [ "$EUID" -eq 0 ]; then
+        echo "更新 Cloudflared 配置..."
+        update_prod_cloudflared
+    else
+        echo "⚠️ 需要 root 权限更新 Cloudflared 配置"
+        echo "请使用 sudo $0 deploy 命令进行完整部署"
+        return 1
+    fi
+    
+    # 5. 显示部署完成信息
+    echo "===== 前端部署完成 ====="
+    echo "访问地址: https://eeg-visualization-platform.site"
+    echo "检查服务状态: $0 status"
+    
+    return 0
 }
 
 # 检查服务是否真的在运行
@@ -594,6 +724,9 @@ case "$1" in
         ;;
     build)
         build_frontend
+        ;;
+    deploy)
+        deploy_frontend
         ;;
     nginx-setup)
         setup_nginx

@@ -1,0 +1,1 @@
+import{_ as a,o as t,c as o,w as _,A as r,a as e}from"./index-633a0f38.js";const p={__name:"UserProfile",setup(c){return(l,s)=>(t(),o(r,null,{default:_(()=>s[0]||(s[0]=[e("div",{class:"profile-container"},[e("h1",{class:"page-title"},"个人资料"),e("p",{class:"page-description"},"此页面正在开发中，敬请期待！")],-1)])),_:1}))}},i=a(p,[["__scopeId","data-v-b881a878"]]);export{i as default};

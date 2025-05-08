@@ -71,6 +71,16 @@ export const datasetService = {
     return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/export`, {
       responseType: 'blob'
     });
+  },
+
+  // 记录网站访问
+  recordVisit() {
+    return api.post('/api/datasets/record-visit');
+  },
+  
+  // 获取网站访问量
+  getVisitCount() {
+    return api.get('/api/datasets/visit-count');
   }
 };
 
