@@ -162,3 +162,27 @@ async def get_subject_events(dataset_id: str, subject_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/record-visit", response_model=APIResponse)
+async def record_visit():
+    """记录网站访问量"""
+    try:
+        visit_count = dataset_service.record_visit()
+        return APIResponse(
+            message="访问量记录成功",
+            data={"visit_count": visit_count}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/visit-count", response_model=APIResponse)
+async def get_visit_count():
+    """获取网站访问量"""
+    try:
+        visit_count = dataset_service.get_visit_count()
+        return APIResponse(
+            message="获取访问量成功",
+            data={"visit_count": visit_count}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

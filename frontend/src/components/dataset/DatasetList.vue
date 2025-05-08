@@ -33,6 +33,33 @@ const { isLoading: loading, withLoading } = useLoading(false);
 // 控制筛选面板的显示/隐藏
 const showFilterPanel = ref(false);
 
+// 访问量
+const visitCount = ref(0);
+
+// 获取访问量
+const fetchVisitCount = async () => {
+  try {
+    const response = await datasetService.getVisitCount();
+    if (response.data && response.data.visit_count !== undefined) {
+      visitCount.value = response.data.visit_count;
+    }
+  } catch (error) {
+    console.error('获取访问量失败:', error);
+  }
+};
+
+// 记录访问
+const recordVisit = async () => {
+  try {
+    const response = await datasetService.recordVisit();
+    if (response.data && response.data.visit_count !== undefined) {
+      visitCount.value = response.data.visit_count;
+    }
+  } catch (error) {
+    console.error('记录访问量失败:', error);
+  }
+};
+
 // 防抖的获取数据集函数
 const debouncedFetchDatasets = useDebounceFn(async () => {
   try {
@@ -101,6 +128,9 @@ const closeFilterPanel = (event) => {
 onMounted(() => {
   debouncedFetchDatasets();
   document.addEventListener('click', closeFilterPanel);
+  
+  // 记录访问并获取访问量
+  recordVisit();
 });
 
 // 暴露方法给父组件
@@ -132,6 +162,15 @@ defineExpose({
             
             <!-- 右侧操作按钮 -->
             <div class="header-right">
+              <!-- 访问量显示 -->
+              <div class="visit-count">
+                <el-tooltip content="网站总访问量" placement="bottom">
+                  <div>
+                    <el-icon><View /></el-icon>
+                    <span>{{ visitCount }}</span>
+                  </div>
+                </el-tooltip>
+              </div>
               <el-button @click="debouncedFetchDatasets">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
@@ -418,5 +457,19 @@ defineExpose({
   margin-top: 20px; /* 上方间距 */
   display: flex;
   justify-content: center; /* 居中显示 */
+}
+
+/* 访问量显示样式 */
+.visit-count {
+  display: flex;
+  align-items: center;
+  margin-right: 15px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.visit-count .el-icon {
+  margin-right: 5px;
+  font-size: 16px;
 }
 </style> 
