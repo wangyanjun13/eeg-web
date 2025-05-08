@@ -1,9 +1,8 @@
-INFO:     Started server process [261801]
+INFO:     Started server process [266401]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ✅ Redis连接成功
-INFO:     127.0.0.1:36198 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51182 - "GET /health HTTP/1.1" 200 OK
 INFO:     144.48.80.21:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
 INFO:     144.48.80.21:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54270 - "GET /health HTTP/1.1" 200 OK

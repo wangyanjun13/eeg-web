@@ -7,8 +7,8 @@ CREDENTIALS_FILE="/etc/cloudflared/${TUNNEL_UUID}.json"
 CONFIG_FILE="/etc/cloudflared/config.yml"
 BACKUP_FILE="/etc/cloudflared/config.yml.bak"
 
-# 当前服务器 IP 地址和端口
-FRONTEND_PORT=5173
+# 当前服务器 IP 地址和端口 - 生产环境使用 Nginx 80 端口
+FRONTEND_PORT=80
 BACKEND_PORT=8000
 
 echo "===== 更新 Cloudflare 隧道配置 ====="
@@ -34,9 +34,9 @@ credentials-file: ${CREDENTIALS_FILE}
 
 ingress:
   - hostname: eeg-visualization-platform.site
-    service: http://localhost:${FRONTEND_PORT}
+    service: http://127.0.0.1:${FRONTEND_PORT}
   - hostname: api.eeg-visualization-platform.site
-    service: http://localhost:${BACKEND_PORT}
+    service: http://127.0.0.1:${BACKEND_PORT}
     originRequest:
       connectTimeout: 30s
       noTLSVerify: true

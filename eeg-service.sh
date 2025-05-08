@@ -240,12 +240,12 @@ credentials-file: ${CREDENTIALS_FILE}
 
 ingress:
   - hostname: eeg-visualization-platform.site
-    service: http://localhost:80
+    service: http://127.0.0.1:80
     originRequest:
       originServerName: localhost
       noTLSVerify: true
   - hostname: api.eeg-visualization-platform.site
-    service: http://localhost:8000
+    service: http://127.0.0.1:8000
     originRequest:
       connectTimeout: 30s
       noTLSVerify: true
@@ -357,9 +357,9 @@ credentials-file: ${CREDENTIALS_FILE}
 
 ingress:
   - hostname: eeg-visualization-platform.site
-    service: http://localhost:${FRONTEND_PORT}
+    service: http://127.0.0.1:${FRONTEND_PORT}
   - hostname: api.eeg-visualization-platform.site
-    service: http://localhost:${BACKEND_PORT}
+    service: http://127.0.0.1:${BACKEND_PORT}
     originRequest:
       connectTimeout: 30s
       noTLSVerify: true
@@ -477,28 +477,28 @@ check_status() {
     fi
     
     # 检查前端端口
-    if grep -q "Local:.*http://localhost:[0-9]\+" $LOG_DIR/frontend.log 2>/dev/null; then
+    if [ "$USE_PRODUCTION" = true ] || systemctl is-active nginx > /dev/null; then
+        echo "ℹ️ 前端模式: 生产模式 (Nginx)"
+        # 检查Cloudflared配置是否匹配Nginx端口
+        if [ -f "$CLOUDFLARED_CONFIG" ]; then
+            if grep -q "service: http://127.0.0.1:80" "$CLOUDFLARED_CONFIG"; then
+                echo "✅ Cloudflared配置: 正常 (Nginx 生产模式)"
+            else
+                echo "⚠️ Cloudflared配置: 不匹配 (需要更新)"
+                echo "   运行 'sudo $0 update-cf prod' 更新配置"
+            fi
+        fi
+    elif grep -q "Local:.*http://localhost:[0-9]\+" $LOG_DIR/frontend.log 2>/dev/null; then
         FRONTEND_PORT=$(grep "Local:.*http://localhost:[0-9]\+" $LOG_DIR/frontend.log | sed -E 's/.*http:\/\/localhost:([0-9]+).*/\1/')
         echo "ℹ️ 前端端口: $FRONTEND_PORT"
         
         # 检查Cloudflared配置是否匹配
         if [ -f "$CLOUDFLARED_CONFIG" ]; then
-            if grep -q "service: http://localhost:$FRONTEND_PORT" "$CLOUDFLARED_CONFIG"; then
+            if grep -q "service: http://127.0.0.1:$FRONTEND_PORT" "$CLOUDFLARED_CONFIG"; then
                 echo "✅ Cloudflared配置: 正常 (与前端端口匹配)"
             else
                 echo "⚠️ Cloudflared配置: 不匹配 (需要更新)"
                 echo "   运行 'sudo $0 update-cf' 更新配置"
-            fi
-        fi
-    elif [ "$USE_PRODUCTION" = true ]; then
-        echo "ℹ️ 前端模式: 生产模式 (Nginx)"
-        # 检查Cloudflared配置是否匹配Nginx端口
-        if [ -f "$CLOUDFLARED_CONFIG" ]; then
-            if grep -q "service: http://localhost:80" "$CLOUDFLARED_CONFIG"; then
-                echo "✅ Cloudflared配置: 正常 (Nginx 生产模式)"
-            else
-                echo "⚠️ Cloudflared配置: 不匹配 (需要更新)"
-                echo "   运行 'sudo $0 update-cf prod' 更新配置"
             fi
         fi
     fi
