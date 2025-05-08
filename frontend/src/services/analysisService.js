@@ -1,6 +1,29 @@
 import axios from 'axios';
 import api from './api';
 
+// 创建一个新的axios实例，使用相同的基础URL配置
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// 请求拦截器，添加认证信息
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 /**
  * 分析服务 - 提供对EEG数据进行各种分析的API接口
  */
@@ -68,7 +91,7 @@ const analysisService = {
    */
   async applyFilter(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/filter`, 
         params
       );
@@ -102,7 +125,7 @@ const analysisService = {
    */
   async applyResample(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/resample`, 
         params
       );
@@ -135,7 +158,7 @@ const analysisService = {
    */
   async applyReference(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/reference`, 
         params
       );
@@ -169,7 +192,7 @@ const analysisService = {
   async detectBadChannels(datasetId, subjectId, params) {
     try {
       console.log('发送坏通道检测请求:', params);
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/bad_channels`, 
         params
       );
@@ -445,7 +468,7 @@ const analysisService = {
    */
   async detectBadSegments(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/bad_segments`, 
         params
       );
@@ -478,7 +501,7 @@ const analysisService = {
    */
   async runICA(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/ica`,
         params
       );
@@ -511,7 +534,7 @@ const analysisService = {
    */
   async removeArtifacts(datasetId, subjectId, params) {
     try {
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `/api/preprocess/${datasetId}/subjects/${subjectId}/artifacts`,
         params
       );

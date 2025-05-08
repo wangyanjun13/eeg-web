@@ -1,93 +1,80 @@
-#### Vue 3 + Vite前端
+# EEG 可视化平台
 
-#### Fastapi  python后端
+#### 技术栈
+- 前端: Vue 3 + Vite
+- 后端: Fastapi (Python)
+- 缓存: Redis
+- 数据集来源: https://openneuro.org/
 
-#### mongodb  元数据存储
+## 基本操作指令
 
-#### redis celery缓存
+1. **启动服务**:
+   ```bash
+   sudo ./eeg-service.sh start-prod
+   ```
 
-#### docker 容器启动和联调
+2. **停止服务**:
+   ```bash
+   sudo ./eeg-service.sh stop
+   ```
 
-#### dataset from :https://openneuro.org/
+3. **重启服务**:
+   ```bash
+   sudo ./eeg-service.sh restart-prod
+   ```
+   _注: 此命令会自动重启前端、后端和 Cloudflared 隧道服务_
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+4. **查看服务状态**:
+   ```bash
+   sudo ./eeg-service.sh status
+   ```
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
-启动：
+5. **查看日志**:
+   ```bash
+   sudo ./eeg-service.sh logs
+   ```
 
-# 在项目根目录下
+## Cloudflare 隧道管理
 
-docker启动：
+1. **更新隧道配置**:
+   ```bash
+   sudo ./eeg-service.sh update-cf prod
+   ```
+   _注: 此命令会自动重启 Cloudflared 服务_
 
-编译&启动：
+2. **检查隧道状态**:
+   ```bash
+   sudo systemctl status cloudflared
+   ```
 
-```
-docker-compose up --build
-```
+3. **查看隧道日志**:
+   ```bash
+   sudo journalctl -u cloudflared -n 50 --no-pager
+   ```
 
-启动：`` docker-compose up --build``
+4. **手动重启隧道**（如果需要）:
+   ```bash
+   sudo systemctl restart cloudflared
+   ```
 
-```
+## 开发流程
 
-后台运行：```
-docker-compose up -d
-```
+1. **代码修改**:
+   - 直接修改前端或后端代码
+   - 修改不会影响正在运行的服务
 
-# 后端准备：
+2. **前端构建**:
+   ```bash
+   sudo ./eeg-service.sh build
+   ```
+   _注: 此命令会构建前端代码生成生产版本_
 
-```
-cd backend
-```
+3. **应用更改**:
+   ```bash
+   sudo ./eeg-service.sh restart-prod
+   ```
+   _注: 执行此命令后新代码才会生效_
 
-```
-pip install -r requirements.txt
-```
-
-```
-启动：
-uvicorn app.main:app  --port 8080 --reload
-```
-
-```
-
-# 前端准备：（下载了node.js）
-cd frontend
-```
-
-```
-npm install```
-```
-
-```
-
-npm run dev
-```
-
-npm create vite@latest -- --template vue
-
-```
-npm install echarts
-```
-
-```
-npm install
-```
-
-```
-
-npm install axios element-plus
-```
-
-启动：
-
-```
-cd frontend
-```
-
-```
-npm install
-```
-
-```
-npm run dev
-```
+访问地址:
+- 前端: https://eeg-visualization-platform.site
+- API: https://api.eeg-visualization-platform.site

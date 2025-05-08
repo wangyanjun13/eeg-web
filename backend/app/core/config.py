@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
 
-# 路径配置
-DATA_DIR = Path("/app/data/eeg_samples")
+# 路径配置 - 直接使用服务器上的数据目录
+DATA_DIR = Path("/data/eeg_samples")
 
 # Redis配置
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"

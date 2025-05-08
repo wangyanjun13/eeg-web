@@ -38,8 +38,18 @@ app.openapi = custom_openapi
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    # 允许所有前端开发环境的源
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],  # 添加通配符
+    # 允许特定源和生产环境域名
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173", 
+        "https://eeg-visualization-platform.site",
+        "http://eeg-visualization-platform.site",
+        "http://localhost:80",
+        "http://127.0.0.1:80",
+        "http://172.21.0.2:80",
+        "http://172.21.0.2:5173",
+        "*"  # 开发阶段保留通配符，生产环境应移除
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
