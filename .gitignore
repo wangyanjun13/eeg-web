@@ -1,6 +1,6 @@
 # 忽略数据文件夹
 data/eeg_samples/*
-
+logs/*
 # 保留必要的配置文件
 # !data/eeg_samples/.gitkeep
 # !data/eeg_samples/README
