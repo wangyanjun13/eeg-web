@@ -28,26 +28,6 @@ class RawEEGData(BaseModel):
     subject_id: Optional[str] = None
     segment_info: Optional[Dict] = None
     timeRange: Optional[List[float]] = None
-    error: Optional[str] = None
-    
-    @classmethod
-    def error(cls, error_message: str):
-        """创建带有错误信息的RawEEGData对象
-        
-        Args:
-            error_message: 错误信息
-            
-        Returns:
-            RawEEGData: 带有错误信息的对象
-        """
-        return cls(
-            data={},
-            times=[],
-            channels=[],
-            duration=0,
-            sampling_rate=0,
-            error=error_message
-        )
 
 class ParticipantInfo(BaseModel):
     """参与者信息"""

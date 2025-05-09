@@ -23,11 +23,26 @@ class ReferenceParams(BaseModel):
     time_range: Optional[List[float]] = None  # 添加时间范围参数，用于保持处理前后一致性
 
 class ICAParams(BaseModel):
-    """ICA参数"""
+    """ICA参数
+    
+    独立成分分析(Independent Component Analysis)参数设置。
+    用于分离EEG信号中的独立成分，帮助识别和去除眨眼、肌肉等伪迹。
+    
+    Attributes:
+        run_ica: 是否执行ICA分析
+        ica_method: ICA方法，可选值:
+            - "fastica": 快速ICA算法，计算效率高
+            - "infomax": 最大化信息熵的ICA算法，适合非高斯信号
+            - "extended-infomax": 扩展的InfoMax算法，可处理超高斯和亚高斯信号
+        n_components: ICA组件数量，通常为通道数的60%-80%，None表示自动计算(70%通道数)
+        auto_detect_artifacts: 是否自动检测眼动等伪迹组件
+        channels: 可选，要执行ICA的通道列表，默认使用所有EEG通道
+    """
     run_ica: bool = True
-    ica_method: str = "fastica"
+    ica_method: str = "infomax"
     n_components: Optional[int] = None
     auto_detect_artifacts: bool = True
+    channels: Optional[List[str]] = None
 
 class BadChannelParams(BaseModel):
     """坏通道检测参数"""

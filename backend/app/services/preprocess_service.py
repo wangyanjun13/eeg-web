@@ -128,64 +128,250 @@ class PreprocessService:
             raise ValueError(error_msg)
 
     def run_ica(self, dataset_id: str, subject_id: str, params: ICAParams) -> RawEEGData:
-        """运行ICA分析"""
-        # 检查缓存
-        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "ica")
-        cache_meta_key = f"{cache_key}:meta"
+        """运行ICA分析
         
-        cached_meta = get_metadata(cache_meta_key)
-        if cached_meta and cached_meta.get('params') == params.dict():
-            cached_data = get_from_cache(cache_key)
-            if cached_data:
-                print(f"使用缓存的ICA结果: {cache_key}")
-                return cached_data
+        Args:
+            dataset_id: 数据集ID
+            subject_id: 受试者ID
+            params: ICA参数，包括方法、组件数量、自动伪迹检测等
+            
+        Returns:
+            RawEEGData: 处理后的数据
+        """
+        try:
+            # 检查ICA参数
+            if not params.run_ica:
+                print("ICA分析已禁用，返回原始数据")
+                return self.get_input_data_for_step(dataset_id, subject_id, "ica")
+            
+            # 检查组件数量
+            if params.n_components is not None and params.n_components <= 0:
+                raise ValueError("ICA组件数量必须大于0")
+            
+            # 检查ICA方法
+            valid_methods = ["fastica", "infomax", "extended-infomax"]
+            if params.ica_method not in valid_methods:
+                raise ValueError(f"不支持的ICA方法: {params.ica_method}，可用方法: {', '.join(valid_methods)}")
                 
-        # 没有缓存，执行处理
-        start_time = time.time()
-        # 获取原始数据
-        raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
-        
-        # 转换为numpy数组
-        data = np.array([raw_data.data[ch] for ch in raw_data.channels])
-        
-        # 运行ICA
-        ica = ICA(
-            n_components=params.n_components,
-            random_state=42
-        )
-        ica.fit(data)
-        
-        # 应用ICA
-        cleaned_data = ica.apply(data)
-        
-        # 转换回字典格式
-        processed_data = {
-            ch: cleaned_data[i].tolist()
-            for i, ch in enumerate(raw_data.channels)
-        }
-        
-        result = RawEEGData(
-            data=processed_data,
-            times=raw_data.times,
-            channels=raw_data.channels,
-            duration=raw_data.duration,
-            sampling_rate=raw_data.sampling_rate,
-            dataset_id=dataset_id,
-            subject_id=subject_id
-        )
-        
-        # 计算处理时间并缓存结果
-        process_time = time.time() - start_time
-        metadata = {
-            'params': params.dict(),
-            'process_time': process_time,
-            'timestamp': time.time()
-        }
-        
-        save_metadata(cache_meta_key, metadata)
-        save_to_cache(cache_key, result)
-        
-        return result
+            # 检查缓存
+            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "ica")
+            cache_meta_key = f"{cache_key}:meta"
+            
+            # 从参数中提取通道信息
+            channels = params.dict().pop("channels", None) if hasattr(params, "channels") else None
+            
+            # 创建缓存参数字典，包含通道信息
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            # 检查缓存
+            cached_meta = get_metadata(cache_meta_key)
+            if cached_meta and cached_meta.get('params') == params_dict:
+                cached_data = get_from_cache(cache_key)
+                if cached_data:
+                    print(f"使用缓存的ICA结果: {cache_key}")
+                    return cached_data
+                    
+            # 没有缓存，执行处理
+            start_time = time.time()
+            
+            # 获取原始数据（应该是前一步骤的结果，例如重参考）
+            input_data = self.get_input_data_for_step(dataset_id, subject_id, "ica")
+            
+            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
+                raise ValueError(input_data.error)
+            
+            # 确保数据有效
+            if not input_data or not input_data.data or not input_data.channels:
+                raise ValueError(f"无法获取有效的EEG数据: dataset_id={dataset_id}, subject_id={subject_id}")
+            
+            print(f"开始执行ICA分析，方法: {params.ica_method}, 组件数量: {params.n_components}")
+            
+            # 确定要处理的通道
+            process_channels = channels if channels else input_data.channels
+            print(f"处理通道数量: {len(process_channels)}")
+            
+            # 转换为MNE格式进行高级处理
+            try:
+                # 构建EEG原始数据阵列
+                channel_data = []
+                selected_channels = []
+                
+                for channel in process_channels:
+                    if channel in input_data.data:
+                        channel_data.append(input_data.data[channel])
+                        selected_channels.append(channel)
+                
+                if not channel_data:
+                    raise ValueError("所选通道无数据")
+                
+                # 转换为numpy数组
+                data_array = np.array(channel_data)
+                
+                # 创建MNE Raw对象进行ICA处理
+                from mne.io import RawArray
+                from mne import create_info
+                
+                # 创建info对象
+                info = create_info(
+                    ch_names=selected_channels,
+                    sfreq=input_data.sampling_rate,
+                    ch_types=['eeg'] * len(selected_channels)
+                )
+                
+                # 创建Raw对象
+                raw = RawArray(data_array, info)
+                
+                # 检查是否需要高通滤波来提高ICA效果
+                if raw.info['highpass'] < 0.5:  # 如果高通滤波低于0.5Hz
+                    print("正在进行高通滤波以提高ICA效果（临时处理不影响原始数据）")
+                    raw_for_ica = raw.copy().filter(l_freq=1.0, h_freq=None)
+                else:
+                    raw_for_ica = raw
+                
+                # 确定最终组件数量
+                if params.n_components is None:
+                    # 如果未指定，使用通道数量的70%作为默认值
+                    n_components = min(len(selected_channels) - 1, max(5, int(len(selected_channels) * 0.7)))
+                else:
+                    # 确保不超过通道数量-1
+                    n_components = min(params.n_components, len(selected_channels) - 1)
+                
+                print(f"使用组件数量: {n_components}")
+                
+                # 运行ICA
+                from mne.preprocessing import ICA
+                
+                # 不同ICA方法的处理
+                method_map = {
+                    "fastica": "fastica",
+                    "infomax": "infomax",
+                    "extended-infomax": "extended-infomax"
+                }
+                
+                # 创建ICA对象
+                ica = ICA(
+                    n_components=n_components,
+                    method=method_map[params.ica_method],
+                    random_state=42  # 固定随机种子以保证结果可重复
+                )
+                
+                # 拟合ICA
+                ica.fit(raw_for_ica)
+                
+                # 自动检测眼动伪迹
+                excluded_components = []
+                if params.auto_detect_artifacts:
+                    try:
+                        # 尝试使用EOG通道自动检测眼动伪迹
+                        eog_indices, eog_scores = ica.find_bads_eog(raw_for_ica)
+                        if eog_indices:
+                            print(f"自动检测到眼动伪迹组件: {eog_indices}")
+                            excluded_components.extend(eog_indices)
+                    except Exception as e:
+                        print(f"自动检测眼动伪迹失败，将使用基于相关性的启发式方法: {str(e)}")
+                        
+                        # 如果无法使用EOG通道，使用启发式方法 - 检查前额通道的相关性
+                        frontal_channels = [ch for ch in selected_channels if 
+                                          ch.startswith(('Fp', 'F', 'AF')) or 
+                                          ch in ['FP1', 'FP2', 'FPZ']]
+                        
+                        if frontal_channels:
+                            print(f"使用前额通道检测眼动伪迹: {frontal_channels}")
+                            
+                            # 为每个组件计算与前额通道的相关性
+                            for comp_idx in range(n_components):
+                                comp_data = ica.get_sources(raw_for_ica).get_data()[comp_idx]
+                                
+                                # 计算与前额通道的最大相关性
+                                max_corr = 0
+                                for ch in frontal_channels:
+                                    ch_idx = selected_channels.index(ch)
+                                    ch_data = data_array[ch_idx]
+                                    corr = np.abs(np.corrcoef(comp_data, ch_data)[0, 1])
+                                    max_corr = max(max_corr, corr)
+                                
+                                # 如果相关性很高，认为是眼动伪迹
+                                if max_corr > 0.8:  # 通常眼动伪迹与前额通道相关性很高
+                                    excluded_components.append(comp_idx)
+                                    print(f"检测到可能的眼动伪迹组件: {comp_idx}, 相关性: {max_corr:.3f}")
+                
+                # 如果检测到伪迹组件，将其排除
+                if excluded_components:
+                    ica.exclude = excluded_components
+                    print(f"排除伪迹组件: {excluded_components}")
+                
+                # 应用ICA - 使用原始raw对象而非高通滤波后的raw_for_ica
+                ica_raw = ica.apply(raw)
+                # 获取处理后的数据
+                cleaned_data = ica_raw.get_data()
+                
+                # 保存处理结果
+                processed_data = {}
+                
+                # 对于处理过的通道，使用ICA处理后的数据
+                for i, ch in enumerate(selected_channels):
+                    processed_data[ch] = cleaned_data[i].tolist()
+                
+                # 对于未处理的通道，保留原始数据
+                for ch in input_data.channels:
+                    if ch not in processed_data and ch in input_data.data:
+                        processed_data[ch] = input_data.data[ch]
+                
+                # 创建结果对象
+                result = RawEEGData(
+                    data=processed_data,
+                    times=input_data.times,
+                    channels=input_data.channels,
+                    duration=input_data.duration,
+                    sampling_rate=input_data.sampling_rate,
+                    dataset_id=dataset_id,
+                    subject_id=subject_id,
+                    # 保存原始时间范围
+                    timeRange=input_data.timeRange if hasattr(input_data, 'timeRange') else None
+                )
+                
+                # 添加ICA处理信息
+                ica_info = {
+                    "method": params.ica_method,
+                    "n_components": n_components,
+                    "excluded_components": excluded_components
+                }
+                
+                # 如果result没有segment_info属性，添加一个
+                if not hasattr(result, 'segment_info') or result.segment_info is None:
+                    result.segment_info = {}
+                    
+                # 添加ICA信息
+                if isinstance(result.segment_info, dict):
+                    result.segment_info["ica_info"] = ica_info
+                
+                # 计算处理时间并缓存结果
+                process_time = time.time() - start_time
+                print(f"ICA处理完成，耗时: {process_time:.2f}秒")
+                
+                metadata = {
+                    'params': params_dict,
+                    'process_time': process_time,
+                    'timestamp': time.time()
+                }
+                
+                save_metadata(cache_meta_key, metadata)
+                save_to_cache(cache_key, result)
+                
+                return result
+                
+            except Exception as e:
+                print(f"ICA处理过程中出错: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
+                raise ValueError(f"ICA处理失败: {str(e)}")
+                
+        except Exception as e:
+            error_msg = f"ICA分析失败: {str(e)}"
+            print(error_msg)
+            raise ValueError(error_msg)
 
     def remove_artifacts(self, dataset_id: str, subject_id: str, params: ArtifactParams) -> RawEEGData:
         """去除伪迹"""
