@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams, BadChannelParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams, BadChannelParams, ReferenceParams
 from app.models.common import APIResponse
 from app.services.preprocess_service import PreprocessService
 from app.services.dataset_service import DatasetService
@@ -437,6 +437,117 @@ async def detect_bad_channels(dataset_id: str, subject_id: str, params: BadChann
         raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         error_msg = f"坏通道检测失败: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@router.post("/{dataset_id}/subjects/{subject_id}/reference", response_model=APIResponse)
+async def apply_reference(dataset_id: str, subject_id: str, params: ReferenceParams):
+    """应用重参考
+    
+    Args:
+        dataset_id: 数据集ID
+        subject_id: 受试者ID
+        params: 重参考参数
+            - reference: 参考方式 ("average", "mastoids", "custom")
+            - custom_ref_channels: 自定义参考通道列表
+    """
+    try:
+        # 输出接收到的参数，帮助调试
+        print(f"接收到重参考请求: dataset_id={dataset_id}, subject_id={subject_id}")
+        print(f"重参考参数: {params.dict()}")
+        
+        # 参数验证
+        if params.reference == "custom" and (not params.custom_ref_channels or len(params.custom_ref_channels) == 0):
+            raise ValueError("自定义参考模式下必须指定参考通道")
+        
+        # 如果是mastoids参考，检查数据集是否有这些通道
+        if params.reference == "mastoids":
+            # 获取通道列表
+            try:
+                subject_info = dataset_service.get_subject_info(dataset_id, subject_id)
+                available_channels = subject_info.get("channels", [])
+                mastoid_channels = ["M1", "M2", "TP9", "TP10"]
+                if not any(ch in available_channels for ch in mastoid_channels):
+                    raise ValueError("未检测到乳突通道(M1/M2或TP9/TP10)，无法应用乳突参考")
+            except Exception as e:
+                print(f"检查乳突通道失败，继续处理: {str(e)}")
+            
+        # 处理通道参数 - channels可能通过query参数或body参数传递
+        channels = None
+        if hasattr(params, "channels"):
+            channels = params.channels
+        
+        # 记录处理开始时间
+        start_time = time.time()
+        
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "reference")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        from_cache = False
+        process_time = 0
+        
+        # 检查元数据
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta:
+            # 检查参数是否匹配
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            # 参数一致则标记为从缓存获取
+            if cached_meta.get('params') == params_dict:
+                from_cache = True
+                process_time = cached_meta.get('process_time', 0)
+                cached_data = get_from_cache(cache_key)
+                if cached_data:
+                    print(f"使用缓存的重参考结果: {cache_key}")
+                    
+                    # 创建响应
+                    response = APIResponse(
+                        success=True,
+                        message="重参考处理完成",
+                        data=cached_data
+                    )
+                    
+                    return Response(
+                        content=response.json(),
+                        media_type="application/json",
+                        headers={
+                            "X-From-Cache": "true",
+                            "X-Process-Time": str(process_time)
+                        }
+                    )
+        
+        # 执行处理
+        result = preprocess_service.apply_reference(dataset_id, subject_id, params, channels)
+        
+        # 如果不是从缓存获取，计算处理时间
+        if not from_cache:
+            process_time = time.time() - start_time
+        
+        # 创建响应
+        response = APIResponse(
+            success=True,
+            message="重参考处理完成",
+            data=result
+        )
+        
+        # 返回响应，添加自定义头信息
+        return Response(
+            content=response.json(),
+            media_type="application/json",
+            headers={
+                "X-From-Cache": str(from_cache).lower(),
+                "X-Process-Time": str(process_time)
+            }
+        )
+    except ValueError as e:
+        error_msg = f"参数错误: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        error_msg = f"重参考处理失败: {str(e)}"
         print(error_msg)
         raise HTTPException(status_code=500, detail=error_msg) 
     

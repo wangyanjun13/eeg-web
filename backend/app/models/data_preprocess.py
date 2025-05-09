@@ -19,6 +19,8 @@ class ReferenceParams(BaseModel):
     """重参考参数"""
     reference: str = "average"  # "average", "mastoids", "custom"
     custom_ref_channels: Optional[List[str]] = None
+    channels: Optional[List[str]] = None
+    time_range: Optional[List[float]] = None  # 添加时间范围参数，用于保持处理前后一致性
 
 class ICAParams(BaseModel):
     """ICA参数"""

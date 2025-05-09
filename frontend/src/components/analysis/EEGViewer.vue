@@ -187,20 +187,93 @@ const getChartOption = (series = [], legendStatus = {}) => {
   };
   
   if (localViewMode.value === 'time') {
-    let xAxisConfig = {};
+    // 确定实际的时间范围
+    let actualTimeRange = props.timeRange;
     
-    if (props.data?.segment_info?.type === 'event_related') {
-      // 对于事件相关数据，显示相对事件的时间
-      xAxisConfig = {
-        type: 'value',
-        name: '事件相对时间 (s)',
-        min: props.data.timeRange ? props.data.timeRange[0] : props.timeRange[0],
-        max: props.data.timeRange ? props.data.timeRange[1] : props.timeRange[1],
-        axisLabel: {
-          formatter: '{value} s'
-        }
-      };
+    // 优先使用数据中的精确timeRange（从数据处理过程中传递过来的）
+    if (props.data?.timeRange && Array.isArray(props.data.timeRange) && props.data.timeRange.length === 2) {
+      // 数据本身包含预设的时间范围（如分段后或处理后的结果）
+      const dataTimeRange = props.data.timeRange;
+      console.log("使用数据中的预设时间范围:", dataTimeRange);
       
+      // 确保范围有效（不能为零宽度）
+      if (dataTimeRange[1] > dataTimeRange[0] && (dataTimeRange[1] - dataTimeRange[0]) > 0.001) {
+        actualTimeRange = dataTimeRange;
+      } else {
+        console.warn("数据中的时间范围无效:", dataTimeRange);
+      }
+    } 
+    // 其次从实际数据点中提取范围
+    else {
+      // 搜集所有时间点并找出真实范围
+      let allTimePoints = [];
+      series.forEach(s => {
+        if (s.data && Array.isArray(s.data)) {
+          s.data.forEach(point => {
+            if (Array.isArray(point) && point.length > 1 && typeof point[0] === 'number') {
+              allTimePoints.push(point[0]);
+            }
+          });
+        }
+      });
+      
+      // 如果有收集到真实时间点，确定范围
+      if (allTimePoints.length > 0) {
+        allTimePoints.sort((a, b) => a - b);
+        const minTime = allTimePoints[0];
+        const maxTime = allTimePoints[allTimePoints.length - 1];
+        
+        // 确保范围有效，并与props.timeRange进行比较
+        if (maxTime > minTime && (maxTime - minTime) > 0.001) {
+          // 数据点有有效的时间分布
+          if (Math.abs(minTime - props.timeRange[0]) > 0.1 || Math.abs(maxTime - props.timeRange[1]) > 0.1) {
+            console.log(`根据实际数据点调整时间范围: [${minTime.toFixed(2)}, ${maxTime.toFixed(2)}] (原范围: [${props.timeRange[0]}, ${props.timeRange[1]}])`);
+          }
+          actualTimeRange = [minTime, maxTime];
+        }
+      } 
+      // 或者从times数组中推断
+      else if (props.data?.times && props.data.times.length > 1) {
+        const minTime = props.data.times[0];
+        const maxTime = props.data.times[props.data.times.length - 1];
+        
+        // 确保范围有效
+        if (maxTime > minTime && (maxTime - minTime) > 0.001) {
+          actualTimeRange = [minTime, maxTime];
+        }
+      }
+    }
+    
+    // 最终安全检查 - 确保时间范围有效且合理
+    if (!actualTimeRange || actualTimeRange.length !== 2 || actualTimeRange[0] === actualTimeRange[1] || 
+        (actualTimeRange[1] - actualTimeRange[0]) < 0.001) {
+      console.warn("时间范围无效或过小，使用默认值:", props.timeRange);
+      actualTimeRange = props.timeRange;
+    }
+    
+    console.log("EEGViewer使用时间范围:", actualTimeRange);
+    
+    // 如果图表显示的时间范围与传入的不一致，更新本地timeRange并触发事件
+    // 这使得预处理步骤间的时间范围可以保持一致
+    if (JSON.stringify(timeRange.value) !== JSON.stringify(actualTimeRange)) {
+      console.log("更新本地时间范围:", actualTimeRange);
+      timeRange.value = [...actualTimeRange];
+      // 不立即触发事件，避免循环更新
+    }
+    
+    // 配置X轴
+    baseOption.xAxis = {
+      type: 'value',
+      name: '时间 (s)',
+      min: actualTimeRange[0],
+      max: actualTimeRange[1],
+      axisLabel: {
+        formatter: '{value} s'
+      }
+    };
+    
+    // 添加事件相关信息 (如果有)
+    if (props.data?.segment_info?.type === 'event_related') {
       // 添加事件发生时刻的标记线
       series.push({
         type: 'line',
@@ -228,25 +301,48 @@ const getChartOption = (series = [], legendStatus = {}) => {
         };
         baseOption.grid.top = '60px';
       }
-    } else {
-      // 只修改这一行 - 确保使用数据中的时间范围
-      const dataTimeRange = props.data.timeRange || timeRange.value;
-      xAxisConfig = {
-        type: 'value',
-        name: '时间 (s)',
-        min: dataTimeRange[0],
-        max: dataTimeRange[1]
-      };
     }
     
-    baseOption.xAxis = xAxisConfig;
+    // 为Y轴设置合理的范围
+    // 找到所有数据系列的最大值和最小值
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    
+    series.forEach(s => {
+      if (s.data && Array.isArray(s.data)) {
+        s.data.forEach(point => {
+          if (Array.isArray(point) && point.length > 1) {
+            const value = point[1];
+            if (typeof value === 'number' && !isNaN(value)) {
+              yMin = Math.min(yMin, value);
+              yMax = Math.max(yMax, value);
+            }
+          }
+        });
+      }
+    });
+    
+    // 确保y轴范围有效
+    if (yMin === Infinity || yMax === -Infinity || Math.abs(yMin - yMax) < 0.001) {
+      console.warn("Y轴范围无效，使用默认值");
+      yMin = -100;
+      yMax = 100;
+    } else {
+      // 增加一点余量，使图表更美观
+      const padding = Math.max((yMax - yMin) * 0.1, 0.1);
+      yMin -= padding;
+      yMax += padding;
+    }
+    
     baseOption.yAxis = {
       type: 'value',
       name: '电压 (μV)',
       nameLocation: 'middle',
       nameGap: 40,
       nameRotate: 90,
-      inverse: isYAxisInverted.value
+      inverse: isYAxisInverted.value,
+      min: yMin,
+      max: yMax
     };
   } else {
     const samplingRate = props.data?.sampling_rate || 100;
@@ -452,14 +548,64 @@ const debouncedUpdateChart = useDebounceFn(() => {
       const channelData = props.data.data[channel];
       const times = props.data.times || [];
       
-      if (channelData && times && channelData.length > 0 && times.length > 0) {
+      // 增加数据检查和修复
+      console.log(`通道 ${channel} 数据长度: ${channelData.length}, 时间点数: ${times.length}`);
+      
+      // 检查时间数据是否存在问题 - 判断是否所有时间点都相同或过于接近
+      let timeDataProblem = false;
+      if (times.length > 1) {
+        // 计算时间点的范围
+        const timeRange = times[times.length - 1] - times[0];
+        if (timeRange < 0.001) { // 如果时间范围非常小，认为有问题
+          console.warn(`通道 ${channel} 的时间数据异常 - 范围太小: ${timeRange}s`);
+          timeDataProblem = true;
+        }
+        
+        // 检查前几个时间点是否相同
+        if (times.length > 5) {
+          const allSame = times.slice(0, 5).every(t => Math.abs(t - times[0]) < 0.0001);
+          if (allSame) {
+            console.warn(`通道 ${channel} 的时间数据异常 - 前几个点都相同`);
+            timeDataProblem = true;
+          }
+        }
+      }
+      
+      // 处理时间数据问题
+      if (timeDataProblem || times.length === 0) {
+        console.warn(`为通道 ${channel} 创建新的时间序列数据`);
+        
+        // 创建均匀分布的时间点
+        const syntheticTimes = [];
+        const timeRange = props.timeRange[1] - props.timeRange[0];
+        const pointCount = channelData.length;
+        
+        if (pointCount > 1) {
+          for (let i = 0; i < pointCount; i++) {
+            syntheticTimes.push(props.timeRange[0] + (i * timeRange / (pointCount - 1)));
+          }
+          
+          // 使用合成的时间点创建数据点
+          for (let i = 0; i < pointCount; i++) {
+            if (syntheticTimes[i] >= props.timeRange[0] && syntheticTimes[i] <= props.timeRange[1]) {
+              const value = typeof channelData[i] === 'number' && !isNaN(channelData[i]) ? channelData[i] : 0;
+              dataPoints.push([syntheticTimes[i], value]);
+            }
+          }
+        }
+      } else if (channelData && times && channelData.length > 0 && times.length > 0) {
+        // 正常处理有效的时间数据
         const minLength = Math.min(channelData.length, times.length);
+        
+        // 对于通道数据样本数与时间点数不匹配的情况做特殊处理
+        if (channelData.length !== times.length) {
+          console.warn(`通道 ${channel} 数据长度(${channelData.length})与时间点长度(${times.length})不匹配`);
+        }
         
         for (let i = 0; i < minLength; i++) {
           if (times[i] >= props.timeRange[0] && times[i] <= props.timeRange[1]) {
             // 确保数据是有效的数值
-            const value = typeof channelData[i] === 'number' && !isNaN(channelData[i]) ? 
-                          channelData[i] : 0;
+            const value = typeof channelData[i] === 'number' && !isNaN(channelData[i]) ? channelData[i] : 0;
             dataPoints.push([times[i], value]);
           }
         }

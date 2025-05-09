@@ -298,6 +298,15 @@ const handleProcessComplete = (data, processorKey) => {
     // 确保数据是对象而非字符串
     let processedResult = typeof data === 'string' ? JSON.parse(data) : {...data};
     
+    // 保存原始数据的时间范围以确保一致性
+    const originalTimeRange = originalData.value?.timeRange || 
+                            (originalData.value?.times && originalData.value.times.length > 1 ? 
+                            [originalData.value.times[0], originalData.value.times[originalData.value.times.length - 1]] : 
+                            null);
+    
+    console.log('原始数据时间范围:', originalTimeRange);
+    console.log('处理结果时间范围:', processedResult.timeRange);
+    
     // 基本数据验证和补全 - 保持简单
     if (!processedResult.data) processedResult.data = {};
     
@@ -326,15 +335,50 @@ const handleProcessComplete = (data, processorKey) => {
     
     // 确保必要的元数据存在
     processedResult.sampling_rate = processedResult.sampling_rate || 100;
-    processedResult.duration = processedResult.duration || 10;
     processedResult.dataset_id = processedResult.dataset_id || datasetId;
     processedResult.subject_id = processedResult.subject_id || subjectId;
     
-    // 确保timeRange存在
-    processedResult.timeRange = processedResult.timeRange || [0, processedResult.duration];
+    // 改进的时间范围处理逻辑
+    // 1. 优先使用处理结果自带的时间范围(来自后端)
+    // 2. 如果没有，使用原始数据的时间范围(保持一致性)
+    // 3. 如果原始数据没有时间范围，则从times数组计算
+    // 4. 最后才使用默认范围
+    if (!processedResult.timeRange) {
+      if (originalTimeRange) {
+        console.log('应用原始数据的时间范围:', originalTimeRange);
+        processedResult.timeRange = originalTimeRange;
+      } else if (processedResult.times && processedResult.times.length > 1) {
+        const calculatedRange = [processedResult.times[0], processedResult.times[processedResult.times.length - 1]];
+        console.log('从times数组计算时间范围:', calculatedRange);
+        processedResult.timeRange = calculatedRange;
+      } else {
+        // 设置duration(持续时间)
+        processedResult.duration = processedResult.duration || 10;
+        console.log('使用默认时间范围:', [0, processedResult.duration]);
+        processedResult.timeRange = [0, processedResult.duration];
+      }
+    } else {
+      // 输出诊断信息
+      console.log('处理结果已包含时间范围:', processedResult.timeRange);
+      
+      // 对于分段后的数据，确保duration与时间范围一致
+      if (processorKey === 'segment' || processingSteps.value.findIndex(s => s.key === 'segment') < processingSteps.value.findIndex(s => s.key === processorKey)) {
+        processedResult.duration = processedResult.timeRange[1] - processedResult.timeRange[0];
+        console.log('基于分段后的时间范围更新duration:', processedResult.duration);
+      } else {
+        // 对于其他情况，设置默认duration
+        processedResult.duration = processedResult.duration || (processedResult.timeRange ? (processedResult.timeRange[1] - processedResult.timeRange[0]) : 10);
+      }
+    }
     
     // 更新处理后数据
     processedData.value = processedResult;
+    
+    // 同步UI显示的时间范围
+    if (processedResult.timeRange) {
+      timeRange.value = [...processedResult.timeRange];
+      console.log('更新UI时间范围:', timeRange.value);
+    }
     
     // 只更新显示通道，保留原始处理通道
     if (processedResult.channels?.length) {
