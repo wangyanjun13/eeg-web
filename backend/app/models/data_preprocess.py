@@ -56,8 +56,9 @@ class BadChannelParams(BaseModel):
 class ArtifactParams(BaseModel):
     """伪迹处理参数"""
     remove_artifacts: bool = True
-    artifact_detection_method: str = "auto"  # "auto", "manual", "threshold"
+    artifact_detection_method: str = "threshold"  # "threshold", "ica", "wavelet"
     amplitude_threshold: Optional[float] = 100.0  # μV
+    artifact_handling: str = "interpolate"  # "interpolate", "zero", "remove"
     reject_by_annotation: bool = True
 
 class SegmentParams(BaseModel):

@@ -6,11 +6,14 @@ from app.services.dataset_service import DatasetService
 from pathlib import Path
 import time
 from fastapi.responses import Response
+import json
+import numpy as np
 
 # 导入缓存相关函数
 from app.core.config import get_preprocess_cache_key
 from app.core.redis import get_metadata, save_metadata, get_from_cache, save_to_cache
 from app.core.config import DATA_DIR
+from app.core.utils import convert_numpy_types
 # 创建服务实例
 # DATA_DIR = Path("/app/data/eeg_samples")
 dataset_service = DatasetService(DATA_DIR)
@@ -163,9 +166,13 @@ async def run_ica(dataset_id: str, subject_id: str, params: ICAParams):
     """
     try:
         result = preprocess_service.run_ica(dataset_id, subject_id, params)
+        
+        # 确保结果中没有NumPy类型
+        safe_result = convert_numpy_types(result)
+        
         return APIResponse(
             message="ICA分析完成",
-            data=result
+            data=safe_result
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -178,18 +185,104 @@ async def remove_artifacts(dataset_id: str, subject_id: str, params: ArtifactPar
         dataset_id: 数据集ID
         subject_id: 受试者ID
         params: 伪迹去除参数
-            - eog: 是否去除眼电伪迹
-            - ecg: 是否去除心电伪迹
-            - threshold: 伪迹检测阈值
+            - artifact_detection_method: 伪迹检测方法 ("threshold", "ica", "wavelet")
+            - amplitude_threshold: 幅度阈值
+            - artifact_handling: 伪迹处理方式 ("interpolate", "zero", "remove")
+            - reject_by_annotation: 是否按标记拒绝
     """
     try:
+        # 输出接收到的参数，帮助调试
+        print(f"接收到伪迹处理请求: dataset_id={dataset_id}, subject_id={subject_id}")
+        print(f"伪迹处理参数: {params.dict()}")
+        
+        # 参数验证
+        if params.artifact_detection_method == "threshold" and params.amplitude_threshold <= 0:
+            raise ValueError("幅度阈值必须大于0")
+            
+        # 处理通道参数
+        channels = params.dict().pop("channels", None) if hasattr(params, "channels") else None
+            
+        # 记录处理开始时间
+        start_time = time.time()
+        
+        # 检查缓存
+        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "artifacts")
+        cache_meta_key = f"{cache_key}:meta"
+        
+        from_cache = False
+        process_time = 0
+        
+        # 检查元数据
+        cached_meta = get_metadata(cache_meta_key)
+        if cached_meta:
+            # 检查参数是否匹配
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            # 参数一致则标记为从缓存获取
+            if cached_meta.get('params') == params_dict:
+                from_cache = True
+                process_time = cached_meta.get('process_time', 0)
+                cached_data = get_from_cache(cache_key)
+                if cached_data:
+                    print(f"使用缓存的伪迹处理结果: {cache_key}")
+                    
+                    # 创建响应
+                    response = APIResponse(
+                        success=True,
+                        message="伪迹处理完成",
+                        data=cached_data
+                    )
+                    
+                    return Response(
+                        content=response.json(),
+                        media_type="application/json",
+                        headers={
+                            "X-From-Cache": "true",
+                            "X-Process-Time": str(process_time)
+                        }
+                    )
+        
+        # 执行处理
         result = preprocess_service.remove_artifacts(dataset_id, subject_id, params)
-        return APIResponse(
-            message="伪迹去除完成",
+        
+        # 如果不是从缓存获取，计算处理时间
+        if not from_cache:
+            process_time = time.time() - start_time
+        
+        # 创建响应
+        response = APIResponse(
+            success=True,
+            message="伪迹处理完成",
             data=result
         )
+        
+        # 使用安全的JSON序列化方式，确保没有NumPy类型
+        response_dict = response.dict()
+        # 转换所有NumPy类型为Python原生类型
+        safe_response = convert_numpy_types(response_dict)
+        json_content = json.dumps(safe_response)
+        
+        # 返回响应，添加自定义头信息
+        return Response(
+            content=json_content,
+            media_type="application/json",
+            headers={
+                "X-From-Cache": str(from_cache).lower(),
+                "X-Process-Time": str(process_time)
+            }
+        )
+    except ValueError as e:
+        error_msg = f"参数错误: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"伪迹处理失败: {str(e)}"
+        print(error_msg)
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @router.get("/{dataset_id}/subjects/{subject_id}/status", response_model=APIResponse)
 async def get_preprocess_status(dataset_id: str, subject_id: str):
@@ -227,9 +320,13 @@ async def segment_data(dataset_id: str, subject_id: str, params: SegmentParams):
     """
     try:
         result = preprocess_service.segment_data(dataset_id, subject_id, params)
+        
+        # 确保结果中没有NumPy类型
+        safe_result = convert_numpy_types(result)
+        
         return APIResponse(
             message="数据分段完成",
-            data=result
+            data=safe_result
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -250,9 +347,13 @@ async def detect_bad_segments(dataset_id: str, subject_id: str, params: BadSegme
     """
     try:
         result = preprocess_service.detect_bad_segments(dataset_id, subject_id, params)
+        
+        # 确保结果中没有NumPy类型
+        safe_result = convert_numpy_types(result)
+        
         return APIResponse(
             message="坏段处理完成",
-            data=result
+            data=safe_result
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

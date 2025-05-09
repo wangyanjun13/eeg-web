@@ -11,6 +11,7 @@ import time
 # 导入Redis缓存功能
 from app.core.config import get_preprocess_cache_key
 from app.core.redis import save_to_cache, get_from_cache, save_metadata, get_metadata
+from app.core.utils import convert_numpy_types
 
 class PreprocessService:
     def __init__(self, dataset_service):
@@ -398,91 +399,356 @@ class PreprocessService:
             raise ValueError(error_msg)
 
     def remove_artifacts(self, dataset_id: str, subject_id: str, params: ArtifactParams) -> RawEEGData:
-        """去除伪迹"""
-        # 检查缓存
-        cache_key = get_preprocess_cache_key(dataset_id, subject_id, "artifacts")
-        cache_meta_key = f"{cache_key}:meta"
+        """去除伪迹
         
-        cached_meta = get_metadata(cache_meta_key)
-        if cached_meta and cached_meta.get('params') == params.dict():
-            cached_data = get_from_cache(cache_key)
-            if cached_data:
-                print(f"使用缓存的伪迹处理结果: {cache_key}")
-                return cached_data
-        
-        # 没有缓存，执行处理
-        start_time = time.time()
-        # 获取原始数据
-        raw_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
-        
-        if isinstance(raw_data, RawEEGData) and hasattr(raw_data, 'error') and raw_data.error:
-            raise ValueError(raw_data.error)
-        
-        # 转换为numpy数组以便处理
-        data_array = np.array([raw_data.data[ch] for ch in raw_data.channels])
-        
-        # 简单的阈值去伪迹方法
-        if params.amplitude_threshold and params.amplitude_threshold > 0:
-            # 计算每个通道的标准差
-            channel_stds = np.std(data_array, axis=1)
+        Args:
+            dataset_id: 数据集ID
+            subject_id: 受试者ID
+            params: 伪迹处理参数，包括检测方法、阈值和处理方式
             
-            # 对每个通道应用阈值
-            for i, ch in enumerate(raw_data.channels):
-                # 获取当前通道数据
-                channel_data = data_array[i]
+        Returns:
+            RawEEGData: 处理后的数据
+        """
+        try:
+            # 检查缓存
+            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "artifacts")
+            cache_meta_key = f"{cache_key}:meta"
+            
+            # 从参数中提取通道信息
+            channels = params.dict().pop("channels", None) if hasattr(params, "channels") else None
+            
+            # 创建缓存参数字典，包含通道信息
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+            
+            # 检查元数据，比对参数判断缓存是否有效
+            cached_meta = get_metadata(cache_meta_key)
+            if cached_meta and cached_meta.get('params') == params_dict:
+                cached_data = get_from_cache(cache_key)
+                if cached_data:
+                    print(f"使用缓存的伪迹处理结果: {cache_key}")
+                    return cached_data
+            
+            # 没有缓存，执行处理
+            start_time = time.time()
+            
+            # 获取输入数据（应该是ICA分析后的结果）
+            input_data = self.get_input_data_for_step(dataset_id, subject_id, "artifacts")
+            
+            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
+                raise ValueError(input_data.error)
+            
+            # 确保数据有效
+            if not input_data or not input_data.data or not input_data.channels:
+                raise ValueError(f"无法获取有效的EEG数据: dataset_id={dataset_id}, subject_id={subject_id}")
+            
+            print(f"开始执行伪迹处理，方法: {params.artifact_detection_method}, 处理方式: {params.artifact_handling}")
+            
+            # 确定要处理的通道
+            process_channels = channels if channels else input_data.channels
+            print(f"处理通道数量: {len(process_channels)}")
+            
+            # 转换为numpy数组以便处理
+            data_array = {}
+            for channel in process_channels:
+                if channel in input_data.data:
+                    data_array[channel] = np.array(input_data.data[channel])
+            
+            # 检测到的伪迹段信息
+            artifact_segments = []
+            
+            # 根据不同的检测方法处理伪迹
+            if params.artifact_detection_method == "threshold":
+                # 基于阈值的伪迹检测
+                artifact_segments = self._detect_threshold_artifacts(
+                    data_array, 
+                    input_data.times, 
+                    threshold=params.amplitude_threshold
+                )
                 
-                # 计算阈值（标准差的倍数）
-                threshold = channel_stds[i] * params.amplitude_threshold
+            elif params.artifact_detection_method == "ica":
+                # 基于ICA的伪迹处理 - 使用ICA分析结果中标记的伪迹组件
+                if hasattr(input_data, 'segment_info') and input_data.segment_info and 'ica_info' in input_data.segment_info:
+                    ica_info = input_data.segment_info['ica_info']
+                    if 'excluded_components' in ica_info:
+                        print(f"使用ICA分析中已排除的伪迹组件: {ica_info['excluded_components']}")
+                        # 这里伪迹已经在ICA阶段被处理，不需要额外处理
+                        # 只需记录处理信息
+                        artifact_segments = [{
+                            "type": "ica_component",
+                            "component_indices": ica_info['excluded_components'],
+                            "method": ica_info.get('method', 'unknown')
+                        }]
+                    else:
+                        print("ICA分析结果中没有检测到伪迹组件")
+                else:
+                    print("没有找到ICA分析结果，无法进行基于ICA的伪迹处理")
                 
-                # 找出超过阈值的点
-                artifacts = np.where(np.abs(channel_data) > threshold)[0]
+            elif params.artifact_detection_method == "wavelet":
+                # 基于小波变换的伪迹检测
+                artifact_segments = self._detect_wavelet_artifacts(
+                    data_array, 
+                    input_data.times,
+                    input_data.sampling_rate
+                )
+            
+            # 应用伪迹处理
+            processed_data = {}
+            
+            # 如果检测到伪迹段，根据处理方式进行处理
+            if artifact_segments and params.artifact_detection_method != "ica":
+                for channel in process_channels:
+                    if channel in data_array:
+                        # 获取当前通道数据
+                        channel_data = data_array[channel]
+                        
+                        # 创建掩码，标记非伪迹点
+                        mask = np.ones(len(channel_data), dtype=bool)
+                        
+                        # 标记所有伪迹点
+                        for segment in artifact_segments:
+                            if 'start_idx' in segment and 'end_idx' in segment:
+                                start_idx = segment['start_idx']
+                                end_idx = segment['end_idx']
+                                
+                                # 确保索引有效
+                                if 0 <= start_idx < len(channel_data) and 0 <= end_idx <= len(channel_data):
+                                    mask[start_idx:end_idx] = False
+                        
+                        # 根据处理方式处理伪迹
+                        if params.artifact_handling == "interpolate":
+                            # 使用线性插值
+                            x = np.arange(len(channel_data))
+                            if np.any(mask):  # 确保有有效点用于插值
+                                channel_data_clean = np.interp(
+                                    x, 
+                                    x[mask], 
+                                    channel_data[mask]
+                                )
+                                processed_data[channel] = channel_data_clean.tolist()
+                            else:
+                                # 如果全部是伪迹点，保留原始数据
+                                processed_data[channel] = channel_data.tolist()
+                                
+                        elif params.artifact_handling == "zero":
+                            # 将伪迹区域置零
+                            channel_data_clean = channel_data.copy()
+                            channel_data_clean[~mask] = 0.0
+                            processed_data[channel] = channel_data_clean.tolist()
+                            
+                        elif params.artifact_handling == "remove":
+                            # 移除伪迹区域（注意：这会改变数据长度）
+                            if np.any(mask):  # 确保有有效点
+                                processed_data[channel] = channel_data[mask].tolist()
+                            else:
+                                # 如果全部是伪迹点，保留原始数据
+                                processed_data[channel] = channel_data.tolist()
+                    else:
+                        # 如果通道不在处理列表中，保留原始数据
+                        if channel in input_data.data:
+                            processed_data[channel] = input_data.data[channel]
+            else:
+                # 如果没有检测到伪迹段或使用ICA方法（已在ICA阶段处理），保留原始数据
+                for channel in input_data.channels:
+                    if channel in input_data.data:
+                        processed_data[channel] = input_data.data[channel]
+            
+            # 创建结果对象
+            result = RawEEGData(
+                data=processed_data,
+                times=input_data.times,
+                channels=input_data.channels,
+                duration=input_data.duration,
+                sampling_rate=input_data.sampling_rate,
+                dataset_id=dataset_id,
+                subject_id=subject_id,
+                # 保存原始时间范围
+                timeRange=input_data.timeRange if hasattr(input_data, 'timeRange') else None
+            )
+            
+            # 添加伪迹处理信息
+            artifact_segments = self._convert_to_json_serializable(artifact_segments)
+            
+            artifact_info = {
+                "method": params.artifact_detection_method,
+                "handling": params.artifact_handling,
+                "detected_segments": len(artifact_segments), 
+                "segments": artifact_segments[:10] if artifact_segments else []  # 只保存前10个伪迹段信息，避免数据过大
+            }
+            
+            # 如果result没有segment_info属性，添加一个
+            if not hasattr(result, 'segment_info') or result.segment_info is None:
+                result.segment_info = {}
                 
-                # 如果有伪迹点，用线性插值替换
-                if len(artifacts) > 0:
-                    # 创建一个掩码，标记非伪迹点
-                    mask = np.ones(len(channel_data), dtype=bool)
-                    mask[artifacts] = False
+            # 添加伪迹信息
+            if isinstance(result.segment_info, dict):
+                result.segment_info["artifact_info"] = artifact_info
+            
+            # 计算处理时间并缓存结果
+            process_time = time.time() - start_time
+            print(f"伪迹处理完成，耗时: {process_time:.2f}秒")
+            
+            metadata = {
+                'params': params_dict,
+                'process_time': process_time,
+                'timestamp': time.time()
+            }
+            
+            save_metadata(cache_meta_key, metadata)
+            save_to_cache(cache_key, result)
+            
+            return result
+                
+        except Exception as e:
+            error_msg = f"伪迹处理失败: {str(e)}"
+            print(error_msg)
+            import traceback
+            print(traceback.format_exc())
+            raise ValueError(error_msg)
+            
+    def _detect_threshold_artifacts(self, data_array, times, threshold=100.0):
+        """基于阈值的伪迹检测
+        
+        Args:
+            data_array: 通道数据字典
+            times: 时间点数组
+            threshold: 幅度阈值 (μV)
+            
+        Returns:
+            检测到的伪迹段列表
+        """
+        artifact_segments = []
+        
+        # 对每个通道进行处理
+        for channel, channel_data in data_array.items():
+            # 检测超过阈值的点
+            artifacts = np.where(np.abs(channel_data) > threshold)[0]
+            
+            if len(artifacts) > 0:
+                # 将连续的伪迹点分组为段
+                artifact_groups = []
+                current_group = [int(artifacts[0])]  # 转换为Python原生int类型
+                
+                for i in range(1, len(artifacts)):
+                    if artifacts[i] == artifacts[i-1] + 1:
+                        # 连续点
+                        current_group.append(int(artifacts[i]))  # 转换为Python原生int类型
+                    else:
+                        # 不连续，开始新的组
+                        if len(current_group) > 0:
+                            artifact_groups.append(current_group)
+                        current_group = [int(artifacts[i])]  # 转换为Python原生int类型
+                
+                # 添加最后一组
+                if len(current_group) > 0:
+                    artifact_groups.append(current_group)
+                
+                # 创建伪迹段信息
+                for group in artifact_groups:
+                    start_idx = int(group[0])  # 确保是Python原生int类型
+                    end_idx = int(group[-1] + 1)  # 结束索引加1，表示半开区间，确保是Python原生int类型
                     
-                    # 使用非伪迹点进行插值
-                    x = np.arange(len(channel_data))
-                    channel_data_clean = np.interp(
-                        x, 
-                        x[mask], 
-                        channel_data[mask]
-                    )
-                    
-                    # 更新数据
-                    data_array[i] = channel_data_clean
+                    # 确保索引有效
+                    if start_idx < len(times) and end_idx <= len(times):
+                        start_time = float(times[start_idx])  # 确保是Python原生float类型
+                        end_time = float(times[min(end_idx, len(times)-1)])  # 确保是Python原生float类型
+                        
+                        segment = {
+                            "channel": channel,
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "start_idx": start_idx,
+                            "end_idx": end_idx,
+                            "reason": "幅度超过阈值"
+                        }
+                        
+                        artifact_segments.append(segment)
         
-        # 转换回字典格式
-        processed_data = {
-            ch: data_array[i].tolist()
-            for i, ch in enumerate(raw_data.channels)
-        }
-        
-        result = RawEEGData(
-            data=processed_data,
-            times=raw_data.times,
-            channels=raw_data.channels,
-            duration=raw_data.duration,
-            sampling_rate=raw_data.sampling_rate,
-            dataset_id=dataset_id,
-            subject_id=subject_id
-        )
-        
-        # 计算处理时间并缓存结果
-        process_time = time.time() - start_time
-        metadata = {
-            'params': params.dict(),
-            'process_time': process_time,
-            'timestamp': time.time()
-        }
-        
-        save_metadata(cache_meta_key, metadata)
-        save_to_cache(cache_key, result)
-        
-        return result
+        return artifact_segments
     
+    def _detect_wavelet_artifacts(self, data_array, times, sampling_rate):
+        """基于小波变换的伪迹检测
+        
+        使用小波变换检测突发伪迹，如肌肉活动
+        
+        Args:
+            data_array: 通道数据字典
+            times: 时间点数组
+            sampling_rate: 采样率
+            
+        Returns:
+            检测到的伪迹段列表
+        """
+        try:
+            from pywt import wavedec
+            
+            artifact_segments = []
+            
+            # 对每个通道进行处理
+            for channel, channel_data in data_array.items():
+                # 使用小波分解
+                coeffs = wavedec(channel_data, 'db4', level=4)
+                
+                # 获取高频系数
+                cD1 = coeffs[1]
+                
+                # 计算高频系数的标准差
+                std_cD1 = np.std(cD1)
+                
+                # 检测超过阈值的系数（通常为标准差的4-5倍）
+                threshold = 5 * std_cD1
+                artifacts = np.where(np.abs(cD1) > threshold)[0]
+                
+                if len(artifacts) > 0:
+                    # 将连续的伪迹点分组为段
+                    artifact_groups = []
+                    current_group = [int(artifacts[0])]  # 转换为Python原生int类型
+                    
+                    for i in range(1, len(artifacts)):
+                        if artifacts[i] == artifacts[i-1] + 1:
+                            # 连续点
+                            current_group.append(int(artifacts[i]))  # 转换为Python原生int类型
+                        else:
+                            # 不连续，开始新的组
+                            if len(current_group) > 0:
+                                artifact_groups.append(current_group)
+                            current_group = [int(artifacts[i])]  # 转换为Python原生int类型
+                    
+                    # 添加最后一组
+                    if len(current_group) > 0:
+                        artifact_groups.append(current_group)
+                    
+                    # 创建伪迹段信息
+                    for group in artifact_groups:
+                        # 小波系数对应的原始数据索引需要进行调整
+                        # 这里使用一个简单的缩放因子（2倍，因为小波分解会降低分辨率）
+                        scale_factor = len(channel_data) / len(cD1)
+                        start_idx = int(group[0] * scale_factor)  # 确保是Python原生int类型
+                        end_idx = int(group[-1] * scale_factor) + 1  # 确保是Python原生int类型
+                        
+                        # 确保索引有效
+                        if start_idx < len(times) and end_idx <= len(times):
+                            start_time = float(times[start_idx])  # 确保是Python原生float类型
+                            end_time = float(times[min(end_idx, len(times)-1)])  # 确保是Python原生float类型
+                            
+                            segment = {
+                                "channel": channel,
+                                "start_time": start_time,
+                                "end_time": end_time,
+                                "start_idx": start_idx,
+                                "end_idx": end_idx,
+                                "reason": "小波检测到的突发伪迹"
+                            }
+                            
+                            artifact_segments.append(segment)
+            
+            return artifact_segments
+        except ImportError:
+            print("警告: 未安装PyWavelets库，无法使用小波伪迹检测。使用默认阈值检测替代。")
+            # 如果没有PyWavelets，回退到阈值检测
+            return self._detect_threshold_artifacts(data_array, times, threshold=100.0)
+
     def preprocess_eeg(self, raw, params: Optional[PreprocessParams] = None):
         # 使用默认参数或用户提供的参数
         if params is None:
@@ -1276,7 +1542,7 @@ class PreprocessService:
         """
         try:
             # 所有处理步骤，按顺序排列
-            steps = ["filter", "resample", "segment", "badChannels", "badSegments", "reference", "ica", "artifacts"]
+            steps = ["filter", "resample", "badChannels", "reference", "segment", "badSegments", "ica", "artifacts"]
             
             # 找出当前步骤的索引
             current_index = steps.index(step_name) if step_name in steps else -1
@@ -1941,3 +2207,125 @@ class PreprocessService:
             import traceback
             print(traceback.format_exc())  # 打印完整堆栈跟踪，帮助调试
             raise ValueError(error_msg)
+
+    def apply_complete_preprocessing(self, dataset_id: str, subject_id: str, params: PreprocessParams) -> RawEEGData:
+        """应用完整预处理流程
+        
+        按顺序执行：滤波、重采样、坏通道检测、重参考、分段、坏段检测、ICA、伪迹处理
+        
+        Args:
+            dataset_id: 数据集ID
+            subject_id: 受试者ID
+            params: 预处理参数
+            
+        Returns:
+            RawEEGData: 处理后的数据
+        """
+        try:
+            print(f"开始完整预处理流程: dataset_id={dataset_id}, subject_id={subject_id}")
+            start_time = time.time()
+            
+            # 1. 滤波
+            if params.filter.apply_filter:
+                print("执行滤波...")
+                filtered_data = self.apply_filter(dataset_id, subject_id, params.filter)
+            else:
+                print("跳过滤波...")
+                filtered_data = self.dataset_service.get_subject_data(dataset_id, subject_id)
+            
+            # 2. 重采样
+            if params.resample.resample:
+                print("执行重采样...")
+                resampled_data = self.apply_resample(dataset_id, subject_id, params.resample)
+            else:
+                print("跳过重采样...")
+                resampled_data = filtered_data
+                
+            # 3. 坏通道检测
+            if params.bad_channels.detect_bad_channels:
+                print("执行坏通道检测...")
+                bad_channels_data = self.process_bad_channels(dataset_id, subject_id, params.bad_channels)
+            else:
+                print("跳过坏通道检测...")
+                bad_channels_data = resampled_data
+                
+            # 4. 重参考
+            if params.reference.apply_reference:
+                print("执行重参考...")
+                referenced_data = self.apply_reference(dataset_id, subject_id, params.reference)
+            else:
+                print("跳过重参考...")
+                referenced_data = bad_channels_data
+                
+            # 5. 分段
+            if params.segment.apply_segment:
+                print("执行数据分段...")
+                segmented_data = self.segment_data(dataset_id, subject_id, params.segment)
+            else:
+                print("跳过数据分段...")
+                segmented_data = referenced_data
+                
+            # 6. 坏段检测
+            if params.bad_segments.detect_bad_segments:
+                print("执行坏段检测...")
+                bad_segments_data = self.detect_bad_segments(dataset_id, subject_id, params.bad_segments)
+            else:
+                print("跳过坏段检测...")
+                bad_segments_data = segmented_data
+                
+            # 7. ICA分析
+            if params.ica.run_ica:
+                print("执行ICA分析...")
+                ica_data = self.run_ica(dataset_id, subject_id, params.ica)
+            else:
+                print("跳过ICA分析...")
+                ica_data = bad_segments_data
+                
+            # 8. 伪迹处理
+            if params.artifacts.remove_artifacts:
+                print("执行伪迹处理...")
+                artifacts_data = self.remove_artifacts(dataset_id, subject_id, params.artifacts)
+            else:
+                print("跳过伪迹处理...")
+                artifacts_data = ica_data
+                
+            # 记录处理时间
+            process_time = time.time() - start_time
+            print(f"完整预处理流程完成，总耗时: {process_time:.2f}秒")
+            
+            # 返回最终处理结果
+            return artifacts_data
+            
+        except Exception as e:
+            error_msg = f"完整预处理流程失败: {str(e)}"
+            print(error_msg)
+            import traceback
+            print(traceback.format_exc())
+            raise ValueError(error_msg)
+    def _convert_to_json_serializable(self, obj):
+        """将对象转换为JSON可序列化的格式
+        
+        递归处理包含NumPy类型的对象，将其转换为Python原生类型
+        
+        Args:
+            obj: 输入对象
+            
+        Returns:
+            转换后的对象
+        """
+        import numpy as np
+        
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return self._convert_to_json_serializable(obj.tolist())
+        elif isinstance(obj, dict):
+            return {key: self._convert_to_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_to_json_serializable(item) for item in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._convert_to_json_serializable(item) for item in obj)
+        else:
+            return obj
