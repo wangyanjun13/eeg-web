@@ -1,64 +1,199 @@
-# 忽略数据文件夹和大型数据文件
+# EEG 可视化平台 .gitignore 文件
+
+# ===== 数据文件 =====
+# 忽略数据样本目录和大型数据文件
 /data/eeg_samples/
+/data/venv/
 *.set
 *.fdt
 *.mat
+*.edf
+*.bdf
+*.cnt
+*.eeg
+*.vhdr
+*.vmrk
+*.raw
+*.mff
+*.ds
+*.npy
+*.npz
+
+# 压缩文件
 *.zip
 *.7z
+*.tar
 *.tar.gz
+*.tgz
+*.rar
 
-# 忽略日志文件
+# ===== 日志和临时文件 =====
+# 日志文件
 /logs/
 *.log
-
-# 前端构建和依赖
-/frontend/node_modules/
-/frontend/dist/
-/frontend/dist.bak.*
-/frontend/.vite/
-/frontend/coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
-yarn.lock
+.pnpm-debug.log*
 
-# 后端和Python相关
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-/backend/env/
-/backend/.env
-/backend/venv/
-/.venv/
-/.env
-*.sqlite
-*.db
-
-# 操作系统相关文件
+# 临时文件
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# 编辑器和IDE文件
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.project
-.settings/
-.classpath
-
 # 备份文件
 *.bak
 *.backup
 *.old
-*.tmp
+dist.bak.*
+/frontend/dist.bak.*
 
 # 临时构建目录
+/tmp/
+/temp/
 /tmp/eeg-build*
+
+# ===== 前端相关 =====
+# 依赖和构建
+/frontend/node_modules/
+/frontend/.pnp
+/frontend/.pnp.js
+/frontend/dist/
+/frontend/dist-ssr/
+/frontend/.vite/
+/frontend/coverage/
+/frontend/.env
+/frontend/.env.*
+/frontend/.env.local
+/frontend/.env.*.local
+
+# 包管理器锁定文件（根据需要选择保留或忽略）
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ===== 后端相关 =====
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 虚拟环境
+/backend/env/
+/backend/venv/
+/backend/.venv/
+/.venv/
+/env/
+/venv/
+/ENV/
+/env.bak/
+/venv.bak/
+
+# 环境变量和配置
+/.env
+/backend/.env
+*.sqlite
+*.db
+*.sqlite3
+
+# ===== IDE和编辑器 =====
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Eclipse
+.project
+.settings/
+.classpath
+.factorypath
+
+# ===== 系统特定 =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===== 其他 =====
+# 本地配置文件
+*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 部署相关
+/deploy/
+/.netlify
+/.vercel
