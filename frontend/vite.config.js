@@ -20,18 +20,18 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:8000',  // 在同一台服务器上直接使用 localhost
+          target: 'https://api.eeg-visualization-platform.site',  // 直接使用生产API地址
           changeOrigin: true,
-          secure: false,
+          secure: true,
+          rewrite: (path) => path
         }
       },
       hmr: {
-        // 禁用 WebSocket 连接重试
         protocol: 'ws',
         host: 'eeg-visualization-platform.site',
         clientPort: 443,
         path: 'hmr/',
-        overlay: false, // 禁用错误覆盖
+        overlay: false,
       },
       allowedHosts: [
         'eeg-visualization-platform.site', 
