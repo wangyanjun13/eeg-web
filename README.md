@@ -41,6 +41,10 @@
 ```bash
 sudo ./eeg-service.sh deploy
 ```
+单独构建前端：
+```bash
+   sudo ./eeg-service.sh build
+```
 
 这个命令将自动：
 1. 使用合适的 Node.js 版本构建前端

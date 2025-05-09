@@ -58,42 +58,94 @@ const applyReference = async () => {
       throw new Error('使用自定义参考时，必须选择至少一个参考通道');
     }
 
-    // TODO: 实际的重参考API调用实现
-    ElMessage.info('重参考功能正在开发中');
+    // 双侧乳突参考检查
+    if (props.preprocessParams.reference.reference === 'mastoids') {
+      const hasMastoids = availableChannels.value.some(ch => ['M1', 'M2', 'TP9', 'TP10'].includes(ch));
+      if (!hasMastoids) {
+        throw new Error('未检测到乳突通道(M1/M2或TP9/TP10)，无法应用乳突参考');
+      }
+    }
+
+    console.log('应用重参考处理:', props.preprocessParams.reference);
+    console.log('处理通道列表:', props.processingChannels);
     
-    /* 当后端API完成后，可以使用类似的代码
+    // 验证处理通道列表
+    if (!props.processingChannels || props.processingChannels.length === 0) {
+      console.warn('未指定处理通道列表，将使用所有可用通道');
+    }
+    
+    // 确保原始数据有效
+    if (!props.originalData.data || !props.originalData.times) {
+      throw new Error('原始数据无效，缺少数据或时间信息');
+    }
+    
+    // 记录原始数据的时间范围信息，用于后续处理
+    const originalTimeRange = props.originalData.timeRange || 
+                             [props.originalData.times[0], props.originalData.times[props.originalData.times.length - 1]];
+    console.log('原始数据时间范围:', originalTimeRange);
+    
+    // 创建完整的参数对象，确保正确传递channels参数和时间范围
+    const requestParams = {
+      reference: props.preprocessParams.reference.reference,
+      custom_ref_channels: props.preprocessParams.reference.custom_ref_channels || [],
+      channels: props.processingChannels.length > 0 ? props.processingChannels : null,
+      // 传递时间范围到后端，以确保处理的一致性
+      time_range: originalTimeRange
+    };
+    
+    // 调用重参考API，传递完整参数对象
     const response = await withLoading(
-      analysisService.applyReference(props.datasetId, props.subjectId, {
-        reference: props.preprocessParams.reference.reference,
-        custom_ref_channels: props.preprocessParams.reference.custom_ref_channels,
-        channels: props.processingChannels // 传递处理通道
-      }),
+      analysisService.applyReference(props.datasetId, props.subjectId, requestParams),
       'processing'
     );
 
     if (!response || !response.data) {
       throw new Error('服务器返回数据无效');
     }
+    
+    // 验证返回的数据结构
+    if (!response.data.data || !response.data.times) {
+      console.warn('服务器返回的数据结构可能不完整，可能影响显示效果');
+    }
+    
+    // 检查时间数据的有效性
+    const times = response.data.times || [];
+    if (times.length > 1) {
+      const timeRange = times[times.length - 1] - times[0];
+      if (timeRange < 0.001) {
+        console.warn('重参考结果的时间范围异常小，可能影响显示效果', timeRange);
+      }
+      if (times.length > 5 && times.slice(0, 5).every(t => Math.abs(t - times[0]) < 0.0001)) {
+        console.warn('重参考结果的前几个时间点几乎相同，可能影响显示效果');
+      }
+    } else if (times.length <= 1) {
+      console.warn('重参考结果没有有效的时间数据，可能影响显示效果');
+    }
+    
+    // 确保数据和时间点的长度匹配
+    const firstChannel = Object.keys(response.data.data || {})[0];
+    if (firstChannel && response.data.data[firstChannel]) {
+      const channelLength = response.data.data[firstChannel].length;
+      if (times.length !== channelLength) {
+        console.warn(`数据长度(${channelLength})与时间点长度(${times.length})不匹配，可能影响显示效果`);
+      }
+    }
+    
+    // 确保结果中包含原始数据的时间范围
+    if (!response.data.timeRange) {
+      console.log('添加原始数据的时间范围信息到结果:', originalTimeRange);
+      response.data.timeRange = originalTimeRange;
+    }
+    
+    console.log('参考处理完成，数据结构:', {
+      通道数: response.data.channels?.length,
+      时间点数: response.data.times?.length,
+      数据对象大小: Object.keys(response.data.data || {}).length,
+      时间范围: response.data.timeRange
+    });
 
     emit('process-complete', response.data);
     ElMessage.success('重参考应用成功');
-    */
-    
-    // 临时模拟
-    setTimeout(() => {
-      // 模拟后端返回的数据，保持通道一致性
-      const simulatedData = {
-        ...props.originalData,
-        channels: props.processingChannels,
-        // 保持数据不变，但需确保通道列表与处理通道一致
-        data: Object.fromEntries(
-          props.processingChannels.map(ch => [ch, props.originalData.data[ch]])
-        )
-      };
-      emit('process-complete', simulatedData);
-      ElMessage.success('重参考模拟应用成功');
-    }, 1000);
-    
   } catch (error) {
     console.error('应用重参考失败:', error);
     const errorMessage = error.response?.data?.detail || error.message || '未知错误';
@@ -123,7 +175,19 @@ const selectChannels = () => {
         </el-radio-group>
       </el-form-item>
       
+      <!-- 添加简单的重参考解释 -->
+      <div class="reference-explanation">
+        <p class="explanation-text">
+          重参考将改变信号的基准点，使得通道间电位差更准确反映大脑活动。
+        </p>
+      </div>
+      
       <el-form-item label="参考通道" v-if="preprocessParams.reference.reference === 'custom'">
+        <div class="help-text">
+          <small>
+            请选择要作为参考的通道（数据会减去这些通道的平均值）
+          </small>
+        </div>
         <el-select 
           v-model="preprocessParams.reference.custom_ref_channels" 
           multiple 
@@ -138,6 +202,33 @@ const selectChannels = () => {
           />
         </el-select>
       </el-form-item>
+      
+      <el-alert 
+        v-if="preprocessParams.reference.reference === 'average'"
+        type="info"
+        show-icon
+        :closable="false"
+      >
+        平均参考：将所有通道的平均值作为参考，适合电极分布均匀的情况
+      </el-alert>
+      
+      <el-alert 
+        v-if="preprocessParams.reference.reference === 'mastoids'"
+        type="info"
+        show-icon
+        :closable="false"
+      >
+        使用 M1/M2 或 TP9/TP10 作为参考，适合前额和中央区域分析
+      </el-alert>
+      
+      <el-alert 
+        v-if="preprocessParams.reference.reference === 'custom'"
+        type="info"
+        show-icon
+        :closable="false"
+      >
+        自定义参考：选择特定通道作为参考，适合针对性研究特定脑区
+      </el-alert>
       
       <el-alert 
         v-if="preprocessParams.reference.reference === 'mastoids' && 
@@ -190,5 +281,25 @@ h3 {
 
 :deep(.el-radio__label) {
   font-size: 12px;
+}
+
+.help-text {
+  margin-bottom: 5px;
+  color: #606266;
+  font-size: 12px;
+}
+
+/* 重参考解释的样式 */
+.reference-explanation {
+  margin: 8px 0;
+  padding: 0 8px;
+  border-left: 2px solid #909399;
+}
+
+.explanation-text {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.4;
+  margin: 0;
 }
 </style> 

@@ -27,6 +27,7 @@ class RawEEGData(BaseModel):
     dataset_id: Optional[str] = None
     subject_id: Optional[str] = None
     segment_info: Optional[Dict] = None
+    timeRange: Optional[List[float]] = None
 
 class ParticipantInfo(BaseModel):
     """参与者信息"""

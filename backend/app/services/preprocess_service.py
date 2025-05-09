@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np
-from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessedData, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams, BadChannelParams
+from app.models.data_preprocess import FilterParams, ICAParams, ArtifactParams, PreprocessedData, PreprocessParams, SegmentParams, BadSegmentParams, ResampleParams, BadChannelParams, ReferenceParams
 from scipy import signal
 from app.models.data_dataset import RawEEGData
 from mne.preprocessing import ICA
@@ -1441,3 +1441,293 @@ class PreprocessService:
         raw = mne.io.RawArray(data, info)
         
         return raw
+
+    def apply_reference(self, dataset_id: str, subject_id: str, params: ReferenceParams, channels: List[str] = None) -> RawEEGData:
+        """应用重参考处理
+        
+        Args:
+            dataset_id: 数据集ID
+            subject_id: 受试者ID
+            params: 重参考参数
+            channels: 处理通道列表（可选）
+            
+        Returns:
+            RawEEGData: 重参考后的数据
+        """
+        try:
+            # 检查缓存
+            cache_key = get_preprocess_cache_key(dataset_id, subject_id, "reference")
+            cache_meta_key = f"{cache_key}:meta"
+            
+            # 首先检查元数据，比对参数判断缓存是否有效
+            cached_meta = get_metadata(cache_meta_key)
+            if cached_meta:
+                # 检查参数是否匹配
+                params_dict = params.dict()
+                if channels:
+                    params_dict['channels'] = channels
+                    
+                # 参数一致则返回缓存的结果
+                if cached_meta.get('params') == params_dict:
+                    print(f"找到有效的重参考缓存: {cache_key}")
+                    cached_data = get_from_cache(cache_key)
+                    if cached_data:
+                        # 确保时间范围信息存在
+                        if params.time_range and hasattr(cached_data, 'timeRange'):
+                            cached_data.timeRange = params.time_range
+                        return cached_data
+
+            # 缓存无效或不存在，执行重参考处理
+            print(f"执行重参考处理: 方式={params.reference}")
+            start_time = time.time()
+            
+            # 获取输入数据（应该是前一步骤的结果）
+            input_data = self.get_input_data_for_step(dataset_id, subject_id, "reference")
+            
+            if isinstance(input_data, RawEEGData) and hasattr(input_data, 'error') and input_data.error:
+                raise ValueError(input_data.error)
+            
+            # 诊断原始数据
+            print(f"处理前数据信息 - 通道数: {len(input_data.channels)}, 时间点数: {len(input_data.times)}")
+            
+            # 查看几个通道的数据范围
+            for ch in input_data.channels[:3]:
+                if ch in input_data.data:
+                    ch_data = input_data.data[ch]
+                    print(f"通道 {ch} 数据 - 最小值: {min(ch_data):.2f}, 最大值: {max(ch_data):.2f}, 平均值: {sum(ch_data)/len(ch_data):.2f}")
+            
+            # 检查时间数据
+            if input_data.times and len(input_data.times) > 0:
+                print(f"时间数据 - 开始: {input_data.times[0]:.3f}s, 结束: {input_data.times[-1]:.3f}s, 数量: {len(input_data.times)}")
+            else:
+                print("警告: 输入数据没有时间信息")
+            
+            # 设置要处理的通道
+            process_channels = channels if channels else input_data.channels
+            
+            # 转换为numpy数组以便处理
+            data_array = {}
+            for channel in input_data.channels:
+                if channel in input_data.data:
+                    data_array[channel] = np.array(input_data.data[channel])
+            
+            # 应用不同的重参考方法
+            if params.reference == "average":
+                # 平均参考 - 从每个通道减去所有通道的平均值
+                print(f"执行平均参考，处理通道数: {len(process_channels)}")
+                
+                # 1. 使用所有处理通道计算整体平均值
+                ref_channels = [ch for ch in process_channels if ch in data_array]
+                if not ref_channels:
+                    raise ValueError("没有有效的通道用于平均参考")
+                
+                print(f"参考计算使用的通道: {len(ref_channels)} 个")
+                
+                # 收集用于平均计算的数据
+                data_for_avg = []
+                for ch in ref_channels:
+                    data_for_avg.append(data_array[ch])
+                
+                # 使用numpy进行计算，确保平均计算正确
+                data_matrix = np.vstack(data_for_avg)  # 堆叠成矩阵
+                avg_data = np.mean(data_matrix, axis=0)  # 按列求平均
+                
+                # 输出平均参考值的统计信息
+                print(f"平均参考值 - 最小值: {np.min(avg_data):.2f}, 最大值: {np.max(avg_data):.2f}, 平均值: {np.mean(avg_data):.2f}")
+                print(f"平均参考值部分样本: {avg_data[:5]}")
+                
+                # 移除平均参考 - 确保不对所有信号全部归零
+                for ch in input_data.channels:
+                    if ch in data_array:
+                        # 保存原始信号的描述性统计信息
+                        orig_min = np.min(data_array[ch])
+                        orig_max = np.max(data_array[ch])
+                        orig_mean = np.mean(data_array[ch])
+                        
+                        # 减去平均参考
+                        data_array[ch] = data_array[ch] - avg_data
+                        
+                        # 信号处理后的统计信息
+                        new_min = np.min(data_array[ch])
+                        new_max = np.max(data_array[ch])
+                        new_mean = np.mean(data_array[ch])
+                        
+                        # 只打印前几个通道的统计信息避免日志过多
+                        if ch in input_data.channels[:3]:
+                            print(f"通道 {ch} 重参考后 - 最小值: {new_min:.2f}(原{orig_min:.2f}), "
+                                 f"最大值: {new_max:.2f}(原{orig_max:.2f}), "
+                                 f"平均值: {new_mean:.2f}(原{orig_mean:.2f})")
+            
+            # 保持mastoids和custom参考不变
+            elif params.reference == "mastoids":
+                # 双侧乳突参考 (M1+M2)/2
+                mastoid_channels = ["M1", "M2"]  # 常见的乳突通道
+                alt_mastoid_channels = ["TP9", "TP10"]  # 替代的乳突位置
+                
+                # 检查是否存在乳突通道
+                available_mastoids = [ch for ch in mastoid_channels if ch in data_array]
+                
+                # 如果没有标准乳突通道，尝试使用替代通道
+                if not available_mastoids:
+                    available_mastoids = [ch for ch in alt_mastoid_channels if ch in data_array]
+                
+                if not available_mastoids:
+                    raise ValueError("未找到乳突通道(M1/M2或TP9/TP10)，无法应用乳突参考")
+                
+                print(f"使用乳突通道: {available_mastoids}")
+                
+                # 计算乳突通道的平均值 - 使用正确的矩阵方法
+                mastoid_data_arr = np.vstack([data_array[ch] for ch in available_mastoids])
+                mastoid_data = np.mean(mastoid_data_arr, axis=0)
+                
+                # 输出乳突参考值的统计信息
+                print(f"乳突参考值 - 最小值: {np.min(mastoid_data):.2f}, 最大值: {np.max(mastoid_data):.2f}")
+                print(f"乳突参考值部分样本: {mastoid_data[:5]}")
+                
+                # 从每个通道减去乳突平均值
+                proc_count = 0
+                for ch in input_data.channels:
+                    if ch in data_array and ch not in available_mastoids:  # 不对乳突通道自身重参考
+                        data_array[ch] = data_array[ch] - mastoid_data
+                        proc_count += 1
+                
+                print(f"乳突参考完成，处理了 {proc_count} 个通道")
+                
+            elif params.reference == "custom":
+                # 自定义参考 - 使用指定通道作为参考
+                if not params.custom_ref_channels:
+                    raise ValueError("自定义参考模式下必须指定参考通道")
+                
+                # 确保自定义参考通道存在
+                ref_channels = [ch for ch in params.custom_ref_channels if ch in data_array]
+                
+                if not ref_channels:
+                    raise ValueError(f"指定的参考通道不存在或无效: {params.custom_ref_channels}")
+                
+                print(f"使用自定义参考通道: {ref_channels}")
+                
+                # 计算参考通道的平均值 - 使用正确的矩阵方法
+                ref_data_arr = np.vstack([data_array[ch] for ch in ref_channels])
+                ref_data = np.mean(ref_data_arr, axis=0)
+                
+                # 输出自定义参考值的统计信息
+                print(f"自定义参考值 - 最小值: {np.min(ref_data):.2f}, 最大值: {np.max(ref_data):.2f}")
+                print(f"自定义参考值部分样本: {ref_data[:5]}")
+                
+                # 从每个通道减去参考值
+                proc_count = 0
+                for ch in input_data.channels:
+                    if ch in data_array and ch not in ref_channels:  # 不对参考通道自身重参考
+                        data_array[ch] = data_array[ch] - ref_data
+                        proc_count += 1
+                
+                print(f"自定义参考完成，处理了 {proc_count} 个通道")
+            else:
+                raise ValueError(f"不支持的重参考方式: {params.reference}")
+            
+            # 转换回列表格式
+            referenced_data = {}
+            for ch in input_data.channels:
+                if ch in data_array:
+                    referenced_data[ch] = data_array[ch].tolist()
+                else:
+                    referenced_data[ch] = input_data.data[ch]
+            
+            # 确保时间数据正确
+            if not input_data.times or len(input_data.times) == 0:
+                print("警告: 创建默认时间序列，因为输入数据没有时间信息")
+                # 创建与数据长度匹配的默认时间轴
+                first_channel = next(iter(referenced_data.values())) if referenced_data else []
+                data_length = len(first_channel)
+                if data_length > 0:
+                    times = [i * input_data.duration / (data_length - 1) for i in range(data_length)]
+                else:
+                    times = []
+            else:
+                # 检查时间数据的有效性
+                times = input_data.times
+                # 验证时间数据是否单调递增且覆盖合理范围
+                if len(times) > 1:
+                    time_range = times[-1] - times[0]
+                    if time_range < 0.001:  # 时间范围过小
+                        print("警告: 时间范围过小，创建新的时间序列")
+                        first_channel = next(iter(referenced_data.values())) if referenced_data else []
+                        data_length = len(first_channel)
+                        if data_length > 0:
+                            times = [i * input_data.duration / (data_length - 1) for i in range(data_length)]
+                        else:
+                            times = []
+                    elif len(times) > 5 and all(abs(times[i] - times[0]) < 0.0001 for i in range(1, 5)):
+                        # 前几个时间点几乎相同，可能有问题
+                        print("警告: 时间数据异常，前几个点都相同，创建新的时间序列")
+                        first_channel = next(iter(referenced_data.values())) if referenced_data else []
+                        data_length = len(first_channel)
+                        if data_length > 0:
+                            times = [i * input_data.duration / (data_length - 1) for i in range(data_length)]
+                        else:
+                            times = []
+                
+            # 打印输出数据结构信息
+            print(f"输出数据 - 通道数: {len(input_data.channels)}, 时间点数: {len(times)}")
+            if len(times) > 1:
+                print(f"时间范围: {times[0]:.3f}s 到 {times[-1]:.3f}s")
+            
+            for ch in list(referenced_data.keys())[:2]:  # 仅打印前两个通道避免日志过多
+                channel_data = referenced_data[ch]
+                print(f"输出通道 {ch} - 数据长度: {len(channel_data)}, 样本: [{channel_data[0]:.2f}, {channel_data[1]:.2f}, ...]")
+            
+            # 创建结果对象
+            result = RawEEGData(
+                data=referenced_data,
+                times=times,
+                channels=input_data.channels,
+                duration=input_data.duration,
+                sampling_rate=input_data.sampling_rate,
+                dataset_id=dataset_id,
+                subject_id=subject_id
+            )
+            
+            # 处理时间范围 - 优先使用传入的时间范围参数
+            if params.time_range and len(params.time_range) == 2:
+                print(f"使用传入的时间范围参数: {params.time_range}")
+                result.timeRange = params.time_range
+            else:
+                # 如果没有传入时间范围，尝试使用输入数据的时间范围
+                if hasattr(input_data, 'timeRange') and input_data.timeRange:
+                    print(f"使用输入数据的时间范围: {input_data.timeRange}")
+                    result.timeRange = input_data.timeRange
+                else:
+                    # 从时间数据计算时间范围
+                    if len(times) > 1:
+                        result.timeRange = [times[0], times[-1]]
+                        print(f"从时间数据计算时间范围: {result.timeRange}")
+                    else:
+                        print("无法计算有效的时间范围，使用默认值")
+                        result.timeRange = [0, input_data.duration]
+            
+            # 计算处理时间
+            process_time = time.time() - start_time
+            print(f"重参考处理完成，耗时: {process_time:.2f}秒")
+            
+            # 缓存处理结果
+            params_dict = params.dict()
+            if channels:
+                params_dict['channels'] = channels
+                
+            metadata = {
+                'params': params_dict,
+                'process_time': process_time,
+                'timestamp': time.time()
+            }
+            
+            save_metadata(cache_meta_key, metadata)
+            save_to_cache(cache_key, result)
+            print(f"已缓存重参考结果: {cache_key}")
+            
+            return result
+        except Exception as e:
+            error_msg = f"重参考处理失败: {str(e)}"
+            print(error_msg)
+            import traceback
+            print(traceback.format_exc())  # 打印完整堆栈跟踪，帮助调试
+            raise ValueError(error_msg)
