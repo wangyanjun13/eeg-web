@@ -1,92 +1,55 @@
-INFO:     Started server process [321198]
+INFO:     Started server process [325093]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ✅ Redis连接成功
-INFO:     127.0.0.1:50702 - "GET /health HTTP/1.1" 200 OK
-INFO:     104.199.40.115:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     104.199.40.115:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     104.199.40.115:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     104.199.40.115:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     104.199.40.115:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     104.199.40.115:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48554 - "GET /health HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
+INFO:     144.48.80.21:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876 HTTP/1.1" 200 OK
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects HTTP/1.1" 200 OK
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/participants HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876 HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/info HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/01/filter HTTP/1.1" 200 OK
-接收到滤波请求: dataset_id=ds005876, subject_id=01
-滤波参数: {'highpass_filter': True, 'highpass': 1.0, 'lowpass_filter': True, 'lowpass': 40.0, 'notch_filter': True, 'line_freqs': [50.0, 60.0]}
-没有找到有效的缓存，执行滤波处理...
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-滤波处理完成，耗时: 2.81秒
-已缓存滤波结果: eeg:ds005876:01:filter
-INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/01/filter HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-找到事件文件: /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_events.tsv
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/events HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-找到事件文件: /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_events.tsv
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/events HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/01/reference HTTP/1.1" 200 OK
-接收到重参考请求: dataset_id=ds005876, subject_id=01
-重参考参数: {'reference': 'average', 'custom_ref_channels': [], 'channels': ['Fp1', 'F3', 'F7', 'FC5', 'FC1', 'FCz', 'C3', 'T7', 'TP9', 'CP5', 'CP1', 'Pz', 'P3', 'P7', 'O1', 'Oz', 'O2', 'P4', 'P8', 'TP10', 'CP6', 'CP2', 'CPz', 'Cz', 'C4', 'T8', 'FC6', 'FC2', 'F4', 'F8', 'AFz', 'Fp2'], 'time_range': [0.0, 10.0]}
-执行重参考处理: 方式=average
-处理前数据信息 - 通道数: 32, 时间点数: 10000
-通道 Fp1 数据 - 最小值: -19.12, 最大值: 46.35, 平均值: -0.00
-通道 F3 数据 - 最小值: -7.96, 最大值: 7.33, 平均值: -0.01
-通道 F7 数据 - 最小值: -20.87, 最大值: 22.93, 平均值: 0.02
-时间数据 - 开始: 0.000s, 结束: 9.999s, 数量: 10000
-执行平均参考，处理通道数: 32
-参考计算使用的通道: 32 个
-平均参考值 - 最小值: -8.33, 最大值: 7.07, 平均值: 0.02
-平均参考值部分样本: [-0.65942693 -0.67907934 -0.68231481 -0.6644828  -0.6220262 ]
-通道 Fp1 重参考后 - 最小值: -21.41(原-19.12), 最大值: 50.28(原46.35), 平均值: -0.02(原-0.00)
-通道 F3 重参考后 - 最小值: -7.05(原-7.96), 最大值: 10.26(原7.33), 平均值: -0.02(原-0.01)
-通道 F7 重参考后 - 最小值: -17.35(原-20.87), 最大值: 19.43(原22.93), 平均值: 0.01(原0.02)
-输出数据 - 通道数: 32, 时间点数: 10000
-时间范围: 0.000s 到 9.999s
-输出通道 Fp1 - 数据长度: 10000, 样本: [1.13, 1.22, ...]
-输出通道 F3 - 数据长度: 10000, 样本: [-0.33, -0.16, ...]
-使用传入的时间范围参数: [0.0, 10.0]
-重参考处理完成，耗时: 0.50秒
-已缓存重参考结果: eeg:ds005876:01:reference
-INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/01/reference HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/01/ica HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/info HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+找到事件文件: /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_events.tsv
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/events HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+找到事件文件: /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_events.tsv
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/events HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/02/ica HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
 开始执行ICA分析，方法: fastica, 组件数量: 15
 处理通道数量: 32
 Creating RawArray with float64 data, n_channels=32, n_times=10000
@@ -111,57 +74,35 @@ Designing a one-pass, zero-phase, non-causal highpass filter:
 尝试使用 fastica 方法创建ICA对象...
 Fitting ICA to data using 32 channels (please be patient, this may take a while)
 Selecting by number: 15 components
-/data/venv/lib/python3.10/site-packages/sklearn/decomposition/_fastica.py:127: ConvergenceWarning: FastICA did not converge. Consider increasing tolerance or the maximum number of iterations.
-  warnings.warn(
-Fitting ICA took 4.6s.
+Fitting ICA took 0.5s.
 自动检测眼动伪迹失败，将使用基于相关性的启发式方法: No EOG channel(s) found
 使用前额通道检测眼动伪迹: ['Fp1', 'F3', 'F7', 'FC5', 'FC1', 'FCz', 'FC6', 'FC2', 'F4', 'F8', 'AFz', 'Fp2']
-检测到可能的眼动伪迹组件: 0, 相关性: 0.944
-检测到可能的眼动伪迹组件: 1, 相关性: 0.831
-排除伪迹组件: [0, 1]
 Applying ICA to Raw instance
     Transforming to ICA space (15 components)
-    Zeroing out 2 ICA components
+    Zeroing out 0 ICA components
     Projecting back using 32 PCA components
-ICA处理完成，耗时: 5.55秒
-INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/01/ica HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-开始执行ICA分析，方法: infomax, 组件数量: 15
+ICA处理完成，耗时: 4.27秒
+INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/02/ica HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/02/artifacts HTTP/1.1" 200 OK
+接收到伪迹处理请求: dataset_id=ds005876, subject_id=02
+伪迹处理参数: {'remove_artifacts': True, 'artifact_detection_method': 'threshold', 'amplitude_threshold': 100.0, 'artifact_handling': 'interpolate', 'reject_by_annotation': True}
+开始执行伪迹处理，方法: threshold, 处理方式: interpolate
 处理通道数量: 32
-Creating RawArray with float64 data, n_channels=32, n_times=10000
-    Range : 0 ... 9999 =      0.000 ...     9.999 secs
-Ready.
-正在进行高通滤波以提高ICA效果（临时处理不影响原始数据）
-Filtering raw data in 1 contiguous segment
-Setting up high-pass filter at 1 Hz
-
-FIR filter parameters
----------------------
-Designing a one-pass, zero-phase, non-causal highpass filter:
-- Windowed time-domain design (firwin) method
-- Hamming window with 0.0194 passband ripple and 53 dB stopband attenuation
-- Lower passband edge: 1.00
-- Lower transition bandwidth: 1.00 Hz (-6 dB cutoff frequency: 0.50 Hz)
-- Filter length: 3301 samples (3.301 s)
-
-[Parallel(n_jobs=1)]: Done  17 tasks      | elapsed:    0.0s
-[Parallel(n_jobs=1)]: Done  32 out of  32 | elapsed:    0.0s finished
-使用组件数量: 15
-尝试使用 infomax 方法创建ICA对象...
-Fitting ICA to data using 32 channels (please be patient, this may take a while)
-Selecting by number: 15 components
-Computing Infomax ICA
-Fitting ICA took 2.2s.
-自动检测眼动伪迹失败，将使用基于相关性的启发式方法: No EOG channel(s) found
-使用前额通道检测眼动伪迹: ['Fp1', 'F3', 'F7', 'FC5', 'FC1', 'FCz', 'FC6', 'FC2', 'F4', 'F8', 'AFz', 'Fp2']
-检测到可能的眼动伪迹组件: 0, 相关性: 0.948
-检测到可能的眼动伪迹组件: 1, 相关性: 0.836
-排除伪迹组件: [0, 1]
-Applying ICA to Raw instance
-    Transforming to ICA space (15 components)
-    Zeroing out 2 ICA components
-    Projecting back using 32 PCA components
-ICA处理完成，耗时: 2.92秒
-INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/01/ica HTTP/1.1" 200 OK
+伪迹处理完成，耗时: 0.52秒
+INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/02/artifacts HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-02/eeg/sub-02_task-songfamiliarity_eeg.fdt
+Reading 0 ... 2036549  =      0.000 ...  2036.549 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/02/electrodes HTTP/1.1" 200 OK
+接收到伪迹处理请求: dataset_id=ds005876, subject_id=02
+伪迹处理参数: {'remove_artifacts': True, 'artifact_detection_method': 'threshold', 'amplitude_threshold': 100.0, 'artifact_handling': 'zero', 'reject_by_annotation': True}
+开始执行伪迹处理，方法: threshold, 处理方式: zero
+处理通道数量: 32
+伪迹处理完成，耗时: 0.49秒
+INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/02/artifacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33046 - "GET /health HTTP/1.1" 200 OK

@@ -254,106 +254,67 @@ EOF
     fi
 }
 
-# 构建前端生产版本（安全且可靠的方法）
+# 构建前端生产版本（简化且更可靠的方法）
 build_frontend() {
     echo "===== 构建前端生产版本 ====="
     echo "时间: $(date)"
     
-    # 检查是否以 root 用户运行
-    if [ "$EUID" -eq 0 ]; then
-        echo "检测到您正在使用 root 权限运行构建命令"
-        echo "为确保使用正确的 Node.js 版本，将使用临时目录构建方法"
+    # 检查磁盘空间
+    AVAILABLE_SPACE=$(df -m /tmp | awk 'NR==2 {print $4}')
+    if [ "$AVAILABLE_SPACE" -lt 1000 ]; then
+        echo "⚠️ 临时目录空间不足（只有 ${AVAILABLE_SPACE}MB），正在清理..."
+        # 清理临时文件
+        rm -rf /tmp/eeg-build-* 2>/dev/null || true
+        rm -rf /tmp/npm-* 2>/dev/null || true
+        rm -rf /tmp/v8-compile-cache-* 2>/dev/null || true
         
-        # 获取非 root 用户
-        ACTUAL_USER=$(logname 2>/dev/null || echo "${SUDO_USER:-${USER}}")
-        ACTUAL_HOME=$(eval echo ~$ACTUAL_USER)
+        # 清理npm缓存
+        npm cache clean --force
         
-        # 创建临时构建目录
-        BUILD_DIR="/tmp/eeg-build-$(date +%s)"
-        mkdir -p $BUILD_DIR
-        cp -r $FRONTEND_DIR/* $BUILD_DIR/
-        chown -R $ACTUAL_USER:$ACTUAL_USER $BUILD_DIR
+        # 再次检查空间
+        AVAILABLE_SPACE=$(df -m /tmp | awk 'NR==2 {print $4}')
+        echo "清理后可用空间: ${AVAILABLE_SPACE}MB"
+    fi
+    
+    # 检查前端dist目录
+    if [ -d "$FRONTEND_DIR/dist" ]; then
+        echo "备份现有的 dist 目录..."
+        mv $FRONTEND_DIR/dist $FRONTEND_DIR/dist.bak.$(date +%s)
+    fi
+    
+    # 直接在前端目录构建
+    echo "开始构建前端..."
+    cd $FRONTEND_DIR
+    
+    # 设置 npm 镜像
+    npm config set registry https://registry.npmmirror.com
+    
+    # 设置更大的内存限制
+    export NODE_OPTIONS="--max-old-space-size=4096"
+    
+    # 构建生产版本
+    echo "运行 npm run build..."
+    npm run build
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ 前端构建成功，输出目录: $FRONTEND_DIR/dist"
         
-        echo "使用用户 $ACTUAL_USER 的环境构建前端"
+        # 清理旧的备份（保留最新的3个）
+        echo "清理旧的备份文件..."
+        ls -td $FRONTEND_DIR/dist.bak.* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null || true
         
-        # 使用实际用户构建
-        su - $ACTUAL_USER -c "cd $BUILD_DIR && \
-            export NVM_DIR=\"$ACTUAL_HOME/.nvm\" && \
-            [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && \
-            npm config set registry https://registry.npmmirror.com && \
-            npm install && \
-            npm run build"
-        
-        BUILD_STATUS=$?
-        
-        if [ $BUILD_STATUS -eq 0 ]; then
-            echo "✅ 前端构建成功，复制构建结果..."
-            
-            # 如果 dist 目录存在，先备份
-            if [ -d "$FRONTEND_DIR/dist" ]; then
-                echo "备份现有的 dist 目录..."
-                mv $FRONTEND_DIR/dist $FRONTEND_DIR/dist.bak.$(date +%s)
-            fi
-            
-            # 复制构建结果
-            cp -r $BUILD_DIR/dist $FRONTEND_DIR/
-            echo "✅ 前端构建完成，输出目录: $FRONTEND_DIR/dist"
-            
-            # 清理临时目录
-            rm -rf $BUILD_DIR
-            return 0
-        else
-            echo "❌ 前端构建失败，请查看上面的错误信息"
-            rm -rf $BUILD_DIR
-            return 1
-        fi
+        return 0
     else
-        # 非 root 用户直接构建
-        echo "非 root 用户构建模式"
+        echo "❌ 前端构建失败"
         
-        # 设置 Node.js 环境
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        
-        # 检查 Node.js 版本
-        NODE_VERSION=$(node -v)
-        echo "使用 Node.js 版本: $NODE_VERSION"
-        
-        # 检查 Node.js 版本是否满足要求
-        if [[ "$NODE_VERSION" =~ ^v([0-9]+) ]] && [ "${BASH_REMATCH[1]}" -lt 14 ]; then
-            echo "⚠️ 警告: 当前 Node.js 版本 ($NODE_VERSION) 低于项目所需的最低版本 (v14.18.0)"
-            echo "尝试使用 nvm 切换到合适的版本..."
-            
-            if command -v nvm &> /dev/null; then
-                nvm use 14 2>/dev/null || nvm use 16 2>/dev/null || nvm use 18 2>/dev/null || true
-                NODE_VERSION=$(node -v)
-                echo "现在使用 Node.js 版本: $NODE_VERSION"
-            else
-                echo "⚠️ nvm 未安装或未正确配置，继续使用当前版本"
-            fi
+        # 尝试恢复备份
+        LATEST_BACKUP=$(ls -td $FRONTEND_DIR/dist.bak.* 2>/dev/null | head -n 1)
+        if [ -n "$LATEST_BACKUP" ]; then
+            echo "尝试恢复最近的备份: $LATEST_BACKUP"
+            mv $LATEST_BACKUP $FRONTEND_DIR/dist
         fi
         
-        # 进入前端目录
-        cd $FRONTEND_DIR
-        
-        # 设置 npm 镜像
-        npm config set registry https://registry.npmmirror.com
-        
-        # 安装依赖
-        echo "安装依赖..."
-        npm install
-        
-        # 构建生产版本
-        echo "构建生产版本..."
-        npm run build
-        
-        if [ $? -eq 0 ]; then
-            echo "✅ 前端构建成功，输出目录: $FRONTEND_DIR/dist"
-            return 0
-        else
-            echo "❌ 前端构建失败，请查看错误信息"
-            return 1
-        fi
+        return 1
     fi
 }
 
@@ -366,6 +327,7 @@ deploy_frontend() {
     build_frontend
     if [ $? -ne 0 ]; then
         echo "❌ 前端构建失败，部署中止"
+        echo "尝试手动构建: cd $FRONTEND_DIR && npm run build"
         return 1
     fi
     
@@ -401,7 +363,11 @@ deploy_frontend() {
         return 1
     fi
     
-    # 5. 显示部署完成信息
+    # 5. 执行健康检查
+    echo "执行健康检查..."
+    check_health_and_fix
+    
+    # 6. 显示部署完成信息
     echo "===== 前端部署完成 ====="
     echo "访问地址: https://eeg-visualization-platform.site"
     echo "检查服务状态: $0 status"
