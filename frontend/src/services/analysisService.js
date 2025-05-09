@@ -1,9 +1,9 @@
 import axios from 'axios';
 import api from './api';
 
-// 创建一个新的axios实例，使用相同的基础URL配置
+// 创建一个新的axios实例，使用完整URL用于外网访问
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: 'https://api.eeg-visualization-platform.site',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

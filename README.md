@@ -34,16 +34,13 @@
    ./eeg-service.sh logs
    ```
 
-## 前端代码更新流程 (简化版)
+## 前端代码更新流程
 
 每次修改前端代码后，只需一条命令即可完成构建、部署和配置更新：
 
 ```bash
+（  sudo chmod -R 777 /data/eeg-web/frontend/dist  ）
 sudo ./eeg-service.sh deploy
-```
-单独构建前端：
-```bash
-   sudo ./eeg-service.sh build
 ```
 
 这个命令将自动：
@@ -53,29 +50,30 @@ sudo ./eeg-service.sh deploy
 4. 更新 Cloudflared 隧道配置
 5. 完成所有必要的设置
 
-**注意**：必须使用 `sudo` 运行此命令，才能正确配置所有服务。
+单独构建前端：
+```bash
+sudo ./eeg-service.sh build
+```
 
-## Cloudflare 隧道管理
+## 后端代码更新流程
 
-1. **更新隧道配置**:
+1. **修改后端代码后重启服务**:
    ```bash
-   sudo ./eeg-service.sh update-cf prod
-   ```
-   _注: 此命令会自动重启 Cloudflared 服务_
-
-2. **检查隧道状态**:
-   ```bash
-   sudo systemctl status cloudflared
+   sudo ./eeg-service.sh restart-prod
    ```
 
-3. **查看隧道日志**:
+2. **安装新的Python依赖**:
+   如果添加了新的依赖，需要先安装然后再重启服务：
    ```bash
-   sudo journalctl -u cloudflared -n 50 --no-pager
+   sudo -E /data/venv/bin/python -m pip install 新依赖包名称==版本号
+   sudo ./eeg-service.sh restart-prod
    ```
 
-4. **手动重启隧道**（如果需要）:
+3. **更新requirements.txt**:
+   在添加新依赖后，记得更新requirements.txt文件：
    ```bash
-   sudo systemctl restart cloudflared
+   source /data/venv/bin/activate
+   pip freeze > backend/requirements.txt
    ```
 
 ## 常见问题解决
@@ -91,7 +89,28 @@ sudo ./eeg-service.sh deploy
    sudo ./eeg-service.sh deploy
    ```
 
-3. **中国网络访问问题**:
+3. **后端500错误**:
+   - 检查日志文件找出具体错误：
+     ```bash
+     tail -n 50 logs/backend.log
+     ```
+   - 如果是缺少依赖，安装相应的包：
+     ```bash
+     sudo -E /data/venv/bin/python -m pip install 缺少的包名==版本号
+     ```
+   - 重启后端服务：
+     ```bash
+     sudo ./eeg-service.sh restart-prod
+     ```
+
+4. **Python包安装问题**:
+   - 确保使用正确的虚拟环境安装包：
+     ```bash
+     sudo -E /data/venv/bin/python -m pip install 包名==版本号
+     ```
+   - 不要使用 `pip` 或 `pip3` 直接安装，而是使用 `python -m pip`
+
+5. **中国网络访问问题**:
    - 确保 Cloudflare 路由设置为亚太区域 (ap)
    - 如需手动修改, 登录 Cloudflare 控制台，在 "一步完成所有操作" > "网络" > "隧道" 中更新路由设置
 

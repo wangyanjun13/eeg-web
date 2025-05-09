@@ -159,23 +159,6 @@ server {
     listen 80;
     server_name localhost eeg-visualization-platform.site www.eeg-visualization-platform.site;
     
-    # CORS配置
-    add_header 'Access-Control-Allow-Origin' '*' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
-    add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
-    add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
-    
-    # 处理OPTIONS请求
-    if (\$request_method = 'OPTIONS') {
-        add_header 'Access-Control-Allow-Origin' '*';
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
-        add_header 'Access-Control-Max-Age' 1728000;
-        add_header 'Content-Type' 'text/plain; charset=utf-8';
-        add_header 'Content-Length' 0;
-        return 204;
-    }
-    
     # gzip 配置
     gzip on;
     gzip_min_length 1k;
@@ -187,7 +170,7 @@ server {
     location / {
         root $FRONTEND_DIR/dist;
         index index.html;
-        try_files \$uri \$uri/ /index.html;  # 支持前端路由
+        try_files \$uri \$uri/ /index.html;
     }
     
     # API 代理
@@ -195,7 +178,7 @@ server {
         proxy_pass http://localhost:8000/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
     }

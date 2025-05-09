@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// 在生产环境中始终使用API域名
+// 外网访问必须使用完整URL
 const API_BASE_URL = 'https://api.eeg-visualization-platform.site';
 
 // 创建 Axios 实例

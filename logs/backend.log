@@ -1,14 +1,18 @@
-INFO:     Started server process [292680]
+INFO:     Started server process [312459]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ✅ Redis连接成功
+INFO:     127.0.0.1:37032 - "GET /health HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
 INFO:     144.48.80.21:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
 INFO:     144.48.80.21:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
 INFO:     144.48.80.21:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/participants HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876 HTTP/1.1" 200 OK
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876 HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/participants HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/info HTTP/1.1" 200 OK
@@ -17,21 +21,10 @@ Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50588 - "OPTIONS /api/preprocess/ds005876/subjects/01/filter HTTP/1.1" 200 OK
-接收到滤波请求: dataset_id=ds005876, subject_id=01
-滤波参数: {'highpass_filter': True, 'highpass': 1.0, 'lowpass_filter': True, 'lowpass': 40.0, 'notch_filter': True, 'line_freqs': [50.0, 60.0]}
-找到有效的滤波缓存: eeg:ds005876:01:filter
-INFO:     127.0.0.1:50588 - "POST /api/preprocess/ds005876/subjects/01/filter HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
@@ -42,123 +35,51 @@ Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
 找到事件文件: /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_events.tsv
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/events HTTP/1.1" 200 OK
-找到事件文件: /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_events.tsv
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/events HTTP/1.1" 200 OK
-找到事件文件: /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_events.tsv
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/events HTTP/1.1" 200 OK
-找到事件文件: /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_events.tsv
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/events HTTP/1.1" 200 OK
-INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/01/segment HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/01/segment HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50602 - "OPTIONS /api/preprocess/ds005876/subjects/01/bad_channels HTTP/1.1" 200 OK
-执行坏通道检测和处理
-开始坏通道检测: 方法=correlation, 自定义阈值=None
-通道 Fp1 的平均相关性: -0.0574
-通道 F3 的平均相关性: 0.2754
-通道 F7 的平均相关性: 0.3141
-通道 FC5 的平均相关性: 0.4127
-通道 FC1 的平均相关性: 0.3826
-通道 FCz 的平均相关性: 0.2799
-通道 C3 的平均相关性: 0.4830
-通道 T7 的平均相关性: 0.4523
-通道 TP9 的平均相关性: 0.4958
-通道 CP5 的平均相关性: 0.5371
-通道 CP1 的平均相关性: 0.5410
-通道 Pz 的平均相关性: 0.5297
-通道 P3 的平均相关性: 0.5476
-通道 P7 的平均相关性: 0.5333
-通道 O1 的平均相关性: 0.5430
-通道 Oz 的平均相关性: 0.5492
-通道 O2 的平均相关性: 0.5437
-通道 P4 的平均相关性: 0.5141
-通道 P8 的平均相关性: 0.5404
-通道 TP10 的平均相关性: 0.4926
-通道 CP6 的平均相关性: 0.5319
-通道 CP2 的平均相关性: 0.5111
-通道 CPz 的平均相关性: 0.5253
-通道 Cz 的平均相关性: 0.4792
-通道 C4 的平均相关性: 0.4742
-通道 T8 的平均相关性: 0.4908
-通道 FC6 的平均相关性: 0.3856
-通道 FC2 的平均相关性: 0.3436
-通道 F4 的平均相关性: 0.1149
-通道 F8 的平均相关性: 0.1361
-通道 AFz 的平均相关性: -0.0182
-通道 Fp2 的平均相关性: -0.1120
-检测到坏通道(相关性方法): Fp1, 相关性值: -0.0574
-检测到坏通道(相关性方法): F4, 相关性值: 0.1149
-检测到坏通道(相关性方法): F8, 相关性值: 0.1361
-检测到坏通道(相关性方法): AFz, 相关性值: -0.0182
-检测到坏通道(相关性方法): Fp2, 相关性值: -0.1120
-检测到 5 个坏通道: ['Fp1', 'F4', 'F8', 'AFz', 'Fp2']
-检测到 5 个坏通道: Fp1, F4, F8, AFz, Fp2
-坏通道处理完成，耗时: 0.12秒
-已缓存坏通道处理结果: eeg:ds005876:01:bad_channels
-INFO:     127.0.0.1:50610 - "POST /api/preprocess/ds005876/subjects/01/bad_channels HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:33402 - "OPTIONS /api/preprocess/ds005876/subjects/01/reference HTTP/1.1" 200 OK
-接收到重参考请求: dataset_id=ds005876, subject_id=01
-重参考参数: {'reference': 'average', 'custom_ref_channels': [], 'channels': ['Fp1', 'F3', 'F7', 'FC5', 'FC1', 'FCz', 'C3', 'T7', 'TP9', 'CP5', 'CP1', 'Pz', 'P3', 'P7', 'O1', 'Oz', 'O2', 'P4', 'P8', 'TP10', 'CP6', 'CP2', 'CPz', 'Cz', 'C4', 'T8', 'FC6', 'FC2', 'F4', 'F8', 'AFz', 'Fp2'], 'time_range': [0.0, 5.0]}
-执行重参考处理: 方式=average
-处理前数据信息 - 通道数: 32, 时间点数: 2500
-通道 Fp1 数据 - 最小值: -18.87, 最大值: 46.44, 平均值: -0.00
-通道 F3 数据 - 最小值: -7.92, 最大值: 7.33, 平均值: -0.01
-通道 F7 数据 - 最小值: -20.86, 最大值: 22.91, 平均值: 0.02
-时间数据 - 开始: 0.000s, 结束: 9.996s, 数量: 2500
-执行平均参考，处理通道数: 32
-参考计算使用的通道: 32 个
-平均参考值 - 最小值: -8.35, 最大值: 7.10, 平均值: 0.02
-平均参考值部分样本: [-0.43266322 -0.68554535 -0.16130968  0.55373863  1.36209084]
-通道 Fp1 重参考后 - 最小值: -21.18(原-18.87), 最大值: 50.42(原46.44), 平均值: -0.02(原-0.00)
-通道 F3 重参考后 - 最小值: -7.03(原-7.92), 最大值: 10.29(原7.33), 平均值: -0.02(原-0.01)
-通道 F7 重参考后 - 最小值: -17.34(原-20.86), 最大值: 19.42(原22.91), 平均值: 0.01(原0.02)
-输出数据 - 通道数: 32, 时间点数: 2500
-时间范围: 0.000s 到 9.996s
-输出通道 Fp1 - 数据长度: 2500, 样本: [0.75, 1.52, ...]
-输出通道 F3 - 数据长度: 2500, 样本: [-0.13, 0.19, ...]
-使用传入的时间范围参数: [0.0, 5.0]
-重参考处理完成，耗时: 0.13秒
-已缓存重参考结果: eeg:ds005876:01:reference
-INFO:     127.0.0.1:33402 - "POST /api/preprocess/ds005876/subjects/01/reference HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
-接收到重参考请求: dataset_id=ds005876, subject_id=01
-重参考参数: {'reference': 'custom', 'custom_ref_channels': ['Fp1'], 'channels': ['Fp1', 'F3', 'F7', 'FC5', 'FC1', 'FCz', 'C3', 'T7', 'TP9', 'CP5', 'CP1', 'Pz', 'P3', 'P7', 'O1', 'Oz', 'O2', 'P4', 'P8', 'TP10', 'CP6', 'CP2', 'CPz', 'Cz', 'C4', 'T8', 'FC6', 'FC2', 'F4', 'F8', 'AFz', 'Fp2'], 'time_range': [0.0, 5.0]}
-执行重参考处理: 方式=custom
-处理前数据信息 - 通道数: 32, 时间点数: 2500
-通道 Fp1 数据 - 最小值: -18.87, 最大值: 46.44, 平均值: -0.00
-通道 F3 数据 - 最小值: -7.92, 最大值: 7.33, 平均值: -0.01
-通道 F7 数据 - 最小值: -20.86, 最大值: 22.91, 平均值: 0.02
-时间数据 - 开始: 0.000s, 结束: 9.996s, 数量: 2500
-使用自定义参考通道: ['Fp1']
-自定义参考值 - 最小值: -18.87, 最大值: 46.44
-自定义参考值部分样本: [0.32219023 0.83834126 1.10197037 1.2504285  1.00042292]
-自定义参考完成，处理了 31 个通道
-输出数据 - 通道数: 32, 时间点数: 2500
-时间范围: 0.000s 到 9.996s
-输出通道 Fp1 - 数据长度: 2500, 样本: [0.32, 0.84, ...]
-输出通道 F3 - 数据长度: 2500, 样本: [-0.89, -1.33, ...]
-使用传入的时间范围参数: [0.0, 5.0]
-重参考处理完成，耗时: 0.12秒
-已缓存重参考结果: eeg:ds005876:01:reference
-INFO:     127.0.0.1:33406 - "POST /api/preprocess/ds005876/subjects/01/reference HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
-Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
-INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
+INFO:     144.48.80.21:0 - "OPTIONS /api/preprocess/ds005876/subjects/01/ica HTTP/1.1" 200 OK
+开始执行ICA分析，方法: fastica, 组件数量: 15
+处理通道数量: 32
+Creating RawArray with float64 data, n_channels=32, n_times=10000
+    Range : 0 ... 9999 =      0.000 ...     9.999 secs
+Ready.
+正在进行高通滤波以提高ICA效果（临时处理不影响原始数据）
+Filtering raw data in 1 contiguous segment
+Setting up high-pass filter at 1 Hz
+
+FIR filter parameters
+---------------------
+Designing a one-pass, zero-phase, non-causal highpass filter:
+- Windowed time-domain design (firwin) method
+- Hamming window with 0.0194 passband ripple and 53 dB stopband attenuation
+- Lower passband edge: 1.00
+- Lower transition bandwidth: 1.00 Hz (-6 dB cutoff frequency: 0.50 Hz)
+- Filter length: 3301 samples (3.301 s)
+
+[Parallel(n_jobs=1)]: Done  17 tasks      | elapsed:    0.0s
+[Parallel(n_jobs=1)]: Done  32 out of  32 | elapsed:    0.0s finished
+使用组件数量: 15
+Fitting ICA to data using 32 channels (please be patient, this may take a while)
+Selecting by number: 15 components
+Fitting ICA took 1.6s.
+自动检测眼动伪迹失败，将使用基于相关性的启发式方法: No EOG channel(s) found
+使用前额通道检测眼动伪迹: ['Fp1', 'F3', 'F7', 'FC5', 'FC1', 'FCz', 'FC6', 'FC2', 'F4', 'F8', 'AFz', 'Fp2']
+Applying ICA to Raw instance
+    Transforming to ICA space (15 components)
+    Zeroing out 0 ICA components
+    Projecting back using 32 PCA components
+ICA处理完成，耗时: 2.61秒
+INFO:     144.48.80.21:0 - "POST /api/preprocess/ds005876/subjects/01/ica HTTP/1.1" 200 OK
 Reading /data/eeg_samples/ds005876/sub-01/eeg/sub-01_task-songfamiliarity_eeg.fdt
 Reading 0 ... 1807099  =      0.000 ...  1807.099 secs...
 INFO:     144.48.80.21:0 - "GET /api/datasets/ds005876/subjects/01/electrodes HTTP/1.1" 200 OK
