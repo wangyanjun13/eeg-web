@@ -91,6 +91,9 @@ const applyICA = async () => {
     if (!channels || channels.length === 0) {
       throw new Error('没有可用的处理通道');
     }
+    
+    // 确保在ICA参数中更新当前处理通道
+    props.preprocessParams.ica.channels = channels;
 
     console.log('ICA参数:', {
       ...props.preprocessParams.ica,
@@ -146,11 +149,7 @@ const icaMethodDescriptions = {
   },
   infomax: {
     name: "InfoMax",
-    description: "最大化信息熵的算法，对非高斯信号分离效果好"
-  },
-  "extended-infomax": {
-    name: "Extended-InfoMax",
-    description: "InfoMax扩展版，可处理超高斯和亚高斯信号"
+    description: "最大化信息熵的算法，对非高斯信号分离效果好，稳定性高"
   }
 };
 
@@ -185,7 +184,6 @@ initializeDefaults();
           <el-select v-model="preprocessParams.ica.ica_method" size="small" style="width: 100%">
             <el-option label="FastICA（快速）" value="fastica" />
             <el-option label="InfoMax（高精度）" value="infomax" />
-            <el-option label="Extended-InfoMax（增强）" value="extended-infomax" />
           </el-select>
           <div class="method-description" v-if="currentMethodDescription">
             <small>{{ currentMethodDescription }}</small>
@@ -257,11 +255,8 @@ initializeDefaults();
             <li>
               <strong>InfoMax</strong>: 精度高，适合复杂信号
             </li>
-            <li>
-              <strong>Extended-InfoMax</strong>: 增强版，适合复杂伪迹
-            </li>
           </ul>
-          <p class="tip">提示: 对于常规EEG数据，FastICA通常足够</p>
+          <p class="tip">提示: 对于常规EEG数据，InfoMax通常效果最好且稳定性高</p>
         </div>
       </template>
       

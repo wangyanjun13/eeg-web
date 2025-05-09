@@ -32,8 +32,8 @@ class ICAParams(BaseModel):
         run_ica: 是否执行ICA分析
         ica_method: ICA方法，可选值:
             - "fastica": 快速ICA算法，计算效率高
-            - "infomax": 最大化信息熵的ICA算法，适合非高斯信号
-            - "extended-infomax": 扩展的InfoMax算法，可处理超高斯和亚高斯信号
+            - "infomax": 最大化信息熵的ICA算法，适合非高斯信号，稳定性高
+            - "picard": 预条件型ICA算法，适合复杂EEG信号
         n_components: ICA组件数量，通常为通道数的60%-80%，None表示自动计算(70%通道数)
         auto_detect_artifacts: 是否自动检测眼动等伪迹组件
         channels: 可选，要执行ICA的通道列表，默认使用所有EEG通道
