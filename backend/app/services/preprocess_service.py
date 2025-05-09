@@ -148,8 +148,8 @@ class PreprocessService:
             if params.n_components is not None and params.n_components <= 0:
                 raise ValueError("ICA组件数量必须大于0")
             
-            # 检查ICA方法
-            valid_methods = ["fastica", "infomax", "extended-infomax"]
+            # 检查ICA方法 - 注意: MNE支持的方法可能随版本变化
+            valid_methods = ["fastica", "infomax", "picard"]
             if params.ica_method not in valid_methods:
                 raise ValueError(f"不支持的ICA方法: {params.ica_method}，可用方法: {', '.join(valid_methods)}")
                 
@@ -243,31 +243,54 @@ class PreprocessService:
                 # 运行ICA
                 from mne.preprocessing import ICA
                 
-                # 不同ICA方法的处理
+                # 不同ICA方法的映射
                 method_map = {
                     "fastica": "fastica",
                     "infomax": "infomax",
-                    "extended-infomax": "extended-infomax"
+                    "picard": "picard"
                 }
                 
-                # 创建ICA对象
-                ica = ICA(
-                    n_components=n_components,
-                    method=method_map[params.ica_method],
-                    random_state=42  # 固定随机种子以保证结果可重复
-                )
+                # 获取实际使用的方法
+                actual_method = method_map.get(params.ica_method)
+                
+                # 向后兼容处理：如果用户请求了已移除的extended-infomax方法，回退到infomax
+                if params.ica_method == "extended-infomax" or actual_method is None:
+                    print(f"请求的方法 '{params.ica_method}' 不再支持或无效，回退到使用 'infomax' 方法")
+                    actual_method = "infomax"
+                
+                # 创建ICA对象 - 添加错误处理
+                try:
+                    print(f"尝试使用 {actual_method} 方法创建ICA对象...")
+                    ica = ICA(
+                        n_components=n_components,
+                        method=actual_method,
+                        random_state=42  # 固定随机种子以保证结果可重复
+                    )
+                except ValueError as e:
+                    # 如果指定方法失败，尝试回退到infomax
+                    if actual_method != "infomax":
+                        print(f"方法 {actual_method} 创建失败: {str(e)}，尝试回退到infomax")
+                        actual_method = "infomax"
+                        ica = ICA(
+                            n_components=n_components,
+                            method=actual_method,
+                            random_state=42
+                        )
+                    else:
+                        raise
                 
                 # 拟合ICA
                 ica.fit(raw_for_ica)
                 
                 # 自动检测眼动伪迹
                 excluded_components = []
+                eog_scores = []
                 if params.auto_detect_artifacts:
                     try:
                         # 尝试使用EOG通道自动检测眼动伪迹
                         eog_indices, eog_scores = ica.find_bads_eog(raw_for_ica)
                         if eog_indices:
-                            print(f"自动检测到眼动伪迹组件: {eog_indices}")
+                            print(f"自动检测到眼动伪迹组件: {eog_indices}，相关分数: {[round(score, 3) for score in eog_scores]}")
                             excluded_components.extend(eog_indices)
                     except Exception as e:
                         print(f"自动检测眼动伪迹失败，将使用基于相关性的启发式方法: {str(e)}")
@@ -335,6 +358,7 @@ class PreprocessService:
                 # 添加ICA处理信息
                 ica_info = {
                     "method": params.ica_method,
+                    "actual_method": getattr(ica, 'method', actual_method),  # 记录实际使用的方法
                     "n_components": n_components,
                     "excluded_components": excluded_components
                 }

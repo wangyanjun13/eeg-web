@@ -1,1 +1,0 @@
-import{_ as t,o as a,c as _,w as n,A as o,a as e}from"./index-633a0f38.js";const c={__name:"UserSettings",setup(p){return(r,s)=>(a(),_(o,null,{default:n(()=>s[0]||(s[0]=[e("div",{class:"settings-container"},[e("h1",{class:"page-title"},"用户设置"),e("p",{class:"page-description"},"此页面正在开发中，敬请期待！")],-1)])),_:1}))}},l=t(c,[["__scopeId","data-v-61829e83"]]);export{l as default};

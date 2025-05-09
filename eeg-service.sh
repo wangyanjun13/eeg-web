@@ -32,6 +32,7 @@ show_help() {
     echo "  build           - 构建前端生产版本"
     echo "  deploy          - 一键部署前端更新"
     echo "  nginx-setup     - 设置Nginx配置文件"
+    echo "  health          - 执行健康检查"
     echo "  help            - 显示帮助信息"
 }
 
@@ -132,6 +133,11 @@ start_services() {
     
     # 确认服务
     check_running_status
+    
+    # 添加健康检查
+    echo "执行健康检查..."
+    sleep 3
+    check_health_and_fix
     
     # 显示访问信息
     echo "===== 服务启动完成 ====="
@@ -545,11 +551,100 @@ stop_services() {
         fuser -k 5174/tcp 2>/dev/null || true
         fuser -k 5175/tcp 2>/dev/null || true
         fuser -k 5176/tcp 2>/dev/null || true
+        
+        # 确保端口8000释放
+        echo "确保后端端口8000已释放..."
+        fuser -k 8000/tcp 2>/dev/null || true
+        
+        # 等待端口完全释放
+        sleep 3
     fi
     
     if [ "$1" != "quiet" ]; then
         echo "所有服务已停止"
     fi
+}
+
+# 添加健康检查函数
+check_health_and_fix() {
+    echo "===== 健康检查与自动修复 ====="
+    echo "时间: $(date)"
+    
+    # 检查后端健康
+    if ! curl -s http://localhost:8000/health > /dev/null 2>&1; then
+        echo "⚠️ 后端服务不可用，尝试重启..."
+        
+        # 停止后端
+        pkill -f "uvicorn app.main:app" 2>/dev/null || true
+        fuser -k 8000/tcp 2>/dev/null || true
+        sleep 2
+        
+        # 重启后端
+        cd $BACKEND_DIR
+        echo "重启后端服务..."
+        (setsid $VENV_PATH/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > $LOG_DIR/backend.log 2>&1 </dev/null) &
+        BACKEND_PID=$!
+        echo $BACKEND_PID > $LOG_DIR/backend.pid
+        echo "后端服务已重启，PID: $BACKEND_PID"
+        
+        # 等待后端启动
+        echo "等待后端服务启动..."
+        sleep 5
+        
+        # 再次检查
+        if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+            echo "✅ 后端服务已恢复"
+        else
+            echo "❌ 后端服务恢复失败，请检查日志"
+        fi
+    else
+        echo "✅ 后端服务正常"
+    fi
+    
+    # 检查Nginx状态
+    if ! systemctl is-active nginx > /dev/null; then
+        echo "⚠️ Nginx服务不可用，尝试重启..."
+        sudo systemctl restart nginx
+        sleep 2
+        
+        if systemctl is-active nginx > /dev/null; then
+            echo "✅ Nginx服务已恢复"
+        else
+            echo "❌ Nginx服务恢复失败，请检查日志"
+        fi
+    else
+        echo "✅ Nginx服务正常"
+    fi
+    
+    # 检查Cloudflared状态
+    if ! systemctl is-active cloudflared > /dev/null; then
+        echo "⚠️ Cloudflared服务不可用，尝试重启..."
+        sudo systemctl restart cloudflared
+        sleep 5
+        
+        if systemctl is-active cloudflared > /dev/null; then
+            echo "✅ Cloudflared服务已恢复"
+        else
+            echo "❌ Cloudflared服务恢复失败，请检查日志"
+            echo "尝试强制重启Cloudflared..."
+            sudo systemctl stop cloudflared
+            sleep 2
+            sudo pkill -f cloudflared
+            sleep 2
+            sudo systemctl start cloudflared
+            sleep 5
+            
+            if systemctl is-active cloudflared > /dev/null; then
+                echo "✅ Cloudflared服务已通过强制重启恢复"
+            else
+                echo "❌ Cloudflared服务强制重启失败"
+            fi
+        fi
+    else
+        echo "✅ Cloudflared服务正常"
+    fi
+    
+    echo "健康检查完成"
 }
 
 # 检查状态
@@ -713,6 +808,10 @@ case "$1" in
         ;;
     nginx-setup)
         setup_nginx
+        ;;
+    health)
+        # 新增健康检查命令
+        check_health_and_fix
         ;;
     help|--help|-h)
         show_help
