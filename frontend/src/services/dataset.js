@@ -56,6 +56,12 @@ export const datasetService = {
     });
   },
   
+  // 获取事件信息
+  getEvents(datasetId, subjectId) {
+    console.log(`获取事件信息: datasetId=${datasetId}, subjectId=${subjectId}`);
+    return api.get(`/api/datasets/${datasetId}/subjects/${subjectId}/events`);
+  },
+  
   // 获取参与者信息
   getParticipantsInfo(datasetId) {
     return api.get(`/api/datasets/${datasetId}/participants`);

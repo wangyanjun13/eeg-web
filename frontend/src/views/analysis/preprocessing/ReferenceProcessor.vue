@@ -169,9 +169,9 @@ const selectChannels = () => {
     <el-form label-position="left" label-width="80px" class="compact-form">
       <el-form-item label="参考方式">
         <el-radio-group v-model="preprocessParams.reference.reference">
-          <el-radio label="average">平均参考</el-radio>
-          <el-radio label="mastoids">双侧乳突参考</el-radio>
-          <el-radio label="custom">自定义参考</el-radio>
+          <el-radio :value="'average'">平均参考</el-radio>
+          <el-radio :value="'mastoids'">双侧乳突参考</el-radio>
+          <el-radio :value="'custom'">自定义参考</el-radio>
         </el-radio-group>
       </el-form-item>
       

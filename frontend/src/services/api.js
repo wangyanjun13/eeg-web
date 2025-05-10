@@ -9,7 +9,9 @@ const api = axios.create({
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  // 修改withCredentials设置，解决CORS问题
+  withCredentials: false
 });
 
 // 请求拦截器
@@ -61,5 +63,10 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// 直接配置全局axios实例，确保所有请求都使用相同的配置
+axios.defaults.baseURL = API_BASE_URL;
+axios.defaults.timeout = 30000;
+axios.defaults.withCredentials = false;
 
 export default api; 

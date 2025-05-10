@@ -553,7 +553,107 @@ const analysisService = {
    * @returns {Promise<Object>} - 分析结果
    */
   performTimeAnalysis(datasetId, subjectId, params) {
-    return api.post(`/api/analysis/time/${datasetId}/${subjectId}`, params);
+    // 检查是否有预处理数据
+    try {
+      console.log('performTimeAnalysis开始，检查是否有预处理数据');
+      const preprocessedData = localStorage.getItem('preprocessed_data');
+      if (preprocessedData) {
+        console.log('在localStorage中找到了preprocessed_data');
+        const parsedData = JSON.parse(preprocessedData);
+        console.log('预处理数据基本信息:', {
+          datasetId: parsedData.datasetId,
+          subjectId: parsedData.subjectId,
+          timestamp: parsedData.timestamp,
+          hasData: !!parsedData.data,
+          metadata: parsedData.metadata
+        });
+        
+        // 检查数据是否匹配当前的数据集和受试者
+        if (parsedData.datasetId === datasetId && 
+            parsedData.subjectId === subjectId) {
+          console.log('预处理数据匹配当前数据集和受试者');
+          
+          // 检查数据是否过期（24小时）
+          const dataAge = Date.now() - parsedData.timestamp;
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          
+          if (dataAge < oneDayMs) {
+            console.log('使用预处理后的数据进行时域分析，数据有效期内', {
+              dataAge,
+              oneDayMs,
+              dataChannels: parsedData.data?.channels?.length || 0
+            });
+            
+            // 将完整的预处理数据添加到参数中
+            params.use_preprocessed_data = true;
+            params.preprocessed_data = parsedData.data;
+            console.log('已将预处理数据添加到请求参数中');
+            
+            // 如果预处理数据中有时间范围，使用它来自动设置时间窗口和基线
+            if (parsedData.data.timeRange && Array.isArray(parsedData.data.timeRange) && parsedData.data.timeRange.length === 2) {
+              const [startTime, endTime] = parsedData.data.timeRange;
+              console.log('预处理数据包含时间范围:', [startTime, endTime]);
+              
+              // 如果没有明确设置时间窗口，就使用预处理数据的时间范围
+              if (!params.timeWindow) {
+                params.timeWindow = [...parsedData.data.timeRange];
+                console.log('使用预处理数据中的时间范围作为时间窗口:', params.timeWindow);
+              }
+              
+              // 如果没有明确设置基线，且起始时间是负值，自动设置基线区间
+              if (!params.baseline && startTime < 0) {
+                params.baseline = [startTime, 0]; // 基线区间从起始时间到事件发生时刻
+                console.log('自动设置基线校正区间:', params.baseline);
+              }
+            }
+          } else {
+            // 数据已过期，从localStorage中移除
+            console.log('预处理数据已过期，将被移除', { dataAge, oneDayMs });
+            localStorage.removeItem('preprocessed_data');
+            
+            // 提示用户数据已过期
+            const expiredTime = new Date(parsedData.timestamp);
+            throw new Error(`预处理数据已过期（超过24小时）。创建时间: ${expiredTime.toLocaleString()}`);
+          }
+        } else {
+          console.log('预处理数据不匹配当前数据集/受试者', {
+            expected: { datasetId, subjectId },
+            actual: { datasetId: parsedData.datasetId, subjectId: parsedData.subjectId }
+          });
+        }
+      } else {
+        console.log('localStorage中没有找到preprocessed_data');
+      }
+    } catch (e) {
+      console.warn('读取预处理数据失败', e);
+    }
+    
+    // 确保baseline参数格式正确
+    if (params.baseline && !Array.isArray(params.baseline)) {
+      console.warn('baseline参数不是数组格式，进行转换');
+      if (params.baseline.enabled) {
+        params.baseline = [params.baseline.start / 1000, params.baseline.end / 1000];
+      } else {
+        params.baseline = null;
+      }
+    }
+    
+    // 确保timeWindow参数格式正确
+    if (params.timeWindow && !Array.isArray(params.timeWindow)) {
+      console.warn('timeWindow参数不是数组格式，进行转换');
+      params.timeWindow = [params.timeWindow.start / 1000, params.timeWindow.end / 1000];
+    }
+    
+    console.log('发送时域分析请求到后端', {
+      url: `/api/analysis/${datasetId}/subjects/${subjectId}/erp`,
+      usePreprocessedData: params.use_preprocessed_data,
+      hasPreprocessedData: !!params.preprocessed_data,
+      baseline: params.baseline,
+      timeWindow: params.timeWindow,
+      events: params.events
+    });
+    
+    return api.post(`/api/analysis/${datasetId}/subjects/${subjectId}/erp`, params);
   },
 
   /**
@@ -564,7 +664,38 @@ const analysisService = {
    * @returns {Promise<Object>} - 分析结果
    */
   performFrequencyAnalysis(datasetId, subjectId, params) {
-    return api.post(`/api/analysis/frequency/${datasetId}/${subjectId}`, params);
+    // 检查是否有预处理数据
+    try {
+      const preprocessedData = localStorage.getItem('preprocessed_data');
+      if (preprocessedData) {
+        const parsedData = JSON.parse(preprocessedData);
+        
+        // 检查数据是否匹配当前的数据集和受试者
+        if (parsedData.datasetId === datasetId && 
+            parsedData.subjectId === subjectId) {
+          
+          // 检查数据是否过期（24小时）
+          const dataAge = Date.now() - parsedData.timestamp;
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          
+          if (dataAge < oneDayMs) {
+            console.log('使用预处理后的数据进行频域分析');
+            
+            // 将完整的预处理数据添加到参数中
+            params.use_preprocessed_data = true;
+            params.preprocessed_data = parsedData.data;
+          } else {
+            // 数据已过期，从localStorage中移除
+            console.log('预处理数据已过期，将被移除');
+            localStorage.removeItem('preprocessed_data');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('读取预处理数据失败', e);
+    }
+    
+    return api.post(`/api/analysis/${datasetId}/subjects/${subjectId}/time_freq`, params);
   },
 
   /**
@@ -575,7 +706,38 @@ const analysisService = {
    * @returns {Promise<Object>} - 分析结果
    */
   performSpatialAnalysis(datasetId, subjectId, params) {
-    return api.post(`/api/analysis/spatial/${datasetId}/${subjectId}`, params);
+    // 检查是否有预处理数据
+    try {
+      const preprocessedData = localStorage.getItem('preprocessed_data');
+      if (preprocessedData) {
+        const parsedData = JSON.parse(preprocessedData);
+        
+        // 检查数据是否匹配当前的数据集和受试者
+        if (parsedData.datasetId === datasetId && 
+            parsedData.subjectId === subjectId) {
+          
+          // 检查数据是否过期（24小时）
+          const dataAge = Date.now() - parsedData.timestamp;
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          
+          if (dataAge < oneDayMs) {
+            console.log('使用预处理后的数据进行空间分析');
+            
+            // 将完整的预处理数据添加到参数中
+            params.use_preprocessed_data = true;
+            params.preprocessed_data = parsedData.data;
+          } else {
+            // 数据已过期，从localStorage中移除
+            console.log('预处理数据已过期，将被移除');
+            localStorage.removeItem('preprocessed_data');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('读取预处理数据失败', e);
+    }
+    
+    return api.post(`/api/analysis/${datasetId}/subjects/${subjectId}/connectivity`, params);
   },
 
   /**
@@ -590,35 +752,216 @@ const analysisService = {
   },
 
   /**
-   * 获取时域分析示例数据（用于开发和测试）
+   * 获取时域分析示例数据
    * @returns {Promise<Object>} - 示例数据
    */
   getTimeAnalysisExample() {
-    return api.get(`/api/analysis/examples/time`);
+    return api.get('/api/analysis/examples/time');
   },
 
   /**
-   * 获取频域分析示例数据（用于开发和测试）
+   * 获取频域分析示例数据
    * @returns {Promise<Object>} - 示例数据
    */
   getFrequencyAnalysisExample() {
-    return api.get(`/api/analysis/examples/frequency`);
+    return api.get('/api/analysis/examples/frequency');
   },
 
   /**
-   * 获取空间分析示例数据（用于开发和测试）
+   * 获取空间分析示例数据
    * @returns {Promise<Object>} - 示例数据
    */
   getSpatialAnalysisExample() {
-    return api.get(`/api/analysis/examples/spatial`);
+    return api.get('/api/analysis/examples/spatial');
   },
 
   /**
-   * 获取高级分析示例数据（用于开发和测试）
-   * @returns {Promise<Object>} - 示例数据
+   * 运行时域分析
+   * @param {Object} params - 分析参数，包含datasetId, subjectId, baseline, timeWindow, events等
+   * @returns {Promise<Object>} - 分析结果
    */
-  getAdvancedAnalysisExample() {
-    return api.get(`/api/analysis/examples/advanced`);
+  async runTimeAnalysis(params) {
+    try {
+      console.log('发送时域分析请求，参数:', params);
+      
+      // 确保参数完整
+      if (!params.datasetId || !params.subjectId) {
+        throw new Error('缺少必要的数据集和受试者ID参数');
+      }
+      
+      // 检查并转换参数
+      if (params.baseline && !Array.isArray(params.baseline)) {
+        console.log('baseline参数不是数组格式，正在转换...');
+        if (typeof params.baseline === 'object' && params.baseline.hasOwnProperty('enabled')) {
+          params.baseline = params.baseline.enabled 
+            ? [params.baseline.start / 1000, params.baseline.end / 1000] 
+            : null;
+        } else {
+          console.warn('baseline参数格式不规范，设置为默认值');
+          params.baseline = [-0.2, 0];
+        }
+      }
+      
+      if (params.timeWindow && !Array.isArray(params.timeWindow)) {
+        console.log('timeWindow参数不是数组格式，正在转换...');
+        if (typeof params.timeWindow === 'object') {
+          params.timeWindow = [params.timeWindow.start / 1000, params.timeWindow.end / 1000];
+        } else {
+          console.warn('timeWindow参数格式不规范，设置为默认值');
+          params.timeWindow = [-0.2, 0.8];
+        }
+      }
+      
+      // 确保事件列表存在且是数组
+      if (!params.events || !Array.isArray(params.events) || params.events.length === 0) {
+        console.warn('events参数为空或不是数组，尝试获取预处理数据中的事件');
+        
+        // 尝试从预处理数据中获取事件
+        const preprocessedData = localStorage.getItem('preprocessed_data');
+        if (preprocessedData) {
+          try {
+            const parsedData = JSON.parse(preprocessedData);
+            if (parsedData.data && parsedData.datasetId === params.datasetId && 
+                parsedData.subjectId === params.subjectId) {
+              
+              // 检查是否有时间范围，用于过滤事件
+              const timeRange = params.timeWindow || parsedData.data.timeRange;
+              console.log('时间窗口范围:', timeRange);
+              
+              if (parsedData.data.events) {
+                let eventList = [];
+                
+                // 处理不同格式的事件数据
+                if (Array.isArray(parsedData.data.events)) {
+                  // 数组格式的事件列表
+                  console.log('预处理数据中的事件是数组格式, 总数:', parsedData.data.events.length);
+                  
+                  // 先检查事件结构
+                  const sampleEvent = parsedData.data.events[0];
+                  console.log('事件数据结构样例:', sampleEvent);
+                  
+                  // 如果事件有时间信息且有时间范围，进行过滤
+                  if (timeRange && parsedData.data.events.some(e => e.time !== undefined || e.latency !== undefined || e.onset !== undefined)) {
+                    console.log(`根据时间范围 [${timeRange[0]}, ${timeRange[1]}] 过滤事件`);
+                    
+                    // 过滤在时间范围内的事件
+                    eventList = parsedData.data.events.filter(event => {
+                      // 获取事件时间（秒）
+                      const eventTime = 
+                        event.time !== undefined ? event.time : 
+                        event.latency !== undefined ? event.latency / 1000 : 
+                        event.onset !== undefined ? event.onset : null;
+                      
+                      // 如果没有时间信息，保留该事件
+                      if (eventTime === null) {
+                        console.log(`事件 ${event.id || event} 没有时间信息，默认保留`);
+                        return true;
+                      }
+                      
+                      const isInRange = eventTime >= timeRange[0] && eventTime <= timeRange[1];
+                      if (isInRange) {
+                        console.log(`事件 ${event.id || event} 在时间范围内，时间点: ${eventTime}`);
+                      }
+                      return isInRange;
+                    });
+                    
+                    console.log(`过滤后的事件数量: ${eventList.length}/${parsedData.data.events.length}`);
+                  } else {
+                    // 没有时间信息或没有时间范围，使用所有事件
+                    console.log('没有找到时间信息或时间范围，使用全部事件');
+                    eventList = [...parsedData.data.events];
+                  }
+                  
+                  // 提取事件ID
+                  params.events = eventList.map(event => {
+                    const eventId = event.id !== undefined ? event.id : (typeof event === 'number' ? event : null);
+                    if (eventId === null && typeof event === 'object') {
+                      console.warn('事件对象没有ID属性:', event);
+                      return 1; // 默认ID
+                    }
+                    return eventId;
+                  }).filter(id => id !== null);
+                } else if (typeof parsedData.data.events === 'object') {
+                  // 对象格式的事件列表
+                  console.log('预处理数据中的事件是对象格式');
+                  
+                  const eventMap = parsedData.data.events;
+                  const eventIds = Object.keys(eventMap);
+                  
+                  console.log(`找到 ${eventIds.length} 个事件类型`);
+                  
+                  // 如果事件有时间信息且有时间范围，进行过滤
+                  if (timeRange && Object.values(eventMap).some(e => e.time !== undefined || e.latency !== undefined || e.onset !== undefined)) {
+                    console.log(`根据时间范围 [${timeRange[0]}, ${timeRange[1]}] 过滤事件`);
+                    
+                    // 过滤在时间范围内的事件
+                    const filteredIds = eventIds.filter(id => {
+                      const event = eventMap[id];
+                      // 获取事件时间（秒）
+                      const eventTime = 
+                        event.time !== undefined ? event.time : 
+                        event.latency !== undefined ? event.latency / 1000 : 
+                        event.onset !== undefined ? event.onset : null;
+                      
+                      // 如果没有时间信息，保留该事件
+                      if (eventTime === null) {
+                        console.log(`事件类型 ${id} 没有时间信息，默认保留`);
+                        return true;
+                      }
+                      
+                      const isInRange = eventTime >= timeRange[0] && eventTime <= timeRange[1];
+                      if (isInRange) {
+                        console.log(`事件类型 ${id} 在时间范围内，时间点: ${eventTime}`);
+                      }
+                      return isInRange;
+                    });
+                    
+                    console.log(`过滤后的事件类型数量: ${filteredIds.length}/${eventIds.length}`);
+                    params.events = filteredIds.map(id => parseInt(id) || id);
+                  } else {
+                    // 没有时间信息或没有时间范围，使用所有事件ID
+                    console.log('没有找到时间信息或时间范围，使用全部事件类型');
+                    params.events = eventIds.map(id => parseInt(id) || id);
+                  }
+                }
+                
+                console.log('从预处理数据中读取事件列表:', params.events);
+              } else {
+                console.log('预处理数据中没有找到事件信息');
+              }
+            } else {
+              console.log('预处理数据不匹配当前数据集/受试者');
+            }
+          } catch (error) {
+            console.error('解析预处理数据时出错:', error);
+          }
+        } else {
+          console.log('没有找到预处理数据');
+        }
+        
+        // 如果仍然没有事件，添加默认事件
+        if (!params.events || !Array.isArray(params.events) || params.events.length === 0) {
+          params.events = [1]; // 添加默认事件ID
+          console.log('未找到有效事件，使用默认事件ID:', params.events);
+        }
+      }
+      
+      console.log('格式化后的参数:', {
+        baseline: params.baseline,
+        timeWindow: params.timeWindow,
+        events: params.events
+      });
+      
+      // 使用现有的performTimeAnalysis方法，保持兼容性
+      return this.performTimeAnalysis(params.datasetId, params.subjectId, {
+        baseline: params.baseline,
+        timeWindow: params.timeWindow,
+        events: params.events
+      });
+    } catch (error) {
+      console.error('时域分析请求失败:', error);
+      throw error;
+    }
   }
 };
 

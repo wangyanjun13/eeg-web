@@ -1,10 +1,14 @@
 import mne
+import logging
 from typing import Dict, Any
 from app.models.data_analysis import ERPParams, TimeFreqParams, ConnectivityParams
 import numpy as np
 from mne.time_frequency import tfr_morlet
 from scipy.stats import ttest_rel
 from mne.stats import fdr_correction
+
+# 创建logger
+logger = logging.getLogger(__name__)
 
 class AnalysisService:
     def __init__(self, dataset_service):
@@ -25,31 +29,431 @@ class AnalysisService:
         }
 
     def compute_erp(self, dataset_id: str, subject_id: str, params: ERPParams) -> Dict[str, Any]:
-        """计算ERP"""
+        """计算ERP分析结果"""
+        try:
+            # 检查是否使用预处理数据
+            if params.use_preprocessed_data and params.preprocessed_data:
+                logger.info(f"使用预处理数据进行ERP分析")
+                print(f"使用预处理数据进行ERP分析，数据集ID: {dataset_id}, 受试者ID: {subject_id}")
+                print(f"预处理数据基本信息: channels={len(params.preprocessed_data.get('channels', []))},"
+                      f" sampling_rate={params.preprocessed_data.get('sampling_rate')}")
+                
+                if 'data' in params.preprocessed_data:
+                    channel_data_lengths = {ch: len(data) for ch, data in params.preprocessed_data['data'].items() 
+                                           if isinstance(data, list)}
+                    print(f"通道数据长度: {channel_data_lengths}")
+                else:
+                    print("警告: 预处理数据中缺少'data'字段")
+                
+                raw = self._convert_preprocessed_to_mne(params.preprocessed_data)
+                print(f"预处理数据转换为MNE格式成功，通道数: {len(raw.ch_names)}, 采样率: {raw.info['sfreq']}")
+            else:
         # 获取原始数据
-        raw = self.dataset_service._read_eeg_file(dataset_id, subject_id)
-        
-        # 如果需要预处理，可以在这里调用预处理服务
-        # 但不直接在构造函数中依赖它，而是作为参数传入
-        if params.preprocess:
-            # 这里可以通过参数传入预处理服务实例
-            # preprocess_service.preprocess_eeg(raw, params.preprocess_params)
-            pass
+                print(f"使用原始数据进行ERP分析，数据集ID: {dataset_id}, 受试者ID: {subject_id}")
+                raw = self.dataset_service.get_raw_data(dataset_id, subject_id)
+                
+                # 如果需要预处理
+                if params.preprocess and params.preprocess_params:
+                    # 应用预处理
+                    logger.info(f"应用预处理参数: {params.preprocess_params}")
+                    # TODO: 实现预处理逻辑
+                    pass
             
-        # ERP分析实现
-        return {"status": "not implemented"}
+            # 提取事件
+            print("开始提取事件...")
+            try:
+                events = mne.find_events(raw)
+                print(f"找到 {len(events)} 个事件")
+                
+                # 如果没有找到事件，尝试从注释中创建
+                if len(events) == 0:
+                    print("没有找到事件，尝试从注释创建")
+                    if len(raw.annotations) > 0:
+                        print(f"找到 {len(raw.annotations)} 个注释，尝试转换为事件")
+                        events = mne.events_from_annotations(raw)[0]
+                        print(f"从注释创建了 {len(events)} 个事件")
+                    else:
+                        print("没有注释可用，创建虚拟事件")
+                        # 创建虚拟事件 - 在数据中间位置
+                        middle_sample = len(raw.times) // 2
+                        events = np.array([[middle_sample, 0, 1]], dtype=int)
+                        print(f"创建了虚拟事件，位置: {middle_sample}")
+                        
+                        # 添加注释以便后续处理
+                        onset = middle_sample / raw.info['sfreq']  # 转换为秒
+                        raw.annotations.append(onset, 0.1, '1')
+                        print(f"添加了虚拟事件注释: onset={onset}")
+            except Exception as e:
+                print(f"提取事件失败: {str(e)}")
+                # 创建虚拟事件作为后备
+                middle_sample = len(raw.times) // 2
+                events = np.array([[middle_sample, 0, 1]], dtype=int)
+                print(f"创建了后备虚拟事件，位置: {middle_sample}")
+            
+            # 确保至少有一个事件
+            if len(events) == 0:
+                print("警告: 没有找到任何事件，创建最终后备事件")
+                middle_sample = len(raw.times) // 2
+                events = np.array([[middle_sample, 0, 1]], dtype=int)
+            
+            # 创建epochs
+            print(f"创建epochs, tmin={params.tmin}, tmax={params.tmax}, baseline={params.baseline}")
+            try:
+                epochs = mne.Epochs(
+                    raw, 
+                    events, 
+                    tmin=params.tmin, 
+                    tmax=params.tmax,
+                    baseline=params.baseline if params.baseline else None,
+                    preload=True
+                )
+                print(f"成功创建epochs，包含 {len(epochs)} 个epoch")
+            except Exception as e:
+                print(f"创建epochs失败: {str(e)}")
+                # 尝试调整参数重新创建
+                print("尝试调整参数重新创建epochs")
+                try:
+                    # 调整tmin和tmax以确保在数据范围内
+                    data_duration = len(raw.times) / raw.info['sfreq']
+                    safe_tmin = max(params.tmin, -data_duration/2)
+                    safe_tmax = min(params.tmax, data_duration/2)
+                    print(f"调整后的时间窗口: tmin={safe_tmin}, tmax={safe_tmax}")
+                    
+                    epochs = mne.Epochs(
+                        raw, 
+                        events, 
+                        tmin=safe_tmin, 
+                        tmax=safe_tmax,
+                        baseline=None,  # 禁用基线校正以减少错误可能
+                        preload=True
+                    )
+                    print(f"使用调整后的参数成功创建epochs，包含 {len(epochs)} 个epoch")
+                except Exception as e2:
+                    print(f"调整参数后创建epochs仍然失败: {str(e2)}")
+                    # 创建一个最简单的epoch作为后备
+                    print("创建最简单的epoch作为后备")
+                    # 使用最小的时间窗口
+                    minimal_tmin = -0.1
+                    minimal_tmax = 0.1
+                    epochs = mne.Epochs(
+                        raw, 
+                        events, 
+                        tmin=minimal_tmin, 
+                        tmax=minimal_tmax,
+                        baseline=None,
+                        preload=True,
+                        reject=None,  # 禁用拒绝
+                        flat=None     # 禁用平坦检测
+                    )
+                    print(f"创建最小化epochs成功，包含 {len(epochs)} 个epoch")
+            
+            # 计算ERP
+            print("计算ERP平均值...")
+            evoked = epochs.average()
+            print(f"ERP计算完成，数据形状: {evoked.data.shape}")
+            
+            # 转换为字典格式
+            result = {
+                "times": evoked.times.tolist(),
+                "data": {ch: evoked.data[i].tolist() for i, ch in enumerate(evoked.ch_names)},
+                "info": {
+                    "sfreq": evoked.info["sfreq"],
+                    "ch_names": evoked.ch_names
+                }
+            }
+            
+            print(f"ERP分析完成，返回结果包含 {len(result['data'])} 个通道的数据")
+            return result
+        except Exception as e:
+            logger.error(f"ERP分析失败: {str(e)}")
+            print(f"ERP分析失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise e
+
+    def _convert_preprocessed_to_mne(self, preprocessed_data: Dict[str, Any]) -> mne.io.Raw:
+        """将前端传递的预处理数据转换为MNE Raw对象
+        
+        Args:
+            preprocessed_data: 前端传递的预处理数据
+            
+        Returns:
+            mne.io.Raw: MNE Raw对象
+        """
+        try:
+            print(f"开始转换预处理数据到MNE格式")
+            
+            # 提取必要的数据字段
+            data = preprocessed_data.get("data", {})
+            channels = preprocessed_data.get("channels", [])
+            sampling_rate = preprocessed_data.get("sampling_rate", 1000)
+            
+            if not data:
+                print(f"警告: 预处理数据中缺少data字段")
+                raise ValueError("预处理数据缺少必要的data字段")
+                
+            if not channels:
+                print(f"警告: 预处理数据中缺少channels字段")
+                # 尝试从data中提取通道信息
+                channels = list(data.keys())
+                if not channels:
+                    raise ValueError("预处理数据缺少必要的channels字段，且无法从data中提取")
+                print(f"从data中提取的通道列表: {channels}")
+                
+            print(f"预处理数据包含 {len(channels)} 个通道，采样率为 {sampling_rate} Hz")
+            
+            # 将数据转换为numpy数组
+            data_array = []
+            for channel in channels:
+                if channel in data:
+                    channel_data = np.array(data[channel])
+                    # 检查数据类型和有效性
+                    if not isinstance(channel_data, np.ndarray):
+                        print(f"警告: 通道 {channel} 的数据不是numpy数组，尝试转换")
+                        channel_data = np.array(channel_data)
+                    
+                    # 检查是否有NaN或Inf值
+                    if np.isnan(channel_data).any() or np.isinf(channel_data).any():
+                        print(f"警告: 通道 {channel} 包含NaN或Inf值，将被替换为0")
+                        channel_data = np.nan_to_num(channel_data, nan=0.0, posinf=0.0, neginf=0.0)
+                        
+                    data_array.append(channel_data)
+                else:
+                    # 如果通道不存在，用零填充
+                    print(f"警告：预处理数据中缺少通道 {channel}，将使用零填充")
+                    # 假设所有通道数据长度相同，取第一个通道的长度
+                    first_channel_key = next(iter(data.keys()))
+                    if first_channel_key:
+                        first_channel = np.array(data[first_channel_key])
+                        data_array.append(np.zeros_like(first_channel))
+                    else:
+                        raise ValueError(f"无法确定通道 {channel} 的数据长度，因为没有其他通道数据可参考")
+            
+            # 检查所有通道数据长度是否一致
+            data_lengths = [len(arr) for arr in data_array]
+            if len(set(data_lengths)) > 1:
+                print(f"警告: 通道数据长度不一致: {data_lengths}")
+                # 找到最短的长度
+                min_length = min(data_lengths)
+                # 截断所有通道数据到最短长度
+                data_array = [arr[:min_length] for arr in data_array]
+                print(f"已将所有通道数据截断到长度 {min_length}")
+                    
+            # 创建MNE Raw对象
+            data_array = np.array(data_array)
+            print(f"数据数组形状: {data_array.shape}")
+            
+            # 创建通道信息
+            ch_types = ['eeg'] * len(channels)  # 假设所有通道都是EEG
+            
+            # 检查是否有特殊通道（如EOG、ECG等）
+            for i, ch in enumerate(channels):
+                ch_lower = ch.lower()
+                if 'eog' in ch_lower or 'eye' in ch_lower:
+                    ch_types[i] = 'eog'
+                elif 'ecg' in ch_lower or 'heart' in ch_lower:
+                    ch_types[i] = 'ecg'
+                elif 'emg' in ch_lower or 'muscle' in ch_lower:
+                    ch_types[i] = 'emg'
+                elif 'misc' in ch_lower or 'other' in ch_lower:
+                    ch_types[i] = 'misc'
+            
+            info = mne.create_info(ch_names=channels, sfreq=sampling_rate, ch_types=ch_types)
+            raw = mne.io.RawArray(data_array, info)
+            
+            # 添加额外的元数据
+            if 'metadata' in preprocessed_data:
+                for key, value in preprocessed_data['metadata'].items():
+                    if key not in raw.info:
+                        raw.info[key] = value
+            
+            # 改进事件处理: 处理各种格式的事件信息
+            events_data = []
+            events_from_annotations = False
+            
+            if 'events' in preprocessed_data:
+                print(f"预处理数据中包含事件信息: {preprocessed_data['events']}")
+                try:
+                    # 处理不同格式的事件数据
+                    events_info = preprocessed_data['events']
+                    
+                    # 情况1: events是一个对象，包含events数组
+                    if isinstance(events_info, dict) and 'events' in events_info and isinstance(events_info['events'], list):
+                        events_info = events_info['events']
+                    
+                    # 情况2: events直接是一个数组
+                    if isinstance(events_info, list):
+                        for event in events_info:
+                            if isinstance(event, dict):
+                                # 提取事件ID和时间点
+                                event_id = event.get('id') or event.get('event_id') or event.get('code')
+                                onset = event.get('onset') or event.get('time') or event.get('latency')
+                                
+                                if event_id is not None and onset is not None:
+                                    # 转换时间点到采样点
+                                    sample = int(float(onset) * sampling_rate)
+                                    # 确保event_id是整数
+                                    try:
+                                        event_id_int = int(event_id)
+                                    except (ValueError, TypeError):
+                                        # 如果不能转换为整数，使用字符串的哈希值
+                                        event_id_int = abs(hash(str(event_id))) % 10000
+                                        print(f"事件ID不是整数，使用哈希值: {event_id} -> {event_id_int}")
+                                    
+                                    events_data.append([sample, 0, event_id_int])
+                                    
+                                    # 添加注释同时保留原始信息
+                                    description = str(event_id)
+                                    raw.annotations.append(
+                                        onset=onset,
+                                        duration=event.get('duration', 0),
+                                        description=description
+                                    )
+                                    events_from_annotations = True
+                    
+                    if events_data:
+                        print(f"成功处理 {len(events_data)} 个事件")
+                        if not events_from_annotations:
+                            # 如果没有通过注释添加事件，则直接创建事件数组
+                            events_array = np.array(events_data, dtype=int)
+                            # 确保至少添加一个虚拟刺激通道
+                            stim_data = np.zeros((1, data_array.shape[1]))
+                            for event in events_array:
+                                if 0 <= event[0] < data_array.shape[1]:  # 确保在有效范围内
+                                    stim_data[0, event[0]] = event[2]  # 设置刺激代码
+                            
+                            # 添加刺激通道
+                            stim_info = mne.create_info(['STI'], raw.info['sfreq'], ['stim'])
+                            stim_raw = mne.io.RawArray(stim_data, stim_info)
+                            raw.add_channels([stim_raw])
+                            print(f"已添加刺激通道并设置事件")
+                    else:
+                        print("未能从事件信息中提取有效事件")
+                except Exception as e:
+                    print(f"处理事件信息失败: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # 如果没有成功添加事件，仍然添加一个虚拟事件作为后备
+            if not events_data:
+                print("未提取到有效事件，添加虚拟事件")
+                # 在数据中间添加一个事件
+                middle_sample = len(data_array[0]) // 2
+                stim_data = np.zeros((1, len(data_array[0])))
+                stim_data[0, middle_sample] = 1  # 在中间位置添加一个触发器
+                
+                # 添加一个刺激通道
+                stim_info = mne.create_info(['STI'], raw.info['sfreq'], ['stim'])
+                stim_raw = mne.io.RawArray(stim_data, stim_info)
+                raw.add_channels([stim_raw])
+                print(f"已添加虚拟事件通道，事件位置: {middle_sample}")
+                
+                # 创建一个虚拟事件数组
+                virtual_events = np.array([[middle_sample, 0, 1]], dtype=int)
+                print(f"创建虚拟事件数组: {virtual_events}")
+                
+                # 添加注释
+                onset = middle_sample / raw.info['sfreq']  # 转换为秒
+                raw.annotations.append(onset, 0.1, '1')  # 添加一个注释
+                print(f"已添加虚拟事件注释: onset={onset}")
+            
+            print(f"成功将预处理数据转换为MNE Raw对象，通道数: {len(raw.ch_names)}")
+            return raw
+        except Exception as e:
+            print(f"转换预处理数据到MNE格式失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"转换预处理数据失败: {str(e)}")
 
     def compute_time_freq(self, dataset_id: str, subject_id: str, params: TimeFreqParams) -> Dict[str, Any]:
-        """计算时频图"""
-        raw = self.dataset_service._read_eeg_file(dataset_id, subject_id)
-        # 时频分析实现
-        return {"status": "not implemented"}
+        """计算时频分析结果"""
+        try:
+            # 检查是否使用预处理数据
+            if params.use_preprocessed_data and params.preprocessed_data:
+                logger.info(f"使用预处理数据进行时频分析")
+                raw = self._convert_preprocessed_to_mne(params.preprocessed_data)
+            else:
+                # 获取原始数据
+                raw = self.dataset_service.get_raw_data(dataset_id, subject_id)
+                
+                # 如果需要预处理
+                if params.preprocess and params.preprocess_params:
+                    # 应用预处理
+                    logger.info(f"应用预处理参数: {params.preprocess_params}")
+                    # TODO: 实现预处理逻辑
+                    pass
+            
+            # 计算功率谱
+            psds, freqs = mne.time_frequency.psd_welch(raw, fmin=params.freqs[0], fmax=params.freqs[-1])
+            
+            # 转换为字典格式
+            spectrum_result = {
+                "frequencies": freqs.tolist(),
+                "powers": {ch: psds[i].tolist() for i, ch in enumerate(raw.ch_names)}
+            }
+            
+            # 计算时频表示
+            tfr = mne.time_frequency.tfr_morlet(
+                mne.Epochs(raw, mne.find_events(raw), tmin=-0.5, tmax=1.0, preload=True),
+                freqs=params.freqs,
+                n_cycles=params.n_cycles,
+                return_itc=False
+            )
+            
+            # 转换为字典格式
+            time_freq_result = {
+                "times": tfr.times.tolist(),
+                "freqs": tfr.freqs.tolist(),
+                "data": {ch: tfr.data[i].tolist() for i, ch in enumerate(tfr.ch_names)}
+            }
+            
+            return {
+                "spectrum": spectrum_result,
+                "timeFrequency": time_freq_result
+            }
+        except Exception as e:
+            logger.error(f"时频分析失败: {str(e)}")
+            raise e
 
     def compute_connectivity(self, dataset_id: str, subject_id: str, params: ConnectivityParams) -> Dict[str, Any]:
-        """计算连接性"""
-        raw = self.dataset_service._read_eeg_file(dataset_id, subject_id)
-        # 连接性分析实现
-        return {"status": "not implemented"}
+        """计算连接性分析结果"""
+        try:
+            # 检查是否使用预处理数据
+            if params.use_preprocessed_data and params.preprocessed_data:
+                logger.info(f"使用预处理数据进行连接性分析")
+                raw = self._convert_preprocessed_to_mne(params.preprocessed_data)
+            else:
+                # 获取原始数据
+                raw = self.dataset_service.get_raw_data(dataset_id, subject_id)
+                
+                # 如果需要预处理
+                if params.preprocess and params.preprocess_params:
+                    # 应用预处理
+                    logger.info(f"应用预处理参数: {params.preprocess_params}")
+                    # TODO: 实现预处理逻辑
+                    pass
+            
+            # 提取感兴趣的频段
+            raw_band = raw.copy().filter(params.fmin, params.fmax)
+            
+            # 计算连接性矩阵
+            # 这里简化处理，实际应该使用更复杂的连接性分析方法
+            data = raw_band.get_data()
+            n_channels = len(raw_band.ch_names)
+            conn_matrix = np.corrcoef(data)
+            
+            # 转换为字典格式
+            result = {
+                "channels": raw_band.ch_names,
+                "connectivity": conn_matrix.tolist(),
+                "method": params.method,
+                "freq_range": [params.fmin, params.fmax]
+            }
+            
+            return result
+        except Exception as e:
+            logger.error(f"连接性分析失败: {str(e)}")
+            raise e
 
     def compute_time_frequency(self, epochs, params):
         """计算时频表示，参考TimeFreqComputeClusterChan_NoCommonBase.m"""

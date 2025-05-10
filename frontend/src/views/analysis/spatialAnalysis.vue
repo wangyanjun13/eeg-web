@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import AppLayout from '@/components/layout/AppLayout.vue';
@@ -28,6 +28,10 @@ const availableFrequencyBands = ref([
   { value: 'gamma', label: 'Gamma (30-45 Hz)' }
 ]);
 const selectedFrequencyBand = ref('alpha');
+const preprocessedDataAvailable = ref(false);
+const preprocessedData = ref(null);
+const availableChannels = ref([]);
+const selectedChannels = ref([]);
 
 // 加载状态
 const { isLoading, withLoading } = useLoading({
@@ -54,12 +58,34 @@ const { formState: analysisOptions, resetForm } = useFormState('spatial-analysis
 // 当前活动标签页
 const activeTab = ref('topo');
 
+// 通道选择
+const { 
+  openChannelSelect, 
+  renderChannelSelectDialog 
+} = useChannelPositions();
+
+// 选择通道
+const handleSelectChannels = () => {
+  openChannelSelect(
+    selectedChannels.value,
+    availableChannels.value,
+    (selected) => {
+      selectedChannels.value = selected;
+    }
+  );
+};
+
 // 加载受试者信息
 const loadSubjectInfo = async () => {
   try {
     const response = await datasetService.getSubjectInfo(datasetId.value, subjectId.value);
     if (response.data) {
       console.log('受试者信息:', response.data);
+      if (response.data.channels) {
+        availableChannels.value = response.data.channels;
+        // 默认选择前5个通道或全部通道（如果少于5个）
+        selectedChannels.value = availableChannels.value.slice(0, Math.min(5, availableChannels.value.length));
+      }
     }
   } catch (error) {
     ElMessage.error('加载受试者信息失败');
@@ -67,19 +93,77 @@ const loadSubjectInfo = async () => {
   }
 };
 
+// 加载预处理数据
+const loadPreprocessedData = () => {
+  try {
+    const preprocessedDataStr = localStorage.getItem('preprocessed_data');
+    if (!preprocessedDataStr) {
+      return false;
+    }
+    
+    const parsedData = JSON.parse(preprocessedDataStr);
+    
+    // 检查数据是否匹配当前数据集和受试者
+    if (parsedData.datasetId !== datasetId.value || 
+        parsedData.subjectId !== subjectId.value) {
+      console.log('预处理数据不匹配当前数据集/受试者');
+      return false;
+    }
+    
+    // 检查数据是否过期（24小时）
+    const dataAge = Date.now() - parsedData.timestamp;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    
+    if (dataAge >= oneDayMs) {
+      console.log('预处理数据已过期，已移除');
+      localStorage.removeItem('preprocessed_data');
+      return false;
+    }
+    
+    // 数据有效，可以使用
+    preprocessedData.value = parsedData;
+    preprocessedDataAvailable.value = true;
+    
+    // 更新可用通道
+    if (parsedData.data && parsedData.data.channels) {
+      availableChannels.value = parsedData.data.channels;
+      // 选择所有预处理后的通道，因为这些是用户已经筛选过的
+      selectedChannels.value = [...parsedData.data.channels];
+      ElMessage.info('已加载预处理数据');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('加载预处理数据失败:', error);
+    ElMessage.warning('加载预处理数据失败，将使用原始数据');
+    return false;
+  }
+};
+
 // 运行空间分析
 const runSpatialAnalysis = async () => {
   try {
     const params = {
-      datasetId: datasetId.value,
-      subjectId: subjectId.value,
       frequencyBand: selectedFrequencyBand.value,
       timePoint: selectedTimePoint.value,
+      channels: selectedChannels.value,
       ...analysisOptions
     };
     
+    // 如果有预处理数据，添加到请求参数中
+    if (preprocessedDataAvailable.value && preprocessedData.value) {
+      params.use_preprocessed_data = true;
+      params.preprocessed_data = preprocessedData.value.data;
+    }
+    
+    console.log('发送空间分析请求:', {
+      datasetId: datasetId.value,
+      subjectId: subjectId.value,
+      params
+    });
+    
     const response = await withLoading(
-      analysisService.performSpatialAnalysis(params),
+      analysisService.performSpatialAnalysis(datasetId.value, subjectId.value, params),
       'applying'
     );
     
@@ -101,11 +185,11 @@ const runSpatialAnalysis = async () => {
 const loadExampleData = async () => {
   try {
     const response = await withLoading(
-      analysisService.getExampleSpatialData(),
+      analysisService.getSpatialAnalysisExample(),
       'data'
     );
     
-    if (response.data) {
+    if (response && response.data) {
       topoData.value = response.data;
       availableTimePoints.value = response.data.timePoints || [];
       if (availableTimePoints.value.length > 0) {
@@ -114,19 +198,40 @@ const loadExampleData = async () => {
       ElMessage.success('示例数据加载成功');
     }
   } catch (error) {
+    console.error('加载示例数据失败:', error);
     ElMessage.error('加载示例数据失败');
-    console.error(error);
   }
 };
 
 // 生命周期钩子
-onMounted(() => {
-  loadSubjectInfo();
-  // 如果是示例模式，加载示例数据
-  if (route.query.example === 'true') {
-    loadExampleData();
+onMounted(async () => {
+  // 先尝试加载预处理数据
+  const hasPreprocessedData = loadPreprocessedData();
+  
+  // 如果没有预处理数据或加载失败，则加载原始数据
+  if (!hasPreprocessedData) {
+    await loadSubjectInfo();
   }
 });
+
+// 监听路由参数变化
+watch([datasetId, subjectId], async () => {
+  topoData.value = null;
+  preprocessedDataAvailable.value = false;
+  preprocessedData.value = null;
+  
+  const hasPreprocessedData = loadPreprocessedData();
+  if (!hasPreprocessedData) {
+    await loadSubjectInfo();
+  }
+});
+
+const workflowRef = ref(null);
+
+// 前往下一步
+function goToNextStep() {
+  workflowRef.value?.goToNextStep();
+}
 </script>
 
 <template>
@@ -141,10 +246,22 @@ onMounted(() => {
             <template #header>
               <div class="card-header">
                 <h3>空间分析设置</h3>
+                <el-tag v-if="preprocessedDataAvailable" size="small" type="success">已加载预处理数据</el-tag>
               </div>
             </template>
             
             <el-form :model="analysisOptions" label-width="120px" label-position="left">
+              <!-- 通道选择 -->
+              <el-form-item label="通道选择">
+                <el-button type="primary" size="small" @click="handleSelectChannels">
+                  选择通道 ({{ selectedChannels.length }}/{{ availableChannels.length }})
+                </el-button>
+                <div v-if="selectedChannels.length > 0" class="selected-channels-info">
+                  已选: {{ selectedChannels.slice(0, 3).join(', ') }}
+                  <span v-if="selectedChannels.length > 3">等{{ selectedChannels.length }}个通道</span>
+                </div>
+              </el-form-item>
+              
               <!-- 频带选择 -->
               <el-form-item label="频带选择">
                 <el-select v-model="selectedFrequencyBand" placeholder="选择频带">
@@ -210,11 +327,15 @@ onMounted(() => {
             <!-- 操作按钮 -->
             <div class="action-buttons">
               <el-button @click="resetForm">重置</el-button>
-              <el-button type="primary" @click="runSpatialAnalysis" :loading="isLoading.applying">
+              <el-button type="primary" @click="runSpatialAnalysis" :loading="isLoading.applying"
+                         :disabled="selectedChannels.length === 0">
                 运行分析
               </el-button>
               <el-button @click="loadExampleData" :loading="isLoading.data">
                 加载示例数据
+              </el-button>
+              <el-button type="success" @click="goToNextStep">
+                下一步
               </el-button>
             </div>
           </el-card>
@@ -234,7 +355,7 @@ onMounted(() => {
               </div>
             </template>
             
-            <div v-loading="isLoading.data">
+            <div v-loading="isLoading.data || isLoading.applying">
               <!-- 头皮地形图 -->
               <div v-if="activeTab === 'topo' && topoData">
                 <TopoMap
@@ -266,7 +387,18 @@ onMounted(() => {
           </el-card>
         </el-col>
       </el-row>
+      
+      <!-- 分析流程导航 -->
+      <AnalysisWorkflow 
+        ref="workflowRef"
+        current-step="spatial" 
+        :dataset-id="datasetId" 
+        :subject-id="subjectId" 
+      />
     </div>
+    
+    <!-- 通道选择对话框 -->
+    <component :is="renderChannelSelectDialog()" />
   </AppLayout>
 </template>
 
@@ -310,5 +442,11 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   height: 400px;
+}
+
+.selected-channels-info {
+  font-size: 13px;
+  color: #606266;
+  margin-top: 8px;
 }
 </style> 

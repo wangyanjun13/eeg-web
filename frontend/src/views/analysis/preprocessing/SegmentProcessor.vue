@@ -259,8 +259,8 @@ watch(
       <!-- 分段模式选择 -->
       <el-form-item label="分段模式">
         <el-radio-group v-model="segmentMode" size="small">
-          <el-radio label="time">时间窗口</el-radio>
-          <el-radio label="event" v-if="availableEvents.length > 0">事件相关</el-radio>
+          <el-radio :value="'time'">时间窗口</el-radio>
+          <el-radio :value="'event'" v-if="availableEvents.length > 0">事件相关</el-radio>
         </el-radio-group>
       </el-form-item>
       
