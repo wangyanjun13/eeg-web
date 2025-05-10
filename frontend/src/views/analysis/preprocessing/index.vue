@@ -14,6 +14,7 @@ import BadChannelProcessor from './BadChannelProcessor.vue';
 import ArtifactProcessor from './ArtifactProcessor.vue';
 import SegmentProcessor from './SegmentProcessor.vue';
 import BadSegmentProcessor from './BadSegmentProcessor.vue';
+import datasetService from '@/services/dataset';
 
 // 路由和基础数据
 const route = useRoute();
@@ -422,11 +423,77 @@ const handleComplete = async () => {
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
     );
     
+    // 保存最终的预处理结果到localStorage，供分析阶段使用
+    if (processedData.value) {
+      try {
+        console.log('准备保存预处理数据到localStorage...');
+        
+        // 尝试加载事件信息
+        let events = [];
+        try {
+          const eventsResponse = await datasetService.getEvents(datasetId, subjectId);
+          if (eventsResponse && eventsResponse.data) {
+            events = eventsResponse.data;
+            console.log('成功加载事件信息:', events);
+          }
+        } catch (eventsError) {
+          console.warn('加载事件信息失败，将使用空事件列表', eventsError);
+        }
+        
+        // 确保processedData中包含事件信息
+        if (!processedData.value.events && events.length > 0) {
+          processedData.value.events = events;
+        }
+        
+        // 保存完整的预处理数据，包括通道数据
+        const dataToSave = {
+          datasetId: datasetId,
+          subjectId: subjectId,
+          timestamp: Date.now(),
+          data: {
+            ...processedData.value,
+            events: processedData.value.events || events
+          },
+          metadata: {
+            channels: processedData.value.channels,
+            sampling_rate: processedData.value.sampling_rate,
+            duration: processedData.value.duration,
+            timeRange: processedData.value.timeRange,
+            preprocess_steps: completedSteps.value
+          }
+        };
+        
+        console.log('保存的预处理数据结构:', {
+          datasetId: dataToSave.datasetId,
+          subjectId: dataToSave.subjectId,
+          timestamp: dataToSave.timestamp,
+          dataChannels: dataToSave.data.channels?.length || 0,
+          hasEvents: !!(dataToSave.data.events && dataToSave.data.events.length > 0),
+          eventsCount: dataToSave.data.events?.length || 0,
+          metadata: dataToSave.metadata
+        });
+        
+        localStorage.setItem('preprocessed_data', JSON.stringify(dataToSave));
+        
+        console.log('预处理数据已保存到localStorage，准备进入分析阶段');
+        ElMessage.success('预处理数据已保存，准备进入分析阶段');
+      } catch (e) {
+        console.warn('无法保存预处理结果到localStorage', e);
+        ElMessage.warning('无法保存预处理结果，但仍将继续进入分析阶段');
+      }
+    } else {
+      ElMessage.warning('没有预处理数据可供保存，将继续进入分析阶段');
+    }
+    
+    // 跳转到时域分析页面
     router.push({
-      name: 'analysis',
+      name: 'TimeAnalysis',
       params: { datasetId, subjectId }
     });
-  } catch (e) {} // 用户取消
+  } catch (e) {
+    // 用户取消
+    console.log('用户取消了完成预处理操作');
+  }
 };
 
 // 页面离开确认
