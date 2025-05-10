@@ -1,28 +1,31 @@
-INFO:     Started server process [332842]
+INFO:     Started server process [334285]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ✅ Redis连接成功
-INFO:     127.0.0.1:58796 - "GET /health HTTP/1.1" 200 OK
-INFO:     66.249.65.172:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     66.249.65.172:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     66.249.65.173:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40270 - "GET /health HTTP/1.1" 200 OK
 INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
 INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
 INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/participants HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672/participants HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672/subjects HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672 HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
+INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
 INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876 HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-14/eeg/sub-14_task-songfamiliarity_eeg.fdt
-Reading 0 ... 2010649  =      0.000 ...  2010.649 secs...
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/14/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-14/eeg/sub-14_task-songfamiliarity_eeg.fdt
-Reading 0 ... 2010649  =      0.000 ...  2010.649 secs...
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/14/info HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-14/eeg/sub-14_task-songfamiliarity_eeg.fdt
-Reading 0 ... 2010649  =      0.000 ...  2010.649 secs...
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/14/info HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "OPTIONS /api/analysis/ds005876/subjects/14/time_freq HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/participants HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/info HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/info HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "OPTIONS /api/analysis/ds005876/subjects/21/time_freq HTTP/1.1" 200 OK
 时频分析失败: 'DatasetService' object has no attribute 'get_raw_data'
 Traceback (most recent call last):
   File "/data/eeg-web/backend/./app/services/analysis_service.py", line 377, in compute_time_freq
@@ -30,113 +33,82 @@ Traceback (most recent call last):
 AttributeError: 'DatasetService' object has no attribute 'get_raw_data'
 时频分析出现异常: 'DatasetService' object has no attribute 'get_raw_data'
 返回默认时频分析结果
-INFO:     106.120.86.107:0 - "POST /api/analysis/ds005876/subjects/14/time_freq HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-14/eeg/sub-14_task-songfamiliarity_eeg.fdt
-Reading 0 ... 2010649  =      0.000 ...  2010.649 secs...
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/14/info HTTP/1.1" 200 OK
-Reading /data/eeg_samples/ds005876/sub-14/eeg/sub-14_task-songfamiliarity_eeg.fdt
-Reading 0 ... 2010649  =      0.000 ...  2010.649 secs...
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/14/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds002723 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds002723/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds002723/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004306 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004306/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004306/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005672/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004306 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004306/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004306/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds002680/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds002680 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds002680/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003805 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003805/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003805/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005907/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005907 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds005907/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003805/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003805/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003805 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003822 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003822/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003822/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004252 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004252/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004252/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004264 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004264/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds004264/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003739/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003739 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003739/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003751 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003751/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003751/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003739/participants HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003739 HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets/ds003739/subjects HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "POST /api/datasets/record-visit HTTP/1.1" 200 OK
-INFO:     106.120.86.107:0 - "GET /api/datasets?sort_by=updated_at&sort_order=desc HTTP/1.1" 307 Temporary Redirect
-INFO:     106.120.86.107:0 - "GET /api/datasets/?sort_by=updated_at&sort_order=desc HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "POST /api/analysis/ds005876/subjects/21/time_freq HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/info HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/raw?start_time=0&duration=10 HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "OPTIONS /api/preprocess/ds005876/subjects/21/filter HTTP/1.1" 200 OK
+接收到滤波请求: dataset_id=ds005876, subject_id=21
+滤波参数: {'highpass_filter': True, 'highpass': 1.0, 'lowpass_filter': True, 'lowpass': 40.0, 'notch_filter': True, 'line_freqs': [50.0, 60.0]}
+没有找到有效的缓存，执行滤波处理...
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+滤波处理完成，耗时: 2.96秒
+已缓存滤波结果: eeg:ds005876:21:filter
+INFO:     106.120.86.107:0 - "POST /api/preprocess/ds005876/subjects/21/filter HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+找到事件文件: /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_events.tsv
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/events HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+找到事件文件: /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_events.tsv
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/events HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+INFO:     106.120.86.107:0 - "OPTIONS /api/preprocess/ds005876/subjects/21/artifacts HTTP/1.1" 200 OK
+接收到伪迹处理请求: dataset_id=ds005876, subject_id=21
+伪迹处理参数: {'remove_artifacts': True, 'artifact_detection_method': 'threshold', 'amplitude_threshold': 100.0, 'artifact_handling': 'interpolate', 'reject_by_annotation': True}
+开始执行伪迹处理，方法: threshold, 处理方式: interpolate
+处理通道数量: 32
+伪迹处理完成，耗时: 0.50秒
+INFO:     106.120.86.107:0 - "POST /api/preprocess/ds005876/subjects/21/artifacts HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+找到事件文件: /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_events.tsv
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/events HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/electrodes HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/info HTTP/1.1" 200 OK
+Reading /data/eeg_samples/ds005876/sub-21/eeg/sub-21_task-songfamiliarity_eeg.fdt
+Reading 0 ... 1953649  =      0.000 ...  1953.649 secs...
+INFO:     106.120.86.107:0 - "GET /api/datasets/ds005876/subjects/21/info HTTP/1.1" 200 OK
+时频分析失败: 'DatasetService' object has no attribute 'get_raw_data'
+Traceback (most recent call last):
+  File "/data/eeg-web/backend/./app/services/analysis_service.py", line 377, in compute_time_freq
+    raw = self.dataset_service.get_raw_data(dataset_id, subject_id)
+AttributeError: 'DatasetService' object has no attribute 'get_raw_data'
+时频分析出现异常: 'DatasetService' object has no attribute 'get_raw_data'
+返回默认时频分析结果
+INFO:     106.120.86.107:0 - "POST /api/analysis/ds005876/subjects/21/time_freq HTTP/1.1" 200 OK
