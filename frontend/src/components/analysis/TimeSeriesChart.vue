@@ -168,7 +168,7 @@ function updateChart() {
 
 // 添加通道名称标签
 function addChannelLabels() {
-  if (!chart || !props.channels || props.channels.length === 0) return;
+  if (!chart || !props.channels || props.channels.length === 0 || !chartRef.value) return;
   
   // 移除之前的标签
   const container = chartRef.value;
@@ -242,7 +242,7 @@ function addChannelLabels() {
 // 监听窗口大小变化时更新标签位置
 window.addEventListener('resize', () => {
   // 使用防抖确保不会频繁触发
-  if (chart) {
+  if (chart && chartRef.value) {
     clearTimeout(window.channelLabelTimer);
     window.channelLabelTimer = setTimeout(() => {
       addChannelLabels();
