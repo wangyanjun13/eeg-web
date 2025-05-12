@@ -24,6 +24,12 @@ const { isLoading: loading, withLoading } = useLoading({
 });
 
 const activeTab = ref('subjects'); // 当前活动标签页
+const downloadDialogVisible = ref(false); // 控制获取数据集对话框的显示
+
+// 打开获取数据集对话框
+const openDownloadDialog = () => {
+  downloadDialogVisible.value = true;
+};
 
 // 获取数据集详情
 const fetchDatasetInfo = async () => {
@@ -137,6 +143,7 @@ onMounted(() => {
           <div class="card-header">
             <h2 v-if="dataset">{{ dataset.Name }}</h2>
             <el-skeleton v-else :rows="1" animated />
+            <el-button v-if="dataset" type="primary" @click="openDownloadDialog">获取数据集</el-button>
           </div>
         </template>
 
@@ -257,6 +264,53 @@ onMounted(() => {
         </div>
       </el-card>
     </div>
+    
+    <!-- 获取数据集对话框 -->
+    <el-dialog
+      v-model="downloadDialogVisible"
+      title="获取数据集"
+      width="800px"
+      class="download-dialog"
+    >
+      <div class="download-methods">
+        <h4>数据集ID: {{ dataset?.dataset_id }}</h4>
+        
+        <div class="method">
+          <h5>方法1: 从 S3 下载</h5>
+          <p>此方法最适合较大的数据集或不稳定的连接。此示例使用 AWS CLI。</p>
+          <p>AWS CLI：<a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html" target="_blank">安装指南</a></p>
+          <p>安装后，命令行进入要下载的目录下：</p>
+          <div class="code-block">
+            <pre>aws s3 sync --no-sign-request s3://openneuro.org/{{ dataset?.dataset_id }} {{ dataset?.dataset_id }}</pre>
+          </div>
+        </div>
+        
+        <div class="method">
+          <h5>方法2: 使用 DataLad 下载</h5>
+          <p>有python环境和github账号情况下：</p>
+          <div class="code-block">
+            <pre>pip install datalad
+# 示例：从 OpenNeuro 下载数据集
+datalad clone https://github.com/OpenNeuroDatasets/{{ dataset?.dataset_id }}.git
+cd {{ dataset?.dataset_id }}
+datalad get .  # 获取数据集所有完整文件
+datalad status  # 查看数据集状态</pre>
+          </div>
+        </div>
+        
+        <div class="method">
+          <h5>方法3: 使用 OpenNeuro-py</h5>
+          <p>基于python环境下：</p>
+          <p>OpenNeuro-py<a href="https://github.com/hoechenberger/openneuro-py" target="_blank">详细介绍 </a></p>
+          <div class="code-block">
+            <pre>pip install openneuro-py
+pip install ipywidgets
+# 命令行进入要下载的目录后：
+openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </AppLayout>
 </template>
 
@@ -331,6 +385,75 @@ onMounted(() => {
   margin-bottom: 10px;
   font-size: 16px;
   color: #606266;
+}
+
+/* 下载对话框样式 */
+.download-methods {
+  padding: 10px;
+}
+
+.download-methods h4 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 16px;
+  color: #303133;
+}
+
+.method {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.method:last-child {
+  border-bottom: none;
+}
+
+.method h5 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 15px;
+  color: #303133;
+}
+
+.method p {
+  margin: 5px 0;
+  color: #606266;
+}
+
+.code-block {
+  background-color: #282c34;
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+.code-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 13px;
+  color: #e6e6e6;
+  line-height: 1.5;
+  text-align: left;
+  padding-left: 0;
+}
+
+.code-block p {
+  color: #e6e6e6;
+  margin-bottom: 8px;
+}
+
+.code-block a {
+  color: #61afef;
+  text-decoration: none;
+}
+
+.code-block a:hover {
+  text-decoration: underline;
 }
 
 /* 响应式布局 */
