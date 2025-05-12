@@ -8,6 +8,7 @@ from app.api.dataset import router as dataset_router
 from app.api.visualization import router as visual_router
 from app.api.preprocess import router as preprocess_router
 from app.api.analysis import router as analysis_router
+from app.api.system import router as system_router, register_system_middleware  # 导入系统性能路由器和中间件
 
 # 导入Redis检查
 from app.core.redis import check_redis_connection
@@ -45,11 +46,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 注册系统监控中间件
+app = register_system_middleware(app)
+
 # 注册路由
 app.include_router(dataset_router)
 app.include_router(visual_router)
 app.include_router(preprocess_router)
 app.include_router(analysis_router)
+app.include_router(system_router)  # 添加系统性能路由器
 
 @app.get("/")
 async def root():
@@ -72,3 +77,7 @@ async def startup_event():
         print("✅ Redis连接成功")
     else:
         print("⚠️ Redis连接失败，将使用内存缓存")
+    
+    # 创建必要的目录
+    Path("./logs").mkdir(exist_ok=True)
+    Path("./performance_data").mkdir(exist_ok=True)
