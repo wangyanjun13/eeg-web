@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.data_analysis import ERPParams, TimeFreqParams
+from app.models.data_analysis import ERPParams, TimeFreqParams, SpatialParams
 from app.models.common import APIResponse
 from app.services.analysis_service import AnalysisService
 from app.services.dataset_service import DatasetService
@@ -53,6 +53,18 @@ async def compute_time_frequency(dataset_id: str, subject_id: str, params: TimeF
         result = analysis_service.compute_time_freq(dataset_id, subject_id, params)
         return APIResponse(
             message="时频分析完成",
+            data=result
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{dataset_id}/subjects/{subject_id}/spatial", response_model=APIResponse)
+async def compute_spatial(dataset_id: str, subject_id: str, params: SpatialParams):
+    """计算空间分析（头皮地形图）"""
+    try:
+        result = analysis_service.compute_spatial_analysis(dataset_id, subject_id, params.dict())
+        return APIResponse(
+            message="空间分析完成",
             data=result
         )
     except Exception as e:
