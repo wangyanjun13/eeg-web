@@ -77,30 +77,44 @@ function updateChart() {
   const min = Math.min(...values);
   const max = Math.max(...values);
   
-  // 选择颜色映射
-  let colorStops;
-  if (props.colorMap === 'jet') {
-    colorStops = [
-      { offset: 0, color: '#00007F' },
-      { offset: 0.25, color: '#0000FF' },
-      { offset: 0.5, color: '#00FFFF' },
-      { offset: 0.75, color: '#FFFF00' },
-      { offset: 1, color: '#FF0000' }
-    ];
-  } else if (props.colorMap === 'RdBu') {
-    colorStops = [
-      { offset: 0, color: '#053061' },
-      { offset: 0.5, color: '#F7F7F7' },
-      { offset: 1, color: '#67001F' }
-    ];
-  } else {
-    // 默认蓝红色映射
-    colorStops = [
-      { offset: 0, color: '#0000FF' },
-      { offset: 0.5, color: '#FFFFFF' },
-      { offset: 1, color: '#FF0000' }
-    ];
+  // 简化颜色映射：使用固定颜色数组而不是动态添加colorStops
+  let colors = ['#00007F', '#0000FF', '#00FFFF', '#FFFF00', '#FF0000']; // 默认jet
+  
+  if (props.colorMap === 'viridis') {
+    colors = ['#440154', '#433982', '#30678D', '#218F8B', '#36B677', '#8ED542', '#FDE725'];
+  } else if (props.colorMap === 'plasma') {
+    colors = ['#0D0887', '#5B02A3', '#9A179B', '#CB4678', '#EB7852', '#FBB32F', '#F0F921'];
+  } else if (props.colorMap === 'inferno') {
+    colors = ['#000004', '#320A5A', '#781C6D', '#BC3754', '#ED6925', '#FBB32F', '#FCFEA4'];
   }
+  
+  // 准备插值数据点
+  const interpolationData = [];
+  try {
+    // 从电极位置和值创建插值数据
+    for (let i = 0; i < positions.length; i++) {
+      if (positions[i] && positions[i].length === 2 && !isNaN(values[i])) {
+        interpolationData.push({
+          value: [positions[i][0], positions[i][1], values[i]]
+        });
+      }
+    }
+  } catch (e) {
+    console.error('准备插值数据时出错:', e);
+  }
+  
+  // 创建热力图数据点
+  const resolution = props.data.interpolation?.resolution || 64;
+  const gridStep = 1.4 / resolution;
+  const gridData = [];
+  
+  // 使用电极位置作为散点图数据，使用大小和颜色表示值
+  const pointData = positions.map((pos, idx) => {
+    return {
+      value: [pos[0], pos[1], values[idx]],
+      symbolSize: Math.max(5, Math.min(20, 5 + values[idx] / max * 15)), // 根据值调整大小
+    };
+  });
   
   const option = {
     title: {
@@ -114,6 +128,8 @@ function updateChart() {
           const channelName = props.data.channels[index];
           const value = values[index].toFixed(2);
           return `${channelName}: ${value}`;
+        } else if (params.seriesName === 'values') {
+          return `值: ${params.value[2].toFixed(2)}`;
         }
         return '';
       }
@@ -124,7 +140,7 @@ function updateChart() {
       calculable: true,
       realtime: false,
       inRange: {
-        color: colorStops.map(stop => stop.color)
+        color: colors
       },
       text: [`最大值: ${max.toFixed(2)}`, `最小值: ${min.toFixed(2)}`],
       textStyle: {
@@ -135,7 +151,8 @@ function updateChart() {
       left: '5%',
       right: '5%',
       top: '10%',
-      bottom: '15%'
+      bottom: '15%',
+      containLabel: true
     },
     xAxis: {
       show: false,
@@ -195,16 +212,17 @@ function updateChart() {
         z: 10
       },
       {
-        name: 'heatmap',
-        type: 'heatmap',
-        data: positions.map((pos, index) => [pos[0], pos[1], values[index]]),
-        pointSize: 10,
-        blurSize: 20,
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
+        name: 'values',
+        type: 'scatter',
+        data: pointData,
+        large: true,
+        largeThreshold: 500,
+        dimensions: ['x', 'y', 'value'],
+        itemStyle: {
+          opacity: 0.7
+        },
+        encode: {
+          tooltip: 2
         }
       },
       {
@@ -214,8 +232,8 @@ function updateChart() {
         symbol: 'circle',
         symbolSize: 5,
         itemStyle: {
-          color: '#000',
-          borderColor: '#fff',
+          color: '#fff',
+          borderColor: '#000',
           borderWidth: 1
         },
         z: 11
@@ -223,7 +241,11 @@ function updateChart() {
     ]
   };
   
-  chart.setOption(option);
+  try {
+    chart.setOption(option);
+  } catch (e) {
+    console.error('设置图表选项时出错:', e);
+  }
 }
 </script>
 

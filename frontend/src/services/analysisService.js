@@ -1060,7 +1060,7 @@ const analysisService = {
       console.warn('读取预处理数据失败', e);
     }
     
-    return api.post(`/api/analysis/${datasetId}/subjects/${subjectId}/connectivity`, params);
+    return api.post(`/api/analysis/${datasetId}/subjects/${subjectId}/spatial`, params);
   },
 
   /**
@@ -1257,7 +1257,62 @@ const analysisService = {
    * @returns {Promise<Object>} - 示例数据
    */
   getSpatialAnalysisExample() {
-    return api.get('/api/analysis/examples/spatial');
+    // 创建示例数据
+    // 标准10-20系统电极位置
+    const positions = [
+      [-0.3, -0.4], [0.3, -0.4], // Fp1, Fp2
+      [-0.5, -0.2], [-0.3, -0.2], [0, -0.2], [0.3, -0.2], [0.5, -0.2], // F7, F3, Fz, F4, F8
+      [-0.5, 0], [-0.3, 0], [0, 0], [0.3, 0], [0.5, 0], // T3, C3, Cz, C4, T4
+      [-0.5, 0.2], [-0.3, 0.2], [0, 0.2], [0.3, 0.2], [0.5, 0.2], // T5, P3, Pz, P4, T6
+      [-0.3, 0.4], [0.3, 0.4] // O1, O2
+    ];
+    
+    const channels = [
+      'Fp1', 'Fp2',
+      'F7', 'F3', 'Fz', 'F4', 'F8',
+      'T3', 'C3', 'Cz', 'C4', 'T4',
+      'T5', 'P3', 'Pz', 'P4', 'T6',
+      'O1', 'O2'
+    ];
+    
+    // 生成模式化的功率值
+    const values = [];
+    for (let i = 0; i < positions.length; i++) {
+      const [x, y] = positions[i];
+      // 模拟典型的alpha节律幅度：后部较高，前部较低
+      const posteriorFactor = (y + 0.5) / 1.0; // 值从前部到后部增加
+      // 增加一个左右两侧对称的alpha分布
+      const lateralFactor = 1 - Math.abs(x) * 0.5;
+      // 基础模式 + 随机噪声
+      const value = (posteriorFactor * 4 + lateralFactor * 2 + Math.random() * 0.5);
+      values.push(value);
+    }
+    
+    // 构建示例响应数据
+    const exampleData = {
+      positions: positions,
+      channels: channels,
+      values: values,
+      timePoints: [0, 100, 200, 300, 400, 500],
+      selectedFrequencyBand: 'alpha',
+      frequencyRange: [8, 13],
+      interpolation: {
+        method: "spline",
+        resolution: 64
+      },
+      display: {
+        colorMap: "jet",
+        showContour: true,
+        showElectrodes: true
+      }
+    };
+    
+    // 模拟异步API调用
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({ data: exampleData });
+      }, 500);
+    });
   },
 
   /**

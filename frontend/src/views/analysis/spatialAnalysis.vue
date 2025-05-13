@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import AppLayout from '@/components/layout/AppLayout.vue';
 import TopoMap from '@/components/analysis/TopoMap.vue';
+import TopoMap3D from '@/components/analysis/TopoMap3D.vue';
+import SourceLocalization from '@/components/analysis/SourceLocalization.vue';
 import { useLoading } from '@/composables/useLoading';
 import { useFormState } from '@/composables/useFormState';
 import analysisService from '@/services/analysisService';
@@ -239,18 +241,19 @@ function goToNextStep() {
     <div class="spatial-analysis-container">
       <h2>空间分析</h2>
       
-      <el-row :gutter="20">
-        <!-- 左侧控制面板 -->
-        <el-col :span="6">
-          <el-card class="control-panel">
-            <template #header>
-              <div class="card-header">
-                <h3>空间分析设置</h3>
-                <el-tag v-if="preprocessedDataAvailable" size="small" type="success">已加载预处理数据</el-tag>
-              </div>
-            </template>
-            
-            <el-form :model="analysisOptions" label-width="120px" label-position="left">
+      <!-- 参数设置面板（顶部） -->
+      <el-card class="control-panel">
+        <template #header>
+          <div class="card-header">
+            <h3>空间分析设置</h3>
+            <el-tag v-if="preprocessedDataAvailable" size="small" type="success">已加载预处理数据</el-tag>
+          </div>
+        </template>
+        
+        <el-form :model="analysisOptions" label-position="top" label-width="120px">
+          <el-row :gutter="20">
+            <!-- 第一列 -->
+            <el-col :span="6">
               <!-- 通道选择 -->
               <el-form-item label="通道选择">
                 <el-button type="primary" size="small" @click="handleSelectChannels">
@@ -261,7 +264,10 @@ function goToNextStep() {
                   <span v-if="selectedChannels.length > 3">等{{ selectedChannels.length }}个通道</span>
                 </div>
               </el-form-item>
-              
+            </el-col>
+            
+            <!-- 第二列 -->
+            <el-col :span="6">
               <!-- 频带选择 -->
               <el-form-item label="频带选择">
                 <el-select v-model="selectedFrequencyBand" placeholder="选择频带">
@@ -285,108 +291,116 @@ function goToNextStep() {
                   />
                 </el-select>
               </el-form-item>
-              
-              <!-- 插值方法 -->
-              <el-form-item label="插值方法">
-                <el-select v-model="analysisOptions.interpolation.method">
+            </el-col>
+            
+            <!-- 第三列 -->
+            <el-col :span="6">
+              <!-- 插值设置 -->
+              <el-form-item label="插值设置">
+                <el-select v-model="analysisOptions.interpolation.method" style="width: 100%; margin-bottom: 10px;">
                   <el-option label="样条插值" value="spline" />
                   <el-option label="线性插值" value="linear" />
                   <el-option label="最近邻插值" value="nearest" />
                 </el-select>
+                
+                <el-form-item label="分辨率">
+                  <el-slider
+                    v-model="analysisOptions.interpolation.resolution"
+                    :min="32"
+                    :max="128"
+                    :step="16"
+                    show-input
+                  />
+                </el-form-item>
               </el-form-item>
-              
-              <!-- 插值分辨率 -->
-              <el-form-item label="插值分辨率">
-                <el-slider
-                  v-model="analysisOptions.interpolation.resolution"
-                  :min="32"
-                  :max="128"
-                  :step="16"
-                  show-input
-                />
-              </el-form-item>
-              
+            </el-col>
+            
+            <!-- 第四列 -->
+            <el-col :span="6">
               <!-- 显示设置 -->
               <el-form-item label="显示设置">
-                <el-checkbox v-model="analysisOptions.display.showContour">显示等高线</el-checkbox>
-                <el-checkbox v-model="analysisOptions.display.showElectrodes">显示电极位置</el-checkbox>
-                <el-checkbox v-model="analysisOptions.display.normalize">归一化</el-checkbox>
+                <div class="display-options">
+                  <el-checkbox v-model="analysisOptions.display.showContour">显示等高线</el-checkbox>
+                  <el-checkbox v-model="analysisOptions.display.showElectrodes">显示电极位置</el-checkbox>
+                  <el-checkbox v-model="analysisOptions.display.normalize">归一化</el-checkbox>
+                </div>
+                
+                <el-form-item label="颜色映射">
+                  <el-select v-model="analysisOptions.display.colorMap" style="width: 100%;">
+                    <el-option label="Jet" value="jet" />
+                    <el-option label="Viridis" value="viridis" />
+                    <el-option label="Plasma" value="plasma" />
+                    <el-option label="Inferno" value="inferno" />
+                  </el-select>
+                </el-form-item>
               </el-form-item>
-              
-              <!-- 颜色映射 -->
-              <el-form-item label="颜色映射">
-                <el-select v-model="analysisOptions.display.colorMap">
-                  <el-option label="Jet" value="jet" />
-                  <el-option label="Viridis" value="viridis" />
-                  <el-option label="Plasma" value="plasma" />
-                  <el-option label="Inferno" value="inferno" />
-                </el-select>
-              </el-form-item>
-            </el-form>
-            
-            <!-- 操作按钮 -->
-            <div class="action-buttons">
-              <el-button @click="resetForm">重置</el-button>
-              <el-button type="primary" @click="runSpatialAnalysis" :loading="isLoading.applying"
-                         :disabled="selectedChannels.length === 0">
-                运行分析
-              </el-button>
-              <el-button @click="loadExampleData" :loading="isLoading.data">
-                加载示例数据
-              </el-button>
-              <el-button type="success" @click="goToNextStep">
-                下一步
-              </el-button>
-            </div>
-          </el-card>
-        </el-col>
+            </el-col>
+          </el-row>
+        </el-form>
         
-        <!-- 右侧显示区域 -->
-        <el-col :span="18">
-          <el-card class="data-display">
-            <template #header>
-              <div class="card-header">
-                <h3>空间分布</h3>
-                <el-tabs v-model="activeTab" type="card">
-                  <el-tab-pane label="头皮地形图" name="topo"></el-tab-pane>
-                  <el-tab-pane label="3D视图" name="3d"></el-tab-pane>
-                  <el-tab-pane label="源定位" name="source"></el-tab-pane>
-                </el-tabs>
-              </div>
-            </template>
-            
-            <div v-loading="isLoading.data || isLoading.applying">
-              <!-- 头皮地形图 -->
-              <div v-if="activeTab === 'topo' && topoData">
-                <TopoMap
-                  :data="topoData"
-                  :colorMap="analysisOptions.display.colorMap"
-                  :title="`${selectedFrequencyBand} 频带 (${selectedTimePoint || 'N/A'} ms)`"
-                />
-              </div>
-              
-              <!-- 3D视图 -->
-              <div v-else-if="activeTab === '3d' && topoData">
-                <div class="placeholder">
-                  <el-empty description="3D视图功能正在开发中" />
-                </div>
-              </div>
-              
-              <!-- 源定位 -->
-              <div v-else-if="activeTab === 'source' && topoData">
-                <div class="placeholder">
-                  <el-empty description="源定位功能正在开发中" />
-                </div>
-              </div>
-              
-              <!-- 无数据提示 -->
-              <div v-else class="no-data">
-                <el-empty description="暂无数据，请运行分析或加载示例数据" />
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+        <!-- 操作按钮 -->
+        <div class="action-buttons">
+          <el-button @click="resetForm">重置参数</el-button>
+          <el-button type="primary" @click="runSpatialAnalysis" :loading="isLoading.applying"
+                     :disabled="selectedChannels.length === 0">
+            运行分析
+          </el-button>
+          <el-button @click="loadExampleData" :loading="isLoading.data">
+            加载示例数据
+          </el-button>
+          <el-button type="success" @click="goToNextStep">
+            下一步
+          </el-button>
+        </div>
+      </el-card>
+      
+      <!-- 显示区域 -->
+      <el-card class="data-display" style="margin-top: 20px;">
+        <template #header>
+          <div class="card-header">
+            <h3>空间分布</h3>
+            <el-tabs v-model="activeTab" type="card">
+              <el-tab-pane label="头皮地形图" name="topo"></el-tab-pane>
+              <el-tab-pane label="3D视图" name="3d"></el-tab-pane>
+              <el-tab-pane label="源定位" name="source"></el-tab-pane>
+            </el-tabs>
+          </div>
+        </template>
+        
+        <div v-loading="isLoading.data || isLoading.applying">
+          <!-- 头皮地形图 -->
+          <div v-if="activeTab === 'topo' && topoData">
+            <TopoMap
+              :data="topoData"
+              :colorMap="analysisOptions.display.colorMap"
+              :title="`${selectedFrequencyBand} 频带 (${selectedTimePoint || 'N/A'} ms)`"
+            />
+          </div>
+          
+          <!-- 3D视图 -->
+          <div v-else-if="activeTab === '3d' && topoData">
+            <TopoMap3D
+              :data="topoData"
+              :colorMap="analysisOptions.display.colorMap"
+              :title="`${selectedFrequencyBand} 频带 (${selectedTimePoint || 'N/A'} ms) - 3D视图`"
+            />
+          </div>
+          
+          <!-- 源定位 -->
+          <div v-else-if="activeTab === 'source' && topoData">
+            <SourceLocalization
+              :data="topoData"
+              :colorMap="analysisOptions.display.colorMap"
+              :title="`${selectedFrequencyBand} 频带 (${selectedTimePoint || 'N/A'} ms) - 源定位`"
+            />
+          </div>
+          
+          <!-- 无数据提示 -->
+          <div v-else class="no-data">
+            <el-empty description="暂无数据，请运行分析或加载示例数据" />
+          </div>
+        </div>
+      </el-card>
       
       <!-- 分析流程导航 -->
       <AnalysisWorkflow 
@@ -433,11 +447,11 @@ function goToNextStep() {
 }
 
 .data-display {
-  height: calc(100vh - 180px);
+  height: calc(100vh - 380px);
   overflow: auto;
 }
 
-.no-data, .placeholder {
+.no-data {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -448,5 +462,12 @@ function goToNextStep() {
   font-size: 13px;
   color: #606266;
   margin-top: 8px;
+}
+
+.display-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 </style> 
