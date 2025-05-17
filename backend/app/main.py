@@ -5,7 +5,7 @@ from pathlib import Path
 
 # 直接导入路由器
 from app.api.dataset import router as dataset_router
-from app.api.visualization import router as visual_router
+from app.api.upload_visual import router as upload_visual_router
 from app.api.preprocess import router as preprocess_router
 from app.api.analysis import router as analysis_router
 from app.api.system import router as system_router, register_system_middleware  # 导入系统性能路由器和中间件
@@ -40,18 +40,19 @@ app.openapi = custom_openapi
 app.add_middleware(
     CORSMiddleware,
     # 允许所有前端开发环境的源
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # 移除了通配符
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],  # 暴露Content-Disposition头，用于文件下载
 )
 
 # 注册系统监控中间件
-app = register_system_middleware(app)
+# app = register_system_middleware(app)
 
 # 注册路由
 app.include_router(dataset_router)
-app.include_router(visual_router)
+app.include_router(upload_visual_router)
 app.include_router(preprocess_router)
 app.include_router(analysis_router)
 app.include_router(system_router)  # 添加系统性能路由器
@@ -78,6 +79,10 @@ async def startup_event():
     else:
         print("⚠️ Redis连接失败，将使用内存缓存")
     
-    # 创建必要的目录
-    Path("./logs").mkdir(exist_ok=True)
-    Path("./performance_data").mkdir(exist_ok=True)
+    # # 创建必要的目录
+    # Path("./logs").mkdir(exist_ok=True)
+    # Path("./performance_data").mkdir(exist_ok=True)
+    Path("./uploads").mkdir(exist_ok=True)
+    Path("./uploads/data").mkdir(exist_ok=True)
+    Path("./uploads/models").mkdir(exist_ok=True)
+    Path("./uploads/metadata").mkdir(exist_ok=True)

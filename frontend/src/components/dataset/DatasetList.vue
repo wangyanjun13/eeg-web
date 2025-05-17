@@ -174,6 +174,9 @@ defineExpose({
               <el-button @click="debouncedFetchDatasets">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
+              <el-button @click="router.push('/my-files')">
+                <el-icon><Document /></el-icon> 我的文件
+              </el-button>
               <el-button type="primary" @click="router.push('/upload')">上传数据集</el-button>
             </div>
           </div>

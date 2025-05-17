@@ -102,6 +102,10 @@ API_BASE_URL = "http://localhost:8000"  # 修改为您的实际地址
 
 默认情况下，API端点提供模拟数据。要使用真实系统数据，您需要修改 `app/api/system.py`文件中的相应端点实现，连接到您的真实数据源。
 
+#### 注册系统监控中间件
+测试要保留，注释掉不影响性能：在main.py文件中，注释掉 `register_system_middleware`函数：
+app = register_system_middleware(app)
+
 ### 自定义可视化
 
 您可以修改各个测试脚本中的可视化参数，如颜色、大小、标签等，以适应您的需求。
