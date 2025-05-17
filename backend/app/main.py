@@ -5,7 +5,7 @@ from pathlib import Path
 
 # 直接导入路由器
 from app.api.dataset import router as dataset_router
-from app.api.visualization import router as visual_router
+from app.api.upload_visual import router as upload_visual_router
 from app.api.preprocess import router as preprocess_router
 from app.api.analysis import router as analysis_router
 
@@ -57,7 +57,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(dataset_router)
-app.include_router(visual_router)
+app.include_router(upload_visual_router)
 app.include_router(preprocess_router)
 app.include_router(analysis_router)
 
@@ -82,3 +82,8 @@ async def startup_event():
         print("✅ Redis连接成功")
     else:
         print("⚠️ Redis连接失败，将使用内存缓存")
+
+    Path("./uploads").mkdir(exist_ok=True)
+    Path("./uploads/data").mkdir(exist_ok=True)
+    Path("./uploads/models").mkdir(exist_ok=True)
+    Path("./uploads/metadata").mkdir(exist_ok=True)
