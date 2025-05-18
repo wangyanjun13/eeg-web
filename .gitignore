@@ -20,3 +20,16 @@ frontend/node_modules/
 .DS_Store
 __pycache__/
 *.pyc
+
+# 忽略上传目录及其所有内容
+/uploads/
+/uploads/**/*
+**/uploads/
+**/uploads/**/*
+backend/uploads/
+backend/uploads/**/*
+
+# 忽略性能数据
+/performance_data/
+**/performance_data/
+backend/performance_data/

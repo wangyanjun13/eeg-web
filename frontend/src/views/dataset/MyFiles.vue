@@ -203,7 +203,7 @@ const refreshFiles = async () => {
     ElMessage.success('文件列表已刷新');
   } catch (error) {
     console.error('刷新文件列表失败:', error);
-    ElMessage.error('刷新文件列表失败，请重试');
+    ElMessage.error('刷新文件列表失败，请手动刷新即可');
   } finally {
     loading.value = false;
   }

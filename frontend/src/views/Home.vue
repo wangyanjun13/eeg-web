@@ -65,13 +65,17 @@ onMounted(() => {
 
 <template>
   <div class="home-container">
+    <!-- 全屏背景图层，放在最顶层 -->
+    <div class="svg-poster-container">
+      <img src="@/assets/back2.png" class="svg-poster" alt="EEG 背景" />
+      <div class="poster-overlay"></div>
+    </div>
     <!-- 顶部导航栏 -->
     <header class="home-header">
       <div class="header-left">
-        <img src="@/assets/vue.svg" alt="Logo" class="header-logo" />
+        <img src="@/assets/eeg-logo.svg" alt="Logo" class="header-logo" />
         <h1 class="header-title">EEG数据分析交互展示平台</h1>
       </div>
-      
       <div class="header-right">
         <template v-if="userInfo">
           <el-button type="primary" @click="goToDatasets">进入系统</el-button>
@@ -81,7 +85,6 @@ onMounted(() => {
         </template>
       </div>
     </header>
-    
     <!-- 主要内容区域 -->
     <main class="home-main">
       <!-- 欢迎区域 -->
@@ -93,13 +96,9 @@ onMounted(() => {
           </p>
         </div>
         <div class="hero-image">
-          <!-- 这里可以放置一个脑电相关的示意图 -->
-          <div class="placeholder-image">
-            <el-icon :size="100"><DataAnalysis /></el-icon>
-          </div>
+          <img src="@/assets/eeg-logo.svg" alt="EEG Logo" class="eeg-logo" />
         </div>
       </section>
-      
       <!-- 特点展示区域 -->
       <section class="features-section">
         <h2 class="section-title">系统特点</h2>
@@ -114,7 +113,6 @@ onMounted(() => {
         </div>
       </section>
     </main>
-    
     <!-- 页脚 -->
     <footer class="home-footer">
       <p>© {{ new Date().getFullYear() }} EEG数据分析交互展示平台 版权所有</p>
@@ -127,12 +125,45 @@ onMounted(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* 全屏背景图层，z-index最低 */
+.svg-poster-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.svg-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.poster-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(245, 247, 250, 0.6) 90%,
+    rgba(245, 247, 250, 0.8) 100%
+  );
 }
 
 /* 顶部导航栏 */
 .home-header {
   height: 70px;
-  background-color: white;
+  background-color: rgba(255, 255, 255, 0.8);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
@@ -143,6 +174,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   z-index: 100;
+  backdrop-filter: blur(10px);
 }
 
 .header-left {
@@ -167,35 +199,63 @@ onMounted(() => {
 .home-main {
   flex: 1;
   margin-top: 70px;
+  position: relative;
+  z-index: 10;
 }
 
 /* 欢迎区域 */
 .hero-section {
-  padding: 80px 40px;
+  padding: 0 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   max-width: 1200px;
   margin: 0 auto;
+  position: relative;
+  z-index: 10;
+  margin-top: 80px;
+  min-height: calc(100vh - 300px);
 }
 
 .hero-content {
   flex: 1;
   max-width: 600px;
+  background-color: rgba(255, 255, 255, 0.85);
+  padding: 40px;
+  border-radius: 15px;
+  box-shadow: 0 15px 35px rgba(2, 2, 2, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(12, 12, 12, 0.2);
+  animation: fadeInUp 1s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .hero-title {
   font-size: 42px;
-  color: #303133;
+  color: #f2f2f2;
   margin: 0 0 20px;
   font-weight: 600;
   line-height: 1.2;
+  background: linear-gradient(45deg, #409EFF, #53a8ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 10px rgba(64, 158, 255, 0.3);
 }
 
 .hero-subtitle {
   font-size: 18px;
   color: #606266;
-  margin: 0;
+  margin: 0 0 30px;
   line-height: 1.5;
 }
 
@@ -204,31 +264,59 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  /* 让图片区域更大 */
+  min-width: 550px;
+  min-height: 550px;
 }
 
-.placeholder-image {
+.eeg-logo {
   width: 300px;
   height: 300px;
-  background-color: #f0f5ff;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: #409EFF;
+  filter: drop-shadow(0 10px 20px rgba(64, 158, 255, 0.3));
+  animation: pulse 4s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.05) rotate(2deg);
+  }
 }
 
 /* 特点展示区域 */
 .features-section {
-  padding: 60px 40px;
-  background-color: #f5f7fa;
+  padding: 100px 40px 80px;
+  background-color: rgba(255, 255, 255, 0.9);
+  position: relative;
+  z-index: 10;
+  margin-top: 50px;
+  border-radius: 30px 30px 0 0;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(5px);
 }
 
 .section-title {
-  font-size: 32px;
+  font-size: 36px;
   color: #303133;
   text-align: center;
-  margin: 0 0 50px;
+  margin: 0 0 60px;
   font-weight: 600;
+  position: relative;
+}
+
+.section-title::after {
+  content: "";
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, #409EFF, #53a8ff);
+  border-radius: 2px;
 }
 
 .features-grid {
@@ -240,25 +328,54 @@ onMounted(() => {
 }
 
 .feature-card {
-  background-color: white;
-  border-radius: 8px;
+  background-color: rgb(136, 178, 205);
+  border-radius: 15px;
   padding: 30px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: transform 0.3s, box-shadow 0.3s;
+  box-shadow: 0 10px 30px rgba(94, 91, 91, 0.05);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  border-top: 4px solid #409EFF;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(255, 255, 255, 0) 50%);
+  z-index: 0;
 }
 
 .feature-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(64, 158, 255, 0.2);
 }
 
 .feature-icon {
   margin-bottom: 20px;
   color: #409EFF;
+  background-color: #ecf5ff;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(64, 158, 255, 0.4);
 }
 
 .feature-title {
@@ -266,6 +383,8 @@ onMounted(() => {
   color: #303133;
   margin: 0 0 15px;
   font-weight: 600;
+  position: relative;
+  z-index: 1;
 }
 
 .feature-description {
@@ -273,35 +392,55 @@ onMounted(() => {
   color: #606266;
   margin: 0;
   line-height: 1.5;
+  position: relative;
+  z-index: 1;
 }
 
 /* 页脚 */
 .home-footer {
-  background-color: #303133;
+  background-color: rgba(48, 49, 51, 0.9);
   color: #c0c4cc;
   padding: 30px;
   text-align: center;
+  position: relative;
+  z-index: 10;
+  backdrop-filter: blur(5px);
 }
 
 /* 响应式适配 */
 @media (max-width: 992px) {
   .hero-section {
     flex-direction: column;
-    padding: 60px 20px;
+    padding: 0 20px;
+    margin-top: 80px;
   }
   
   .hero-content {
     max-width: 100%;
     text-align: center;
     margin-bottom: 40px;
+    padding: 30px;
+  }
+  
+  .hero-buttons {
+    justify-content: center;
   }
   
   .hero-title {
     font-size: 36px;
   }
+  
+  .eeg-logo {
+    width: 250px;
+    height: 250px;
+  }
 }
 
 @media (max-width: 768px) {
+  .hero-section {
+    margin-top: 80px;
+  }
+  
   .home-header {
     padding: 0 20px;
   }
@@ -323,13 +462,21 @@ onMounted(() => {
     font-size: 16px;
   }
   
-  .placeholder-image {
+  .eeg-logo {
     width: 200px;
     height: 200px;
+  }
+  
+  .hero-content {
+    padding: 20px;
   }
 }
 
 @media (max-width: 576px) {
+  .hero-section {
+    margin-top: 80px;
+  }
+  
   .home-header {
     padding: 0 15px;
   }
@@ -348,9 +495,19 @@ onMounted(() => {
     font-size: 28px;
   }
   
-  .placeholder-image {
+  .eeg-logo {
     width: 150px;
     height: 150px;
+  }
+  
+  .hero-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .features-section {
+    padding: 60px 15px 40px;
+    margin-top: 30px;
   }
 }
 </style> 

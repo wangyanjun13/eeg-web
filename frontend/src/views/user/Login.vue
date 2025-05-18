@@ -81,7 +81,7 @@ const handleLogin = () => {
             console.error('记录访问量失败', e);
           }
           
-          ElMessage.success('登录成功');
+          ElMessage.success('登录成功');  
           
           // 跳转到首页
           router.push('/');
@@ -122,7 +122,7 @@ loadSavedCredentials();
       <!-- 登录页顶部 -->
       <div class="login-header">
         <div class="logo-container">
-          <img src="@/assets/vue.svg" alt="Logo" class="logo" />
+          <img src="@/assets/eeg-logo.svg" alt="Logo" class="logo" />
           <h1 class="title">EEG数据分析交互展示平台</h1>
         </div>
         <p class="subtitle">脑电数据分析与模型评测系统</p>
@@ -203,7 +203,25 @@ loadSavedCredentials();
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  /* 添加背景图片 - 您可以替换为自己的图片 */
+  background-image: url('@/assets/back2.png'); /* 请将图片放在 public 文件夹中 */
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景遮罩，提高可读性 */
+.login-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(202, 226, 254, 0.75); /* 半透明背景 */
+  backdrop-filter: blur(5px); /* 毛玻璃效果 */
+  z-index: 0;
 }
 
 .login-content {
@@ -213,11 +231,20 @@ loadSavedCredentials();
   width: 100%;
   max-width: 420px;
   padding: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .login-header {
   text-align: center;
   margin-bottom: 30px;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 100%;
 }
 
 .logo-container {
@@ -248,7 +275,10 @@ loadSavedCredentials();
 .login-card {
   width: 100%;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .card-header {
@@ -289,8 +319,12 @@ loadSavedCredentials();
 .login-footer {
   margin-top: 30px;
   text-align: center;
-  color: #909399;
+  color: #606266;
   font-size: 12px;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 10px 20px;
+  border-radius: 20px;
+  backdrop-filter: blur(5px);
 }
 
 /* 响应式适配 */
