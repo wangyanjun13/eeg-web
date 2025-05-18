@@ -5,9 +5,17 @@ import time
 import numpy as np
 import scipy.io as sio
 import traceback
+import shutil
+import asyncio
+import gc
+import psutil
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Union, Tuple
+from fastapi import UploadFile, BackgroundTasks, HTTPException
+
+logger = logging.getLogger("upload_service")
 
 class UploadService:
     """
@@ -1181,3 +1189,314 @@ class ModelEvaluationService:
                 "elapsed_time": float(elapsed_time)
             }
         }
+
+class FileUploadService:
+    """
+    文件上传服务类，处理文件上传的业务逻辑
+    """
+    def __init__(self, data_dir, model_dir, temp_dir, upload_service):
+        self.data_dir = data_dir
+        self.model_dir = model_dir
+        self.temp_dir = temp_dir
+        self.upload_service = upload_service
+        
+        # 上传配置
+        self.CHUNK_SIZE = 1024 * 1024  # 1MB 默认块大小
+        self.LARGE_FILE_THRESHOLD = 50 * 1024 * 1024  # 50MB 大文件阈值
+        self.VERY_LARGE_FILE_THRESHOLD = 200 * 1024 * 1024  # 200MB 超大文件阈值
+        self.MAX_MEMORY_PERCENT = 80  # 内存使用率超过此值时触发垃圾回收
+        
+        # HTTP/2 协议优化参数 - 降低 HTTP/2 的块大小以避免协议错误
+        self.HTTP2_CHUNK_SIZE_VERY_LARGE = 512 * 1024  # 512KB 用于 HTTP/2 超大文件 (原为 256KB)
+        self.HTTP2_CHUNK_SIZE_LARGE = 256 * 1024  # 256KB 用于 HTTP/2 大文件 (原为 128KB)
+        self.HTTP2_CHUNK_SIZE_NORMAL = 128 * 1024  # 128KB 用于 HTTP/2 普通文件 (原为 64KB)
+        self.HTTP2_DELAY_MS = 20  # HTTP/2 连接的块间延迟（毫秒）(原为 50ms)
+        self.HTTP1_CHUNK_SIZE_VERY_LARGE = 5 * 1024 * 1024  # 5MB 用于 HTTP/1.1 超大文件
+        self.HTTP1_CHUNK_SIZE_LARGE = 2 * 1024 * 1024  # 2MB 用于 HTTP/1.1 大文件
+        self.HTTP1_DELAY_MS = 2  # HTTP/1.1 连接的块间延迟（毫秒）(原为 5ms)
+    
+    def check_http2_connection(self, headers):
+        """检查是否是 HTTP/2 连接"""
+        http_version = "HTTP/1.1"  # 默认
+        is_http2 = False
+        
+        # 检查是否是 HTTP/2 连接
+        if "via" in headers and "HTTP/2" in headers["via"]:
+            http_version = "HTTP/2"
+            is_http2 = True
+        elif "sec-ch-ua" in headers:  # 现代浏览器通常会发送这个头
+            # 大多数现代浏览器默认使用 HTTP/2
+            http_version = "可能是 HTTP/2"
+            is_http2 = True
+        
+        # 检查客户端是否请求使用 HTTP/1.1
+        if "x-prefer-http-version" in headers and headers["x-prefer-http-version"] == "HTTP/1.1":
+            http_version = "客户端请求 HTTP/1.1"
+            is_http2 = False
+        
+        # 记录客户端浏览器信息
+        client_browser = headers.get("x-client-browser", "未知浏览器")
+        
+        logger.info(f"客户端连接类型: {http_version}, 是否 HTTP/2: {is_http2}")
+        logger.info(f"客户端浏览器: {client_browser}")
+        
+        return is_http2
+    
+    def check_system_resources(self):
+        """检查系统资源使用情况，如果内存使用率过高则触发垃圾回收"""
+        try:
+            memory_info = psutil.virtual_memory()
+            memory_percent = memory_info.percent
+            
+            if memory_percent > self.MAX_MEMORY_PERCENT:
+                logger.warning(f"内存使用率过高 ({memory_percent}%)，触发垃圾回收")
+                gc.collect()
+                return False
+            
+            return True
+        except Exception as e:
+            logger.error(f"检查系统资源时出错: {str(e)}")
+            return True  # 出错时默认继续执行
+    
+    def cleanup_temp_files(self, temp_file_path: str):
+        """清理临时文件"""
+        try:
+            if os.path.exists(temp_file_path):
+                logger.info(f"清理临时文件: {temp_file_path}")
+                os.remove(temp_file_path)
+        except Exception as e:
+            logger.error(f"清理临时文件失败: {temp_file_path}, 错误: {str(e)}")
+    
+    async def process_file_upload(self, file, file_type, name, description, file_format, is_http2, background_tasks):
+        """处理文件上传的主要逻辑"""
+        start_time = time.time()  # 记录开始时间
+        
+        # 验证文件类型
+        if file_type not in ["data", "model"]:
+            raise HTTPException(status_code=400, detail="文件类型必须是 'data' 或 'model'")
+        
+        # 根据文件类型选择保存目录
+        upload_dir = self.data_dir if file_type == "data" else self.model_dir
+        
+        # 获取文件扩展名
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        
+        # 验证文件扩展名
+        valid_data_extensions = [".set", ".fdt", ".mat", ".npy"]
+        valid_model_extensions = [".h5"]
+        
+        if file_type == "data" and file_extension not in valid_data_extensions:
+            raise HTTPException(status_code=400, detail="数据文件必须是 .set, .fdt, .mat 或 .npy 格式")
+        
+        if file_type == "model" and file_extension not in valid_model_extensions:
+            raise HTTPException(status_code=400, detail="模型文件必须是 .h5 格式")
+        
+        # 生成唯一文件名
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        unique_filename = f"{timestamp}_{file.filename}"
+        file_path = upload_dir / unique_filename
+        
+        # 创建临时文件路径
+        temp_file_path = self.temp_dir / f"temp_{unique_filename}"
+        
+        # 估计文件大小
+        file_size = await self._get_file_size(file)
+        
+        # 根据文件大小和连接类型调整块大小和延迟
+        chunk_size, delay_ms = self._adjust_chunk_size_and_delay(file_size, is_http2)
+        
+        # 保存文件 - 使用分块写入以减少内存使用
+        try:
+            await self._save_file_with_chunks(file, temp_file_path, chunk_size, delay_ms, is_http2, start_time)
+            
+            # 将临时文件移动到最终位置
+            logger.info(f"将临时文件 {temp_file_path} 移动到 {file_path}")
+            shutil.move(str(temp_file_path), str(file_path))
+            
+            # 打印上传完成信息
+            elapsed_time = time.time() - start_time
+            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            speed = file_size_mb / elapsed_time if elapsed_time > 0 else 0
+            logger.info(f"文件上传完成: {file_path}, 大小: {file_size_mb:.2f} MB, 用时: {elapsed_time:.2f}秒, 平均速度: {speed:.2f} MB/s")
+            
+        except Exception as e:
+            # 如果出错，尝试删除已部分写入的文件
+            for path in [temp_file_path, file_path]:
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except:
+                        pass
+            
+            logger.error(f"文件上传失败: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # 检查是否为HTTP/2协议错误
+            error_str = str(e).lower()
+            if "http2" in error_str or "protocol_error" in error_str:
+                logger.error("检测到HTTP/2协议错误")
+                raise HTTPException(status_code=500, detail="网络传输错误，请尝试减小文件大小或使用HTTP/1.1连接")
+            
+            raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
+        finally:
+            # 确保关闭文件
+            await file.close()
+            
+            # 添加清理临时文件的后台任务
+            if os.path.exists(temp_file_path):
+                background_tasks.add_task(self.cleanup_temp_files, str(temp_file_path))
+            
+            # 强制垃圾回收
+            gc.collect()
+        
+        # 检查文件是否成功保存
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=500, detail="文件保存失败")
+        
+        # 获取文件大小
+        file_size = os.path.getsize(file_path)
+        
+        # 保存元数据
+        metadata = {
+            "name": name,
+            "description": description,
+            "original_filename": file.filename,
+            "saved_filename": unique_filename,
+            "file_type": file_type,
+            "file_format": file_format or file_extension.replace(".", ""),
+            "upload_time": timestamp,
+            "file_size": file_size,
+            "file_path": str(file_path),
+            "upload_duration": elapsed_time
+        }
+        
+        logger.info(f"准备保存文件元数据: {metadata}")
+        
+        # 将元数据保存到服务中
+        file_id = self.upload_service.save_file_metadata(metadata)
+        
+        # 返回成功响应
+        return {
+            "status": "success", 
+            "message": "文件上传成功", 
+            "file_id": file_id, 
+            "metadata": metadata
+        }
+    
+    async def _get_file_size(self, file):
+        """尝试获取文件大小"""
+        file_size = 0
+        try:
+            # 尝试获取文件大小，如果可用
+            if hasattr(file, 'file') and hasattr(file.file, 'seek') and hasattr(file.file, 'tell'):
+                current_pos = file.file.tell()
+                file.file.seek(0, os.SEEK_END)
+                file_size = file.file.tell()
+                file.file.seek(current_pos)  # 恢复位置
+                logger.info(f"文件大小: {file_size / (1024 * 1024):.2f} MB")
+        except Exception as e:
+            logger.warning(f"无法获取文件大小: {str(e)}")
+        return file_size
+    
+    def _adjust_chunk_size_and_delay(self, file_size, is_http2):
+        """根据文件大小和连接类型调整块大小和延迟"""
+        chunk_size = self.CHUNK_SIZE
+        delay_ms = 0
+        
+        if is_http2:
+            # HTTP/2 连接需要更小的块大小以避免协议错误
+            if file_size > self.VERY_LARGE_FILE_THRESHOLD:
+                chunk_size = self.HTTP2_CHUNK_SIZE_VERY_LARGE  # 256KB 块大小用于 HTTP/2 超大文件
+                logger.info(f"检测到 HTTP/2 连接和超大文件，使用更小的块大小: {chunk_size/1024} KB")
+            elif file_size > self.LARGE_FILE_THRESHOLD:
+                chunk_size = self.HTTP2_CHUNK_SIZE_LARGE  # 128KB 块大小用于 HTTP/2 大文件
+                logger.info(f"检测到 HTTP/2 连接和大文件，使用更小的块大小: {chunk_size/1024} KB")
+            else:
+                chunk_size = self.HTTP2_CHUNK_SIZE_NORMAL  # 64KB 块大小用于 HTTP/2 普通文件
+                logger.info(f"检测到 HTTP/2 连接，使用更小的块大小: {chunk_size/1024} KB")
+            
+            delay_ms = self.HTTP2_DELAY_MS  # HTTP/2 连接使用较大延迟
+            logger.info(f"HTTP/2 连接使用块间延迟: {delay_ms}ms")
+        else:
+            # HTTP/1.1 连接可以使用更大的块大小
+            if file_size > self.VERY_LARGE_FILE_THRESHOLD:
+                chunk_size = self.HTTP1_CHUNK_SIZE_VERY_LARGE  # 5MB 块大小用于超大文件
+                logger.info(f"检测到超大文件，使用 {chunk_size/(1024*1024)} MB 块大小")
+            elif file_size > self.LARGE_FILE_THRESHOLD:
+                chunk_size = self.HTTP1_CHUNK_SIZE_LARGE  # 2MB 块大小用于大文件
+                logger.info(f"检测到大文件，使用 {chunk_size/(1024*1024)} MB 块大小")
+            
+            delay_ms = self.HTTP1_DELAY_MS  # HTTP/1.1 连接使用较小延迟
+            logger.info(f"HTTP/1.1 连接使用块间延迟: {delay_ms}ms")
+        
+        return chunk_size, delay_ms
+    
+    async def _save_file_with_chunks(self, file, temp_file_path, chunk_size, delay_ms, is_http2, start_time):
+        """使用分块写入保存文件"""
+        # 打开文件准备写入
+        with open(temp_file_path, "wb") as buffer:
+            # 分块读取和写入文件
+            total_size = 0
+            last_log_time = time.time()
+            last_gc_time = time.time()
+            chunk_count = 0
+            
+            # 读取第一个块
+            try:
+                chunk = await file.read(chunk_size)
+            except Exception as e:
+                logger.error(f"读取第一个文件块时出错: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"读取文件块时出错: {str(e)}")
+            
+            # 持续读取和写入，直到没有更多数据
+            while chunk:
+                chunk_count += 1
+                
+                try:
+                    # 检查是否需要触发垃圾回收
+                    current_time = time.time()
+                    if current_time - last_gc_time > 10:  # 每10秒检查一次 (原为15秒)
+                        self.check_system_resources()
+                        last_gc_time = current_time
+                    
+                    buffer.write(chunk)
+                    total_size += len(chunk)
+                    
+                    # 每秒最多记录一次日志，或每10MB记录一次
+                    current_time = time.time()
+                    if current_time - last_log_time > 1 or total_size % (10 * chunk_size) == 0:
+                        elapsed = current_time - start_time
+                        speed = total_size / (1024 * 1024 * elapsed) if elapsed > 0 else 0
+                        logger.info(f"上传进度: {total_size / (1024 * 1024):.2f} MB, 速度: {speed:.2f} MB/s")
+                        last_log_time = current_time
+                    
+                    # 读取下一个块前添加延迟
+                    if delay_ms > 0:
+                        await asyncio.sleep(delay_ms / 1000.0)  # 转换为秒
+                    
+                    # 对于HTTP/2连接，每处理一定数量的块后主动释放资源
+                    if is_http2:
+                        # 每10个块释放一次资源，而不是每5个块 (原为每5个块)
+                        if chunk_count % 10 == 0:
+                            logger.info(f"HTTP/2连接，主动释放资源 (块 #{chunk_count})")
+                            gc.collect()
+                            await asyncio.sleep(0.2)  # 200ms 延迟 (原为100ms)
+                    
+                    # 读取下一个块
+                    try:
+                        chunk = await file.read(chunk_size)
+                    except Exception as e:
+                        logger.error(f"读取文件块时出错: {str(e)}")
+                        raise HTTPException(status_code=500, detail=f"读取文件块时出错: {str(e)}")
+                    
+                except Exception as e:
+                    logger.error(f"处理文件块 #{chunk_count} 时出错: {str(e)}")
+                    # 检查是否为HTTP/2协议错误
+                    error_str = str(e).lower()
+                    if "http2" in error_str or "protocol_error" in error_str:
+                        logger.error("检测到HTTP/2协议错误")
+                        raise HTTPException(status_code=500, detail="网络传输错误，请尝试减小文件大小或使用HTTP/1.1连接")
+                    raise HTTPException(status_code=500, detail=f"处理文件块时出错: {str(e)}")
+            
+            # 完成所有块的写入
+            logger.info(f"文件上传完成，共写入 {total_size / (1024 * 1024):.2f} MB，{chunk_count} 个块")

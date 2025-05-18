@@ -289,6 +289,10 @@ build_frontend() {
     # 设置 npm 镜像
     npm config set registry https://registry.npmmirror.com
     
+    # 安装依赖（确保所有依赖都已安装）
+    echo "安装依赖包..."
+    npm install
+    
     # 设置更大的内存限制
     export NODE_OPTIONS="--max-old-space-size=4096"
     

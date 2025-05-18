@@ -46,20 +46,13 @@ sudo ./eeg-service.sh deploy
 
 ## 后端代码更新流程
 
-1. **修改后端代码后重启服务**:  sudo ./eeg-service.sh restart-prod
+**安装新的Python依赖**:
 
+sudo -E /data/venv/bin/python -m pip install -r backend/requirements.txt
+sudo ./eeg-service.sh restart-prod
 
-2. **安装新的Python依赖**:
+**修改后端代码后重启服务**:  sudo ./eeg-service.sh restart-prod
 
-   sudo -E /data/venv/bin/python -m pip install 新依赖包名称==版本号
-   sudo ./eeg-service.sh restart-prod
-
-
-3. **更新requirements.txt**:
-   在添加新依赖后，记得更新requirements.txt文件：
-
-   source /data/venv/bin/activate
-   pip freeze > backend/requirements.txt
 
 
 ## 常见问题解决

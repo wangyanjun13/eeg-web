@@ -44,15 +44,27 @@ app.add_middleware(
         "http://127.0.0.1:5173", 
         "https://eeg-visualization-platform.site",
         "http://eeg-visualization-platform.site",
+        "https://www.eeg-visualization-platform.site",
+        "http://www.eeg-visualization-platform.site",
+        # 确保 API 子域名也被允许
+        "https://api.eeg-visualization-platform.site",
+        "http://api.eeg-visualization-platform.site",
         "http://localhost:80",
         "http://127.0.0.1:80",
         "http://172.21.0.2:80",
         "http://172.21.0.2:5173",
         "*"  # 开发阶段保留通配符，生产环境应移除
     ],
+    # 允许凭证
     allow_credentials=True,
-    allow_methods=["*"],
+    # 允许所有方法
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    # 允许所有头
     allow_headers=["*"],
+    # 允许暴露的头
+    expose_headers=["Content-Length", "Content-Range", "Content-Disposition"],
+    # 预检请求缓存时间（秒）
+    max_age=3600,
 )
 
 # 注册路由

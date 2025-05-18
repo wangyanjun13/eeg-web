@@ -99,7 +99,7 @@ const goToHome = () => {
     <!-- 顶部导航栏 -->
     <header class="app-header">
       <div class="header-left">
-        <img src="@/assets/vue.svg" alt="Logo" class="header-logo" @click="goToHome" />
+        <img src="@/assets/eeg-logo.svg" alt="Logo" class="header-logo" @click="goToHome" />
         <h1 class="header-title">EEG数据分析交互展示平台</h1>
       </div>
       

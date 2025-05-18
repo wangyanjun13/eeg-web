@@ -1,6 +1,14 @@
 # EEG 可视化平台 .gitignore 文件
 
-# ===== 数据文件 =====
+# ===== 上传和数据文件 =====
+# 忽略上传目录及其所有内容
+/uploads/
+/backend/uploads/
+/backend/app/uploads/
+/backend/uploads/**/*
+/data/eeg-web/backend/uploads/
+/data/eeg-web/backend/uploads/**/*
+
 # 忽略数据样本目录和大型数据文件
 /data/eeg_samples/
 /data/venv/
@@ -18,6 +26,7 @@
 *.ds
 *.npy
 *.npz
+*.h5
 
 # 压缩文件
 *.zip
@@ -30,6 +39,8 @@
 # ===== 日志和临时文件 =====
 # 日志文件
 /logs/
+/data/eeg-web/logs/
+/backend/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -62,13 +73,28 @@ dist.bak.*
 
 # ===== 前端相关 =====
 # 依赖和构建
+/node_modules/
 /frontend/node_modules/
-/frontend/.pnp
-/frontend/.pnp.js
+/data/eeg-web/frontend/node_modules/
+node_modules/
+node_modules/**/*
+.pnp/
+.pnp.js
+/dist/
 /frontend/dist/
+/data/eeg-web/frontend/dist/
+dist/
+dist/**/*
+/dist-ssr/
 /frontend/dist-ssr/
+/.vite/
 /frontend/.vite/
+/coverage/
 /frontend/coverage/
+/.env
+/.env.*
+/.env.local
+/.env.*.local
 /frontend/.env
 /frontend/.env.*
 /frontend/.env.local
