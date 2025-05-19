@@ -65,16 +65,20 @@ onMounted(() => {
 
 <template>
   <div class="home-container">
-    <!-- 全屏背景图层，放在最顶层 -->
+    <!-- 全屏背景视频层，放在最顶层 -->
     <div class="svg-poster-container">
-      <img src="@/assets/back2.png" class="svg-poster" alt="EEG 背景" />
+      <video autoplay loop muted playsinline class="video-background">
+        <source src="@/assets/background.mp4" type="video/mp4">
+        <!-- 如果视频无法播放，则使用图片作为备选方案 -->
+        <img src="@/assets/back1.png" class="svg-poster" alt="EEG 背景" />
+      </video>
       <div class="poster-overlay"></div>
     </div>
-    <!-- 顶部导航栏 -->
+    <!-- 顶部导航栏 - 移除背景和阴影 -->
     <header class="home-header">
       <div class="header-left">
         <img src="@/assets/eeg-logo.svg" alt="Logo" class="header-logo" />
-        <h1 class="header-title">EEG数据分析交互展示平台</h1>
+        <h1 class="header-title">EEG数据分析交互式可视化平台</h1>
       </div>
       <div class="header-right">
         <template v-if="userInfo">
@@ -90,9 +94,9 @@ onMounted(() => {
       <!-- 欢迎区域 -->
       <section class="hero-section">
         <div class="hero-content">
-          <h2 class="hero-title">脑电数据分析与模型评测系统</h2>
+          <h2 class="hero-title">脑电数据分析交互展示平台</h2>
           <p class="hero-subtitle">
-            专业的EEG数据处理、分析和模型评测平台，为脑电研究提供全方位支持
+            较为完备的EEG数据预处理、分析和模型评测平台，为脑电学习研究提供支持！
           </p>
         </div>
         <div class="hero-image">
@@ -115,7 +119,11 @@ onMounted(() => {
     </main>
     <!-- 页脚 -->
     <footer class="home-footer">
-      <p>© {{ new Date().getFullYear() }} EEG数据分析交互展示平台 版权所有</p>
+      <p>© {{ new Date().getFullYear() }} EEG数据分析交互式可视化平台 版权所有</p>
+      <div class="developer-contact">
+        <span>联系开发者：</span>
+        <a href="mailto:wangyanjun13@foxmail.com">wangyanjun13@foxmail.com</a>
+      </div>
     </footer>
   </div>
 </template>
@@ -129,7 +137,7 @@ onMounted(() => {
   overflow-x: hidden;
 }
 
-/* 全屏背景图层，z-index最低 */
+/* 全屏背景视频层，放在最顶层 */
 .svg-poster-container {
   position: fixed;
   top: 0;
@@ -138,12 +146,23 @@ onMounted(() => {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .svg-poster {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* 视频背景样式 */
+.video-background {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .poster-overlay {
@@ -160,11 +179,11 @@ onMounted(() => {
   );
 }
 
-/* 顶部导航栏 */
+/* 顶部导航栏 - 移除背景和阴影 */
 .home-header {
   height: 70px;
-  background-color: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: transparent; /* 透明背景 */
+  box-shadow: none; /* 移除阴影 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -174,7 +193,6 @@ onMounted(() => {
   left: 0;
   right: 0;
   z-index: 100;
-  backdrop-filter: blur(10px);
 }
 
 .header-left {
@@ -190,9 +208,10 @@ onMounted(() => {
 
 .header-title {
   font-size: 22px;
-  color: #303133;
+  color: #f1f1f1;
   margin: 0;
   font-weight: 600;
+  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7); /* 添加文字阴影增加可读性 */
 }
 
 /* 主要内容区域 */
@@ -248,6 +267,7 @@ onMounted(() => {
   line-height: 1.2;
   background: linear-gradient(45deg, #409EFF, #53a8ff);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 2px 10px rgba(64, 158, 255, 0.3);
 }
@@ -405,6 +425,29 @@ onMounted(() => {
   position: relative;
   z-index: 10;
   backdrop-filter: blur(5px);
+}
+
+/* 开发者联系信息 */
+.developer-contact {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.developer-contact:hover {
+  opacity: 1;
+}
+
+.developer-contact a {
+  color: #a0cfff;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.developer-contact a:hover {
+  color: #409EFF;
+  text-decoration: underline;
 }
 
 /* 响应式适配 */

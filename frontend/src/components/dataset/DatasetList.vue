@@ -333,6 +333,14 @@ defineExpose({
   width: 100%; /* 宽度占满 */
 }
 
+/* 列表卡片 */
+.list-card {
+  background-color: rgba(255, 255, 255, 0.8); /* 半透明白色背景 */
+  border: none; /* 移除边框 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* 轻微阴影 */
+  border-radius: 8px; /* 圆角 */
+}
+
 /* 列表头部 */
 .list-header {
   display: flex;
@@ -373,7 +381,7 @@ defineExpose({
   border-left: 4px solid #abcff6; /* 左侧添加蓝色边框 */
   border-radius: 4px; /* 减小圆角 */
   overflow: hidden; /* 确保内容不超出边框 */
-  /* background-color: #5ea4d2; 更改为浅蓝色背景 */
+  background-color: rgba(255, 255, 255, 0.9); /* 半透明白色背景 */
 }
 
 /* 覆盖el-card的默认内边距 */
@@ -385,8 +393,8 @@ defineExpose({
 .dataset-item:hover {
   transform: translateY(-2px); /* 上移效果 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 阴影增强 */
-  background-color: #abcff6; /* 悬停时背景色变为更深的浅蓝 */
-  border-left-color: #abcff6; /* 悬停时边框颜色变亮 */
+  background-color: #e1edff; /* 悬停时背景色变为更深的浅蓝 */
+  border-left-color: #409EFF; /* 悬停时边框颜色变亮 */
 }
 
 /* 数据集信息容器 */
@@ -474,5 +482,18 @@ defineExpose({
 .visit-count .el-icon {
   margin-right: 5px;
   font-size: 16px;
+}
+
+/* 筛选面板容器 */
+.filter-panel-container {
+  margin-bottom: 20px;
+}
+
+.filter-panel {
+  background-color: rgba(255, 255, 255, 0.9); /* 半透明白色背景 */
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 </style> 
