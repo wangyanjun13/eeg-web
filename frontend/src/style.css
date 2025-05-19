@@ -1,11 +1,30 @@
+/* 主题相关的CSS变量 */
 :root {
+  /* 默认浅色主题变量 */
+  --background-color: #ffffff;
+  --text-color: #213547;
+  --text-color-secondary: #606266;
+  --border-color: #dcdfe6;
+  --primary-color: #409EFF;
+  --primary-hover-color: #79bbff;
+  --success-color: #67C23A;
+  --warning-color: #E6A23C;
+  --danger-color: #F56C6C;
+  --info-color: #909399;
+  --card-background: #ffffff;
+  --header-background: rgba(255, 255, 255, 0.8);
+  --footer-background: rgba(48, 49, 51, 0.9);
+  --footer-text-color: #c0c4cc;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --hover-background: #f5f7fa;
+  
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: var(--text-color);
+  background-color: var(--background-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,13 +32,61 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 深色主题变量 */
+:root.theme-dark {
+  --background-color: #1a1a1a;
+  --text-color: rgb(255, 255, 255);
+  --text-color-secondary: #a6a6a6;
+  --border-color: #4c4c4c;
+  --primary-color: #79bbff;
+  --primary-hover-color: #a0cfff;
+  --success-color: #85ce61;
+  --warning-color: #ebb563;
+  --danger-color: #f78989;
+  --info-color: #a6a9ad;
+  --card-background: #2c2c2c;
+  --header-background: rgba(42, 42, 42, 0.8);
+  --footer-background: rgba(28, 28, 28, 0.9);
+  --footer-text-color: #a6a6a6;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --hover-background: #363636;
+  
+  color-scheme: dark;
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
+/* 浅色主题变量 - 显式定义，确保主题切换时覆盖系统默认值 */
+:root.theme-light {
+  --background-color: #ffffff;
+  --text-color: #213547;
+  --text-color-secondary: #606266;
+  --border-color: #dcdfe6;
+  --primary-color: #409EFF;
+  --primary-hover-color: #79bbff;
+  --success-color: #67C23A;
+  --warning-color: #E6A23C;
+  --danger-color: #F56C6C;
+  --info-color: #909399;
+  --card-background: #ffffff;
+  --header-background: rgba(255, 255, 255, 0.8);
+  --footer-background: rgba(48, 49, 51, 0.9);
+  --footer-text-color: #c0c4cc;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --hover-background: #f5f7fa;
+  
+  color-scheme: light;
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--primary-color);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--primary-hover-color);
 }
 
 body {
@@ -28,11 +95,14 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+  color: var(--text-color);
 }
 
 button {
@@ -42,12 +112,12 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--hover-background);
   cursor: pointer;
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--primary-color);
 }
 button:focus,
 button:focus-visible {
@@ -56,6 +126,9 @@ button:focus-visible {
 
 .card {
   padding: 2em;
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px var(--shadow-color);
 }
 
 #app {
@@ -65,25 +138,15 @@ button:focus-visible {
   text-align: center;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
-
 .channel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 10px;
   max-height: 400px;
   overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px;
 }
 
 .channel-select-header {
@@ -95,12 +158,12 @@ button:focus-visible {
 
 /* 已选通道数显示样式 */
 .selected-count {
-  background-color: #f0f9eb;
-  color: #739fc8;
+  background-color: var(--hover-background);
+  color: var(--primary-color);
   padding: 5px 10px;
   border-radius: 4px;
   font-weight: bold;
-  border: 1px solid #e1f3d8;
+  border: 1px solid var(--border-color);
 }
 
 .dialog-footer {
@@ -116,6 +179,7 @@ button:focus-visible {
   width: 700px;
   height: 600px;
   margin: 0 auto 20px;
+  background-color: var(--card-background);
 }
 
 /* 头部轮廓 */
@@ -124,7 +188,7 @@ button:focus-visible {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 2px solid #0e0a0a;
+  border: 2px solid var(--text-color);
   top: 0;
   left: 0;
 }
@@ -134,7 +198,7 @@ button:focus-visible {
   position: absolute;
   width: 40px;
   height: 80px;
-  border: 2px solid #060605;
+  border: 2px solid var(--text-color);
   border-radius: 50%;
   top: 50%;
   transform: translateY(-50%);
@@ -159,7 +223,7 @@ button:focus-visible {
   position: absolute;
   width: 20px;
   height: 20px;
-  border: 2px solid #ccc;
+  border: 2px solid var(--border-color);
   border-radius: 50%;
   top: 0;
   left: 50%;
@@ -172,8 +236,8 @@ button:focus-visible {
   width: 10px; /* 进一步缩小圆圈尺寸 */
   height: 10px; /* 进一步缩小圆圈尺寸 */
   border-radius: 50%;
-  background-color: white;
-  border: 1px solid #333;
+  background-color: var(--card-background);
+  border: 1px solid var(--text-color);
   transform: translate(-50%, -50%);
   cursor: pointer;
   z-index: 20;
@@ -182,9 +246,9 @@ button:focus-visible {
 
 /* 选中的通道标记 - 绿色 */
 .channel-marker.selected {
-  background-color: #67C23A;
-  border-color: #333;
-  box-shadow: 0 0 5px rgba(28, 167, 25, 0.8);
+  background-color: var(--success-color);
+  border-color: var(--text-color);
+  box-shadow: 0 0 5px var(--success-color);
   width: 13px; /* 选中时略微放大 */
   height: 13px; /* 选中时略微放大 */
 }
@@ -192,7 +256,7 @@ button:focus-visible {
 /* 通道标签 - 调整位置和样式 */
 .channel-label {
   position: absolute;
-  color: #000; /* 更深的黑色文本 */
+  color: var(--text-color); /* 更深的黑色文本 */
   font-size: 11px; /* 稍微增大字体 */
   white-space: nowrap;
   pointer-events: none;
@@ -200,6 +264,55 @@ button:focus-visible {
   left: 13px; /* 固定在右侧 */
   top: 0; /* 调整垂直位置，使其在正右方 */
   font-weight: 700; /* 加粗字体 */
-  text-shadow: 0px 0px 2px white; /* 添加白色文字阴影增加可读性 */
+  text-shadow: 0px 0px 2px var(--background-color); /* 添加文字阴影增加可读性 */
+}
+
+/* 元素UI组件主题适配 */
+.el-button {
+  background-color: var(--hover-background);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.el-button--primary {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.el-button--primary:hover {
+  background-color: var(--primary-hover-color);
+  border-color: var(--primary-hover-color);
+}
+
+.el-card {
+  background-color: var(--card-background);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.el-input__inner {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.el-select-dropdown {
+  background-color: var(--card-background);
+  border-color: var(--border-color);
+}
+
+.el-select-dropdown__item {
+  color: var(--text-color);
+}
+
+.el-select-dropdown__item.hover, 
+.el-select-dropdown__item:hover {
+  background-color: var(--hover-background);
+}
+
+/* 过渡动画 */
+.theme-transition {
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
 }
 

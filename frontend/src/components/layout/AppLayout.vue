@@ -96,11 +96,14 @@ const goToHome = () => {
 
 <template>
   <div class="app-layout">
+    <!-- 全局背景层 -->
+    <div class="global-bg"></div>
+    
     <!-- 顶部导航栏 -->
     <header class="app-header">
       <div class="header-left">
         <img src="@/assets/eeg-logo.svg" alt="Logo" class="header-logo" @click="goToHome" />
-        <h1 class="header-title">EEG数据分析交互展示平台</h1>
+        <h1 class="header-title">EEG数据分析交互式可视化平台</h1>
       </div>
       
       <!-- 简化的主导航 -->
@@ -160,13 +163,25 @@ const goToHome = () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* 全局背景层 */
+.global-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.9);
+  z-index: -1; /* 确保背景在最底层 */
 }
 
 /*顶部导航栏*/
 .app-header {
   height: 60px;
-  background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.9); /* 半透明白色背景 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -175,6 +190,7 @@ const goToHome = () => {
   left: 0;
   right: 0;
   z-index: 1001;
+  backdrop-filter: blur(10px); /* 毛玻璃效果 */
 }
 
 .header-left {
@@ -224,12 +240,12 @@ const goToHome = () => {
 }
 
 .nav-item:hover {
-  background-color: #f0f5ff;
+  background-color: #e6f1ff; /* 更浅的蓝色 */
   color: #409EFF;
 }
 
 .nav-item.active {
-  background-color: #ecf5ff;
+  background-color: #e1edff; /* 浅蓝色背景 */
   color: #409EFF;
 }
 
@@ -261,6 +277,8 @@ const goToHome = () => {
   flex: 1;
   margin-top: 60px;
   display: flex;
+  position: relative;
+  z-index: 1; /* 确保内容在背景之上 */
 }
 
 .main-content {

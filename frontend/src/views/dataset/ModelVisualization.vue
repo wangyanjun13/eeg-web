@@ -90,7 +90,7 @@ const formatEEGData = (rawData) => {
   } else if (Array.isArray(rawData.data) && Array.isArray(rawData.data[0])) {
     // 多通道数据 - channels是数组，data是二维数组
     console.log('检测到多通道数据');
-    channels.forEach((channel, idx) => {
+  channels.forEach((channel, idx) => {
       if (idx < rawData.data.length) {
         formattedData.data[channel] = rawData.data[idx].slice();
       } else {
@@ -680,7 +680,7 @@ onMounted(() => {
       <!-- 添加独立的返回按钮区域 -->
       <div class="back-button">
         <el-button @click="goBack" icon="ArrowLeft" size="small" text>返回文件列表</el-button>
-      </div>
+        </div>
       
       <div class="page-header">
         <h1>模型预测可视化</h1>

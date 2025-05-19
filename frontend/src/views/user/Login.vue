@@ -123,7 +123,7 @@ loadSavedCredentials();
       <div class="login-header">
         <div class="logo-container">
           <img src="@/assets/eeg-logo.svg" alt="Logo" class="logo" />
-          <h1 class="title">EEG数据分析交互展示平台</h1>
+          <h1 class="title">EEG数据分析交互式可视化平台</h1>
         </div>
         <p class="subtitle">脑电数据分析与模型评测系统</p>
       </div>
@@ -191,7 +191,11 @@ loadSavedCredentials();
       
       <!-- 页脚信息 -->
       <div class="login-footer">
-        <p>© {{ new Date().getFullYear() }} EEG数据分析交互展示平台 版权所有</p>
+        <p>© {{ new Date().getFullYear() }} EEG数据分析交互式可视化平台 版权所有</p>
+        <div class="developer-contact">
+          <span>联系开发者/管理员：</span>
+          <a href="mailto:wangyanjun13@foxmail.com">wangyanjun13@foxmail.com</a>
+        </div>
       </div>
     </div>
   </div>
@@ -204,7 +208,7 @@ loadSavedCredentials();
   align-items: center;
   height: 100vh;
   /* 添加背景图片 - 您可以替换为自己的图片 */
-  background-image: url('@/assets/background.png'); /* 请将图片放在 public 文件夹中 */
+  background-image: url('@/assets/back2.png'); /* 请将图片放在 public 文件夹中 */
   background-size: cover;
   background-position: center;
   position: relative;
@@ -325,6 +329,28 @@ loadSavedCredentials();
   padding: 10px 20px;
   border-radius: 20px;
   backdrop-filter: blur(5px);
+}
+
+/* 开发者联系信息 */
+.developer-contact {
+  margin-top: 5px;
+  font-size: 11px;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.developer-contact:hover {
+  opacity: 1;
+}
+
+.developer-contact a {
+  color: #409EFF;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.developer-contact a:hover {
+  text-decoration: underline;
 }
 
 /* 响应式适配 */
