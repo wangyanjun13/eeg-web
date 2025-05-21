@@ -306,7 +306,7 @@ h3 {
   color: #606266;
   font-size: 12px;
 }
-
+s
 .result-info {
   margin: 12px 0;
 }

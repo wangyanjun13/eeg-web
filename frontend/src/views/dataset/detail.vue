@@ -571,7 +571,7 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
 }
 
-.action-btn:active {
+.action-btn:active {s's
   transform: translateY(0) !important;
   opacity: 0.8 !important;
 }
