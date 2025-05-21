@@ -327,7 +327,7 @@ h3 {
 .ica-explanation {
   margin: 8px 0 16px;
   padding: 0 8px;
-  border-left: 3px solid #409EFF;
+  border-left: 3px solid var(--button-use);
   background-color: #ecf5ff;
   border-radius: 0 4px 4px 0;
 }

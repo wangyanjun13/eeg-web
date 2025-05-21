@@ -1117,7 +1117,7 @@ onMounted(() => {
 .metric-value {
   font-size: 20px;
   font-weight: bold;
-  color: #409EFF;
+  color: var(--button-use);
 }
 
 .metrics-summary {
@@ -1184,7 +1184,7 @@ onMounted(() => {
 
 .loading-icon {
   font-size: 40px;
-  color: #409EFF;
+  color: var(--button-use);
   animation: loading-rotate 2s linear infinite;
 }
 
@@ -1237,14 +1237,14 @@ onMounted(() => {
 
 .error-container .error-details .error-info-box {
   background-color: #f5f7fa;
-  border-left: 4px solid #409EFF;
+  border-left: 4px solid var(--button-use);
   padding: 10px 15px;
   margin: 15px 0;
   border-radius: 0 4px 4px 0;
 }
 
 .error-container .error-details .error-info-box h4 {
-  color: #409EFF;
+  color: var(--button-use);
   margin-top: 0;
   margin-bottom: 10px;
 }
@@ -1303,7 +1303,7 @@ onMounted(() => {
 }
 
 .error-container .error-details .shape-comparison .shape-item .shape-visualization .shape-box {
-  background-color: #409eff;
+  background-color: var(--button-use);
   border-radius: 4px;
   padding: 10px;
   color: white;
@@ -1388,6 +1388,6 @@ onMounted(() => {
   padding: 2px 4px;
   border-radius: 3px;
   font-family: monospace;
-  color: #409EFF;
+  color: var(--button-use);
 }
 </style> 

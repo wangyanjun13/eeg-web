@@ -93,7 +93,7 @@ onMounted(() => {
     <main class="home-main">
       <!-- 欢迎区域 -->
       <section class="hero-section">
-        <div class="hero-content">
+        <div class="hero-content glass-effect">
           <h2 class="hero-title">脑电数据分析交互展示平台</h2>
           <p class="hero-subtitle">
             较为完备的EEG数据预处理、分析和模型评测平台，为脑电学习研究提供支持！
@@ -208,7 +208,7 @@ onMounted(() => {
 
 .header-title {
   font-size: 22px;
-  color: #f1f1f1;
+  color: #000000;
   margin: 0;
   font-weight: 600;
   text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7); /* 添加文字阴影增加可读性 */
@@ -239,12 +239,12 @@ onMounted(() => {
 .hero-content {
   flex: 1;
   max-width: 600px;
-  background-color: rgba(255, 255, 255, 0.85);
+  background-color: rgba(255, 255, 255, 0.2);
   padding: 40px;
   border-radius: 15px;
   box-shadow: 0 15px 35px rgba(2, 2, 2, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(12, 12, 12, 0.2);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   animation: fadeInUp 1s ease-out;
 }
 
@@ -261,22 +261,22 @@ onMounted(() => {
 
 .hero-title {
   font-size: 42px;
-  color: #f2f2f2;
+  color: #ffffff;
   margin: 0 0 20px;
   font-weight: 600;
   line-height: 1.2;
-  background: linear-gradient(45deg, #409EFF, #53a8ff);
+  background: linear-gradient(45deg, rgb(6, 7, 7),rgb(6, 7, 7));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 2px 10px rgba(64, 158, 255, 0.3);
 }
 
 .hero-subtitle {
   font-size: 18px;
-  color: #606266;
+  color: #000000;
   margin: 0 0 30px;
   line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .hero-image {
@@ -309,13 +309,14 @@ onMounted(() => {
 /* 特点展示区域 */
 .features-section {
   padding: 100px 40px 80px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.2);
   position: relative;
   z-index: 10;
   margin-top: 50px;
   border-radius: 30px 30px 0 0;
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(15px);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .section-title {
@@ -335,7 +336,7 @@ onMounted(() => {
   transform: translateX(-50%);
   width: 80px;
   height: 4px;
-  background: linear-gradient(90deg, #409EFF, #53a8ff);
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-color));
   border-radius: 2px;
 }
 
@@ -348,7 +349,7 @@ onMounted(() => {
 }
 
 .feature-card {
-  background-color: rgb(136, 178, 205);
+  background-color: rgb(108, 187, 237);
   border-radius: 15px;
   padding: 30px;
   box-shadow: 0 10px 30px rgba(94, 91, 91, 0.05);
@@ -357,9 +358,11 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  border-top: 4px solid #409EFF;
+  border-top: 4px solid var(--primary-color);
   position: relative;
   overflow: hidden;
+  backdrop-filter: none;
+  border: none;
 }
 
 .feature-card::before {
@@ -380,7 +383,7 @@ onMounted(() => {
 
 .feature-icon {
   margin-bottom: 20px;
-  color: #409EFF;
+  color: var(--primary-color);
   background-color: #ecf5ff;
   width: 80px;
   height: 80px;
@@ -400,20 +403,22 @@ onMounted(() => {
 
 .feature-title {
   font-size: 20px;
-  color: #303133;
+  color: #000000;
   margin: 0 0 15px;
   font-weight: 600;
   position: relative;
   z-index: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .feature-description {
   font-size: 14px;
-  color: #606266;
+  color: #000000;
   margin: 0;
   line-height: 1.5;
   position: relative;
   z-index: 1;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 /* 页脚 */
@@ -446,7 +451,7 @@ onMounted(() => {
 }
 
 .developer-contact a:hover {
-  color: #409EFF;
+  color: var(--primary-color);
   text-decoration: underline;
 }
 

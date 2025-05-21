@@ -254,6 +254,7 @@ const applyBadChannelProcessing = async () => {
             @click="detectBadChannels" 
             :loading="isLoading.detecting"
             :disabled="!originalData || !preprocessParams.bad_channels.detect_bad_channels"
+            class="detect-btn"
           >
             检测坏通道
           </el-button>
@@ -328,5 +329,17 @@ h3 {
 .cache-info {
   margin-top: 10px;
   font-size: 12px;
+}
+
+.detect-btn {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+.detect-btn:hover {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  opacity: 0.9 !important;
 }
 </style> 

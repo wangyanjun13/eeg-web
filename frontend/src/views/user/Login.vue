@@ -83,8 +83,8 @@ const handleLogin = () => {
           
           ElMessage.success('登录成功');  
           
-          // 跳转到首页
-          router.push('/');
+          // 跳转到数据集列表页面
+          router.push('/datasets');
         } else {
           // 登录失败
           ElMessage.error('用户名或密码错误');
@@ -344,7 +344,7 @@ loadSavedCredentials();
 }
 
 .developer-contact a {
-  color: #409EFF;
+  color: var(--button-use);
   text-decoration: none;
   transition: color 0.3s;
 }

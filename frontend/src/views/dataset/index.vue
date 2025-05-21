@@ -30,17 +30,13 @@ const handleSearch = () => {
       <div class="search-container">
         <el-input
           v-model="searchKeyword"
-          placeholder="请输入数据集名称或ID"
+          placeholder="请输入数据集名称或ID，按回车键搜索"
           class="search-input"
           :prefix-icon="Search"
           clearable
           @keyup.enter="handleSearch"
           size="large"
-        >
-          <template #append>
-            <el-button :icon="Search" @click="handleSearch" class="search-button" />
-          </template>
-        </el-input>
+        />
       </div>
       <!-- 数据集列表组件 -->
       <DatasetList ref="datasetListRef" :initial-keyword="''" />
@@ -73,23 +69,23 @@ const handleSearch = () => {
 /* 输入框外层容器样式 */
 :deep(.el-input__wrapper) {
   border-radius: 24px !important;
-  border: 1px solid #dcdfe6 !important;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05) !important;
-  padding: 0 0 0 16px !important;
+  border: 1px solid var(--primary-color) !important;
+  box-shadow: 0 2px 5px var(--primary-color) !important;
+  padding: 0 16px !important;
   height: 54px;
   transition: all 0.3s;
 }
 
 /* 输入框悬停效果 */
 :deep(.el-input__wrapper:hover) {
-  border-color: #c0c4cc !important;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1) !important;
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 3px 8px var(--primary-color) !important;
 }
 
 /* 输入框聚焦效果 */
 :deep(.el-input__wrapper.is-focus) {
-  border-color: #409eff !important;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2) !important;
+  border-color: #861f37 !important;
+  box-shadow: 0 0 0 2px rgba(134, 31, 55, 0.2) !important;
 }
 
 /* 输入框内部样式 */
@@ -98,35 +94,19 @@ const handleSearch = () => {
   font-size: 18px;
 }
 
-/* 输入框右侧按钮容器样式 */
-:deep(.el-input-group__append) {
-  border-top-right-radius: 24px !important;
-  border-bottom-right-radius: 24px !important;
-  background-color: transparent !important;
-  padding: 0 !important;
-  border-left: none !important;
-}
-
-/* 搜索按钮样式 */
-:deep(.search-button) {
-  border-radius: 0 24px 24px 0 !important;
-  height: 54px;
-  width: 70px;
-  border: none;
-  background-color: #f5f7fa;
-  color: #606266;
-}
-
-/* 搜索按钮悬停效果 */
-:deep(.search-button:hover) {
-  background-color: #ecf5ff;
-  color: #409eff;
-}
-
 /* 前缀图标样式 */
 :deep(.el-input__prefix-inner) {
   font-size: 20px;
-  color: #909399;
+  color: var(--primary-color);
+}
+
+/* 清除按钮样式 */
+:deep(.el-input__suffix) {
+  color: var(--primary-color);
+}
+
+:deep(.el-input__suffix-inner .el-icon) {
+  font-size: 18px;
 }
 
 /* 响应式布局 */
@@ -153,11 +133,6 @@ const handleSearch = () => {
     height: 46px;
     font-size: 16px;
   }
-  
-  :deep(.search-button) {
-    height: 46px;
-    width: 60px;
-  }
 }
 
 @media (max-width: 576px) {
@@ -173,11 +148,6 @@ const handleSearch = () => {
   :deep(.el-input__inner) {
     height: 40px;
     font-size: 14px;
-  }
-  
-  :deep(.search-button) {
-    height: 40px;
-    width: 50px;
   }
   
   :deep(.el-input__prefix-inner) {

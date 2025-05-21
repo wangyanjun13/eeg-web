@@ -634,7 +634,7 @@ const progressTipText = computed(() => {
   background-color: #f0f9eb;
   border: 1px solid #e1f3d8;
   border-radius: 4px;
-  color: #67c23a;
+  color: var(--success-color);
 }
 
 /* 上传进度条样式 */

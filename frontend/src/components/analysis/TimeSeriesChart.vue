@@ -203,7 +203,7 @@ function addChannelLabels() {
       label.style.textAlign = 'left';
       label.style.zIndex = '10';
       label.style.boxShadow = '1px 1px 2px rgba(0,0,0,0.1)';
-      label.style.borderLeft = '2px solid #409EFF';
+      label.style.borderLeft = '2px solid var(--button-use)';
       
       // 添加通道索引编号
       const channelNumber = document.createElement('span');
@@ -219,7 +219,7 @@ function addChannelLabels() {
           type: 'highlight',
           seriesIndex: index
         });
-        label.style.color = '#409EFF';
+        label.style.color = 'var(--button-use)';
         label.style.fontWeight = 'bold';
         label.style.backgroundColor = 'rgba(232, 244, 255, 0.95)';
       });

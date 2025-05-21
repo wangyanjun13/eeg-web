@@ -180,6 +180,7 @@ const applyBadSegmentRejection = async () => {
           :loading="isLoading.processing"
           :disabled="!originalData"
           size="small"
+          class="detect-btn"
         >
           检测坏段
         </el-button>
@@ -258,5 +259,17 @@ h3 {
   display: flex;
   justify-content: space-between;
   margin-top: 15px;
+}
+
+.detect-btn {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+.detect-btn:hover {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  opacity: 0.9 !important;
 }
 </style>

@@ -1,23 +1,23 @@
 /* 主题相关的CSS变量 */
 :root {
-  /* 默认浅色主题变量 */
-  --background-color: #ffffff;
-  --text-color: #213547;
-  --text-color-secondary: #606266;
-  --border-color: #dcdfe6;
-  --primary-color: #409EFF;
-  --primary-hover-color: #79bbff;
-  --success-color: #67C23A;
-  --warning-color: #E6A23C;
-  --danger-color: #F56C6C;
-  --info-color: #909399;
-  --card-background: #ffffff;
-  --header-background: rgba(255, 255, 255, 0.8);
-  --footer-background: rgba(48, 49, 51, 0.9);
-  --footer-text-color: #c0c4cc;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --hover-background: #f5f7fa;
-  
+  /* 应用主题变量 */
+  --background-color: #e2eaec; /* 浅灰色背景 */
+  --text-color: #000000;/*文字颜色*/
+  --text-color-secondary: #666;/*次要文字颜色*/
+  --border-color: #dcdfe6;/*边框颜色*/
+  --primary-color: #037d96;/*主色*/
+  --primary-hover-color: #037d96;/*悬浮颜色*/
+  --success-color: #439938;/*成功颜色*/
+  --warning-color: #E6A23C;/*警告颜色*/
+  --danger-color: #F56C6C;/*危险颜色*/
+  --info-color: #909399;/*信息颜色*/
+  --card-background: rgba(255, 255, 255, 0.1);/*卡片背景颜色*/
+  --header-background: rgba(44, 62, 80, 0.8);/*头部背景颜色*/
+  --footer-background: rgba(48, 49, 51, 0.9);/*底部背景颜色*/
+  --footer-text-color: #c0c4cc;/*底部文字颜色*/
+  --shadow-color: rgba(0, 0, 0, 0.2);/*阴影颜色*/
+  --hover-background: rgba(255, 255, 255, 0.05);/*悬浮背景颜色*/
+  --button-use:  #037d96;/*自定义的颜色*/
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -30,54 +30,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* 深色主题变量 */
-:root.theme-dark {
-  --background-color: #1a1a1a;
-  --text-color: rgb(255, 255, 255);
-  --text-color-secondary: #a6a6a6;
-  --border-color: #4c4c4c;
-  --primary-color: #79bbff;
-  --primary-hover-color: #a0cfff;
-  --success-color: #85ce61;
-  --warning-color: #ebb563;
-  --danger-color: #f78989;
-  --info-color: #a6a9ad;
-  --card-background: #2c2c2c;
-  --header-background: rgba(42, 42, 42, 0.8);
-  --footer-background: rgba(28, 28, 28, 0.9);
-  --footer-text-color: #a6a6a6;
-  --shadow-color: rgba(0, 0, 0, 0.3);
-  --hover-background: #363636;
-  
-  color-scheme: dark;
-  color: var(--text-color);
-  background-color: var(--background-color);
-}
-
-/* 浅色主题变量 - 显式定义，确保主题切换时覆盖系统默认值 */
-:root.theme-light {
-  --background-color: #ffffff;
-  --text-color: #213547;
-  --text-color-secondary: #606266;
-  --border-color: #dcdfe6;
-  --primary-color: #409EFF;
-  --primary-hover-color: #79bbff;
-  --success-color: #67C23A;
-  --warning-color: #E6A23C;
-  --danger-color: #F56C6C;
-  --info-color: #909399;
-  --card-background: #ffffff;
-  --header-background: rgba(255, 255, 255, 0.8);
-  --footer-background: rgba(48, 49, 51, 0.9);
-  --footer-text-color: #c0c4cc;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --hover-background: #f5f7fa;
-  
-  color-scheme: light;
-  color: var(--text-color);
-  background-color: var(--background-color);
 }
 
 a {
@@ -314,5 +266,115 @@ button:focus-visible {
 /* 过渡动画 */
 .theme-transition {
   transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+/* Element Plus 组件样式覆盖 */
+:root {
+  --el-color-primary: var(--primary-color) !important;
+  --el-color-primary-light-3: var(--primary-hover-color) !important;
+  --el-color-primary-light-5: var(--primary-hover-color) !important;
+  --el-color-primary-light-7: var(--primary-hover-color) !important;
+  --el-color-primary-light-8: var(--primary-hover-color) !important;
+  --el-color-primary-light-9: var(--primary-hover-color) !important;
+  --el-color-primary-dark-2: var(--primary-hover-color) !important;
+  --el-color-success: var(--success-color) !important;
+  --el-color-success-light-3: var(--success-color) !important;
+  --el-color-success-light-5: var(--success-color) !important;
+  --el-color-success-light-7: var(--success-color) !important;
+  --el-color-success-light-8: var(--success-color) !important;
+  --el-color-success-light-9: var(--success-color) !important;
+}
+
+/* Radio Button 样式覆盖 */
+.el-radio-button__inner {
+  color: var(--text-color) !important;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+/* Button 样式覆盖 */
+.el-button--primary {
+  --el-button-bg-color: var(--primary-color) !important;
+  --el-button-border-color: var(--primary-color) !important;
+  --el-button-hover-bg-color: var(--primary-hover-color) !important;
+  --el-button-hover-border-color: var(--primary-hover-color) !important;
+  --el-button-active-bg-color: var(--primary-hover-color) !important;
+  --el-button-active-border-color: var(--primary-hover-color) !important;
+}
+
+/* Switch 样式覆盖 */
+.el-switch.is-checked .el-switch__core {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* 其他Element Plus组件的主题色覆盖 */
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.el-tabs__active-bar {
+  background-color: var(--primary-color) !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--primary-color) !important;
+}
+
+.el-menu-item.is-active {
+  color: var(--primary-color) !important;
+}
+
+.el-pagination.is-background .el-pager li:not(.disabled).active {
+  background-color: var(--primary-color) !important;
+}
+
+/* 全局消息提示样式覆盖 */
+.el-message {
+  background-color: white !important;
+  border-width: 1px !important;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1) !important;
+}
+
+.el-message--success {
+  border-color: var(--success-color) !important;
+  color: var(--success-color) !important;
+}
+
+.el-message--info {
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+}
+
+.el-message--warning {
+  border-color: var(--warning-color) !important;
+  color: var(--warning-color) !important;
+}
+
+.el-message--error {
+  border-color: var(--danger-color) !important;
+  color: var(--danger-color) !important;
+}
+
+.el-message .el-message__icon {
+  margin-right: 8px !important;
+}
+
+/* Tag 样式覆盖 */
+.el-tag--mini.el-tag--success.el-tag--light {
+  background-color: white !important;
+  border-color: var(--success-color) !important;
+  color: var(--success-color) !important;
 }
 

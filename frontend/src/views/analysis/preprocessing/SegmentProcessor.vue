@@ -629,7 +629,7 @@ h3 {
   top: -10px;
   left: 50%;
   transform: translateX(-50%);
-  background: #409eff;
+  background: var(--button-use);
   color: white;
   padding: 2px 8px;
   border-radius: 10px;
@@ -650,6 +650,6 @@ h3 {
 .event-count {
   margin-top: 5px;
   font-weight: bold;
-  color: #409eff;
+  color: var(--button-use);
 }
 </style>

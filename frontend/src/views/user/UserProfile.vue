@@ -215,7 +215,7 @@ const uploadAvatar = (file) => {
 }
 
 .avatar-uploader:hover {
-  border-color: #409EFF;
+  border-color: var(--button-use);
 }
 
 .avatar {

@@ -219,7 +219,7 @@ function goToNextStep() {
           />
           <!-- 下一步按钮放到图表右下角 -->
           <div class="next-step-button">
-            <el-button type="success" size="default" plain @click="goToNextStep">
+            <el-button type="success" size="default" plain class="preprocess-btn" @click="goToNextStep">
               <el-icon><ArrowRight /></el-icon> 开始预处理流程
             </el-button>
           </div>
@@ -238,27 +238,65 @@ function goToNextStep() {
 }
 
 .subject-info-card {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   border-radius: 8px;
+  transition: all 0.3s ease;
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+/* 修正卡片头部样式 */
+:deep(.el-card__header) {
+  padding: 0;
+  margin: 0;
+  width: 100% !important;
+  box-sizing: border-box;
+  background-color: var(--primary-color);
+}
+
+/* 修正卡片内容区域样式 */
+:deep(.el-card__body) {
+  padding: 20px;
+  width: 100% !important;
+  box-sizing: border-box;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: var(--primary-color);
+  padding: 15px 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card-header h2, .card-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: #ffffff;
 }
 
 .data-controls {
   display: flex;
   align-items: center;
+}
+
+/* 时间选择按钮组样式 */
+:deep(.el-radio-button__inner) {
+  border: 1px solid transparent;
+  transition: all 0.3s;
+}
+
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  border: 1px solid #000000 !important;
+  box-shadow: 0 0 0 1px #000000 !important;
+}
+
+/* 应用时间选择按钮样式 */
+.data-controls .el-button--primary {
+  border: 1px solid #000000 !important;
 }
 
 .eeg-data-card {
@@ -284,6 +322,18 @@ function goToNextStep() {
 .next-step-button .el-button {
   font-size: 14px;
   padding: 8px 15px;
+}
+
+.preprocess-btn {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+.preprocess-btn:hover {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  opacity: 1 !important;
 }
 
 /* 响应式调整 */

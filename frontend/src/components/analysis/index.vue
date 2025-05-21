@@ -101,7 +101,7 @@ function navigateTo(path) {
 
 .module-icon {
   font-size: 48px;
-  color: #409EFF;
+  color: var(--button-use);
   margin-bottom: 16px;
 }
 

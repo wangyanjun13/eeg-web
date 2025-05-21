@@ -197,23 +197,6 @@ defineExpose({
                 />
               </el-form-item>
               
-              <el-form-item label="数据类型">
-                <el-select 
-                  v-model="filterForm.tags" 
-                  multiple 
-                  placeholder="选择数据类型" 
-                  style="width: 100%"
-                  clearable
-                  @change="handleFilterChange"
-                >
-                  <el-option label="ERP" value="erp" />
-                  <el-option label="静息态" value="resting" />
-                  <el-option label="任务态" value="task" />
-                  <el-option label="睡眠" value="sleep" />
-                  <el-option label="运动想象" value="mi" />
-                </el-select>
-              </el-form-item>
-              
               <el-form-item label="更新时间">
                 <el-date-picker
                   v-model="filterForm.dateRange"
@@ -293,7 +276,7 @@ defineExpose({
               <!-- 数据集详细信息 -->
               <div class="dataset-details">
                 <span v-if="dataset.subject_count" class="detail-item">
-                  <el-tag size="small" type="success">被试: {{ dataset.subject_count }}</el-tag>
+                  <el-tag size="small" type="success" class="subject-count-tag">被试: {{ dataset.subject_count }}</el-tag>
                 </span>
                 <span v-if="dataset.BIDSVersion" class="detail-item">
                   <el-tag size="small" type="info">BIDS版本: {{ dataset.BIDSVersion }}</el-tag>
@@ -346,6 +329,7 @@ defineExpose({
   display: flex;
   justify-content: space-between; /* 两端对齐 */
   align-items: center; /* 垂直居中 */
+  padding: 0 20px; /* 左右加宽一点 */
 }
 
 /* 头部左侧 */
@@ -358,12 +342,33 @@ defineExpose({
 /* 头部标题 */
 .header-left h2 {
   margin: 0; /* 移除默认外边距 */
+  color:  var(--primary-color); /* 设置字体颜色 */
+  font-size: 24px; /* 增加字体大小 */
 }
 
 /* 头部右侧 */
 .header-right {
   display: flex;
   gap: 10px; /* 按钮间距 */
+}
+
+/* 头部右侧按钮样式 */
+.header-right :deep(.el-button) {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* 确保按钮内的文字和图标都是白色 */
+.header-right :deep(.el-button .el-icon) {
+  color: #ffffff;
+}
+
+/* 访问量显示样式 */
+.visit-count {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 /* 数据集列表 */
@@ -394,7 +399,7 @@ defineExpose({
   transform: translateY(-2px); /* 上移效果 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 阴影增强 */
   background-color: #e1edff; /* 悬停时背景色变为更深的浅蓝 */
-  border-left-color: #409EFF; /* 悬停时边框颜色变亮 */
+  border-left-color: var(--primary-color); /* 悬停时边框颜色变亮 */
 }
 
 /* 数据集信息容器 */
@@ -425,7 +430,7 @@ defineExpose({
 .dataset-name {
   margin: 0;
   font-size: 15px; /* 保持字体大小不变 */
-  color: #303133; /* 文字颜色 */
+  color: var(--primary-color); /* 文字颜色 */
   text-align: left; /* 左对齐 */
   flex: 1; /* 占满剩余空间 */
   margin-right: 12px; /* 右侧间距 */
@@ -495,5 +500,12 @@ defineExpose({
   padding: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* 被试数量标签样式 */
+:deep(.subject-count-tag) {
+  background-color: white !important;
+  border-color: var(--success-color) !important;
+  color: var(--success-color) !important;
 }
 </style> 
