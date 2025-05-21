@@ -136,13 +136,13 @@ const getFileTypeInfo = (fileType, fileFormat) => {
   if (fileType === 'data') {
     return {
       icon: Document,
-      color: '#409EFF',
+      color: 'var(--button-use)',
       label: '数据文件'
     };
   } else if (fileType === 'model') {
     return {
       icon: Document,
-      color: '#67C23A',
+      color: 'var(--success-color)',
       label: '模型文件'
     };
   } else {
@@ -539,10 +539,10 @@ const testWithModel = (modelFile) => {
         <h1>我的文件</h1>
         <div class="header-actions">
           <el-button v-if="fileList.filter(f => f.file_type === 'data').length > 0 && fileList.filter(f => f.file_type === 'model').length > 0" 
-            type="success" @click="openTestingCenter">
+            type="success" @click="openTestingCenter" class="visualization-btn">
             <el-icon><component :is="Connection" /></el-icon> 数据模型可视化
           </el-button>
-          <el-button @click="refreshFiles">
+          <el-button @click="refreshFiles" class="refresh-btn">
             <el-icon><RefreshRight /></el-icon> 刷新
           </el-button>
           <el-button type="primary" @click="handleUpload">
@@ -581,7 +581,7 @@ const testWithModel = (modelFile) => {
                   </el-tag>
                   <el-tag v-if="row.file_type === 'data' && fileList.some(f => f.file_type === 'model')" 
                     size="small" type="info" effect="plain" class="model-ready-tag">
-                    可预测
+                    可使用
                   </el-tag>
                   <el-tag v-if="row.file_type === 'model' && fileList.some(f => f.file_type === 'data')" 
                     size="small" type="info" effect="plain" class="model-ready-tag">
@@ -759,5 +759,38 @@ const testWithModel = (modelFile) => {
   margin-left: 5px;
   font-size: 11px;
   opacity: 0.8;
+}
+
+/* 可预测标签样式 */
+:deep(.model-ready-tag) {
+  background-color: white !important;
+  border-color: var(--el-color-info) !important;
+  color: var(--el-color-info) !important;
+}
+
+/* 文件类型标签样式 */
+:deep(.el-tag--primary.el-tag--light),
+:deep(.el-tag--success.el-tag--light) {
+  background-color: white !important;
+}
+
+/* 刷新按钮样式 */
+.refresh-btn {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+/* 数据模型可视化按钮样式 */
+.visualization-btn {
+  background-color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
+  color: white !important;
+}
+
+.visualization-btn:hover {
+  background-color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
+  opacity: 1 !important;
 }
 </style>

@@ -631,7 +631,8 @@ onBeforeUnmount(() => {
           <el-button 
             type="success" 
             @click="handleComplete" 
-            :disabled="isLoading">
+            :disabled="isLoading"
+            class="complete-preprocess-btn">
             完成预处理
           </el-button>
         </div>
@@ -722,14 +723,79 @@ onBeforeUnmount(() => {
   padding-bottom: 60px;
 }
 
-.steps-nav { margin-bottom: 20px; }
-.process-step { cursor: pointer; }
+/* 步骤导航区域样式 */
+.steps-nav {
+  margin-bottom: 20px;
+  background-color: var(--primary-color);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+/* 覆盖Element Plus步骤条的样式 */
+:deep(.el-steps) {
+  --el-text-color-primary: #ffffff;
+}
+
+:deep(.el-step__title) {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+:deep(.el-step__description) {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+:deep(.el-step__head.is-process) {
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+}
+
+:deep(.el-step__title.is-process) {
+  color: #ffffff !important;
+}
+
+:deep(.el-step__head.is-wait) {
+  color: rgba(255, 255, 255, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+:deep(.el-step__title.is-wait) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+:deep(.el-step__head.is-success) {
+  color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3)) !important;
+}
+
+:deep(.el-step__title.is-success) {
+  color: var(--success-color) !important;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.3),
+               0 0 2px rgba(0, 0, 0, 0.2) !important;
+  font-weight: 600 !important;
+}
+
+:deep(.el-step__line) {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+:deep(.el-step__line.is-process) {
+  background-color: #ffffff !important;
+}
 
 .main-content {
   display: flex;
   flex: 1;
   gap: 20px;
   min-height: 600px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .parameter-area {
@@ -779,7 +845,7 @@ onBeforeUnmount(() => {
 .loading-container .el-icon {
   font-size: 2rem;
   margin-bottom: 1rem;
-  color: #409eff;
+  color: var(--button-use);
 }
 
 .loading-text { color: #606266; font-size: 14px; }
@@ -839,5 +905,17 @@ onBeforeUnmount(() => {
   height: 500px;
   border: 1px dashed #dcdfe6;
   border-radius: 4px;
+}
+
+.complete-preprocess-btn {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+.complete-preprocess-btn:hover {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  opacity: 1 !important;
 }
 </style> 

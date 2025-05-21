@@ -5,7 +5,6 @@ import AppLayout from '../../components/layout/AppLayout.vue';
 
 // 用户设置
 const settings = ref({
-  theme: 'light',
   language: 'zh-CN',
   display: {
     showTips: true,
@@ -16,13 +15,6 @@ const settings = ref({
 
 // 当前激活的标签页
 const activeTab = ref('appearance');
-
-// 主题选项
-const themeOptions = [
-  { label: '浅色主题', value: 'light' },
-  { label: '深色主题', value: 'dark' },
-  { label: '跟随系统', value: 'system' }
-];
 
 // 语言选项
 const languageOptions = [
@@ -77,9 +69,6 @@ const saveSettings = () => {
   localStorage.setItem('userSettings', JSON.stringify(settings.value));
   formChanged.value = false;
   ElMessage.success('设置已保存');
-  
-  // 应用主题设置
-  applyTheme(settings.value.theme);
 };
 
 // 重置设置
@@ -93,7 +82,6 @@ const resetSettings = () => {
     cancelButtonText: '取消',
     onConfirm: () => {
       settings.value = {
-        theme: 'light',
         language: 'zh-CN',
         display: {
           showTips: true,
@@ -110,55 +98,6 @@ const resetSettings = () => {
 // 处理标签页切换
 const handleTabChange = (tab) => {
   activeTab.value = tab;
-};
-
-// 应用主题
-const applyTheme = (theme) => {
-  // 获取根元素
-  const htmlElement = document.documentElement;
-  
-  // 移除之前的主题类
-  htmlElement.classList.remove('theme-light', 'theme-dark');
-  
-  // 添加新的主题类
-  if (theme === 'light') {
-    htmlElement.classList.add('theme-light');
-    ElMessage({
-      message: '已切换到浅色主题',
-      type: 'success',
-      duration: 1500
-    });
-  } else if (theme === 'dark') {
-    htmlElement.classList.add('theme-dark');
-    ElMessage({
-      message: '已切换到深色主题',
-      type: 'success',
-      duration: 1500
-    });
-  } else if (theme === 'system') {
-    // 检测系统主题
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    htmlElement.classList.add(prefersDark ? 'theme-dark' : 'theme-light');
-    
-    // 监听系统主题变化
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      htmlElement.classList.remove('theme-light', 'theme-dark');
-      htmlElement.classList.add(e.matches ? 'theme-dark' : 'theme-light');
-    });
-    
-    ElMessage({
-      message: `已跟随系统主题（当前：${prefersDark ? '深色' : '浅色'}）`,
-      type: 'success',
-      duration: 1500
-    });
-  }
-  
-  // 确保添加过渡动画类
-  if (!htmlElement.classList.contains('theme-transition')) {
-    htmlElement.classList.add('theme-transition');
-  }
-  
-  console.log('主题已切换:', theme);
 };
 
 // 处理截图上传
@@ -224,21 +163,6 @@ const submitFeedback = () => {
             <h3 class="section-title">外观设置</h3>
             
             <el-form label-width="100px" @change="handleSettingChange">
-              <el-form-item label="主题">
-                <el-select 
-                  v-model="settings.theme" 
-                  placeholder="选择主题"
-                  @change="handleSettingChange"
-                >
-                  <el-option 
-                    v-for="item in themeOptions" 
-                    :key="item.value" 
-                    :label="item.label" 
-                    :value="item.value"
-                  />
-                </el-select>
-              </el-form-item>
-              
               <el-form-item label="语言">
                 <el-select 
                   v-model="settings.language" 
@@ -398,7 +322,7 @@ const submitFeedback = () => {
   margin-bottom: 25px;
   padding: 10px 15px;
   background-color: #f0f9ff;
-  border-left: 4px solid #409EFF;
+  border-left: 4px solid var(--button-use);
   border-radius: 4px;
 }
 
@@ -422,7 +346,7 @@ const submitFeedback = () => {
 }
 
 .direct-contact a {
-  color: #409EFF;
+  color: var(--button-use);
   text-decoration: none;
   font-weight: 500;
   font-size: 13px;

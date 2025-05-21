@@ -236,7 +236,7 @@ const updateResampleEffectsChart = () => {
         smooth: true,
         showSymbol: false,
         lineStyle: { width: 2 },
-        itemStyle: { color: '#409EFF' }
+        itemStyle: { color: 'var(--button-use)' }
       },
       {
         name: '重采样后信号',
@@ -245,7 +245,7 @@ const updateResampleEffectsChart = () => {
         smooth: true,
         showSymbol: false,
         lineStyle: { width: 2, type: 'dashed' },
-        itemStyle: { color: '#67C23A' }
+        itemStyle: { color: 'var(--success-color)' }
       },
       {
         name: '原始Nyquist频率',
@@ -253,7 +253,7 @@ const updateResampleEffectsChart = () => {
         markLine: {
           symbol: 'none',
           label: { formatter: `原始Nyquist: ${originalNyquist.toFixed(1)}Hz` },
-          lineStyle: { color: '#409EFF', type: 'dashed' },
+          lineStyle: { color: 'var(--button-use)', type: 'dashed' },
           data: [{ xAxis: originalNyquist }]
         }
       },
@@ -263,7 +263,7 @@ const updateResampleEffectsChart = () => {
         markLine: {
           symbol: 'none',
           label: { formatter: `目标Nyquist: ${targetNyquist.toFixed(1)}Hz` },
-          lineStyle: { color: '#67C23A', type: 'dashed' },
+          lineStyle: { color: 'var(--success-color)', type: 'dashed' },
           data: [{ xAxis: targetNyquist }]
         }
       }
@@ -462,6 +462,7 @@ h3 {
 .info-value {
   font-weight: 500;
   color: #303133;
+  background-color: #ffffff;
 }
 
 .effect-chart-container {

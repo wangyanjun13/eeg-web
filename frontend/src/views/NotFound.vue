@@ -39,7 +39,7 @@ function goHome() {
 .error-code {
   font-size: 120px;
   font-weight: 700;
-  color: #409eff;
+  color: var(--button-use);
   margin: 0;
   line-height: 1;
 }
@@ -57,7 +57,7 @@ function goHome() {
 }
 
 .return-button {
-  background-color: #409eff;
+  background-color: var(--button-use);
   color: white;
   border: none;
   padding: 12px 24px;

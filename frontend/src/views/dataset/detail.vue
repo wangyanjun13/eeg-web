@@ -143,7 +143,7 @@ onMounted(() => {
           <div class="card-header">
             <h2 v-if="dataset">{{ dataset.Name }}</h2>
             <el-skeleton v-else :rows="1" animated />
-            <el-button v-if="dataset" type="primary" @click="openDownloadDialog">获取数据集</el-button>
+            <el-button v-if="dataset" class="custom-download-btn" @click="openDownloadDialog">获取数据集</el-button>
           </div>
         </template>
 
@@ -192,16 +192,15 @@ onMounted(() => {
       <el-card class="subjects-card">
         <template #header>
           <div class="card-header">
-            <h3>被试信息</h3>
+            <h3 class="subject-title">被试信息</h3>
             <el-tabs v-model="activeTab">
               <el-tab-pane label="被试列表" name="subjects"></el-tab-pane>
-              <el-tab-pane label="参与者统计" name="participants"></el-tab-pane>
             </el-tabs>
           </div>
         </template>
 
         <!-- 受试者列表标签页 -->
-        <div v-if="activeTab === 'subjects'" v-loading="loading.subjects">
+        <div v-loading="loading.subjects">
           <el-empty v-if="subjects.length === 0 && !loading.subjects" description="暂无受试者数据" />
           
           <el-table v-else :data="subjects" style="width: 100%" border stripe>
@@ -226,41 +225,11 @@ onMounted(() => {
             <!-- 操作列 -->
             <el-table-column label="操作" width="280">
               <template #default="scope">
-                <el-button size="small" type="primary" @click="viewSubject(scope.row.id)">查看/分析</el-button>
-                <el-button size="small" type="success" @click="exportSubjectData(scope.row.id)">导出</el-button>
+                <el-button size="small" type="primary" class="action-btn" @click="viewSubject(scope.row.id)">查看/分析</el-button>
+                <el-button size="small" type="primary" class="action-btn" @click="exportSubjectData(scope.row.id)">导出</el-button>
               </template>
             </el-table-column>
           </el-table>
-        </div>
-        
-        <!-- 参与者统计标签页 -->
-        <div v-else-if="activeTab === 'participants'" v-loading="loading.participants" class="participants-info">
-          <el-empty v-if="!participants && !loading.participants" description="暂无参与者信息" />
-          
-          <div v-else-if="participants">
-            <!-- 参与者统计信息 -->
-            <div v-if="participants.summary">
-              <h3>基本统计</h3>
-              <el-descriptions :column="3" border>
-                <el-descriptions-item label="总人数">{{ participants.summary.total_count }}</el-descriptions-item>
-                <el-descriptions-item label="平均年龄">{{ participants.summary.age_mean }} ± {{ participants.summary.age_std }}</el-descriptions-item>
-                <el-descriptions-item label="性别分布">男: {{ participants.summary.male_count }}, 女: {{ participants.summary.female_count }}</el-descriptions-item>
-              </el-descriptions>
-            </div>
-            
-            <!-- 分组统计信息 -->
-            <div v-if="participants.groups && participants.groups.length > 0" class="group-stats">
-              <h3>分组统计</h3>
-              <div v-for="(group, index) in participants.groups" :key="index" class="group-item">
-                <h4>{{ group.name }}</h4>
-                <el-descriptions :column="3" border>
-                  <el-descriptions-item label="人数">{{ group.count }}</el-descriptions-item>
-                  <el-descriptions-item label="平均年龄">{{ group.age_mean }} ± {{ group.age_std }}</el-descriptions-item>
-                  <el-descriptions-item label="性别分布">男: {{ group.male_count }}, 女: {{ group.female_count }}</el-descriptions-item>
-                </el-descriptions>
-              </div>
-            </div>
-          </div>
         </div>
       </el-card>
     </div>
@@ -325,19 +294,41 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
 }
 
 .dataset-info-card {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   transition: all 0.3s ease;
+  overflow: hidden; /* 防止内容溢出 */
+}
+/* 
+/* 修正卡片头部样式 */
+:deep(.el-card__header) {
+  padding: 0;
+  margin: 0;
+  width: 100% !important;
+  box-sizing: border-box;
+  background-color: var(--primary-color);
+}
+
+/* 修正卡片内容区域样式 */
+:deep(.el-card__body) {
+  padding: 20px;
+  width: 100% !important;
+  box-sizing: border-box;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: var(--primary-color);
+  padding: 15px 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card-header h2 {
   margin: 0;
   font-size: 20px;
+  color: #ffffff;
 }
 
 .dataset-info {
@@ -364,6 +355,7 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
 
 .subjects-card {
   margin-bottom: 20px;
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 .participants-info {
@@ -456,6 +448,21 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
   text-decoration: underline;
 }
 
+/* 修复对话框样式 */
+:deep(.download-dialog .el-dialog__header) {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  padding: 15px 20px;
+}
+
+:deep(.download-dialog .el-dialog__title) {
+  color: #ffffff;
+}
+
+:deep(.download-dialog .el-dialog__body) {
+  padding: 20px;
+}
+
 /* 响应式布局 */
 @media (max-width: 992px) {
   :deep(.el-descriptions) {
@@ -495,5 +502,77 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
     padding: 6px 10px;
     font-size: 12px;
   }
+}
+
+/* 修改获取数据集按钮样式 */
+.custom-download-btn {
+  background-color: transparent !important;
+  color: white !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.8) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.3s ease !important;
+  backdrop-filter: brightness(110%) !important;
+  padding: 10px 20px !important;
+}
+
+.custom-download-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: white !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+
+.custom-download-btn:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 修改被试信息标题样式 */
+.subject-title {
+  color: #ffffff;
+  font-size: 18px;
+  margin: 0;
+}
+
+/* 修改标签页样式 */
+:deep(.el-tabs__item) {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+:deep(.el-tabs__active-bar) {
+  background-color: #ffffff !important;
+}
+
+:deep(.el-tabs__nav-wrap::after) {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 修改操作按钮样式 */
+.action-btn {
+  font-weight: 600 !important;
+  border: none !important;
+  background-color: var(--primary-color) !important;
+  transition: all 0.25s ease !important;
+  margin: 0 5px;
+}
+
+.action-btn:hover {
+  opacity: 0.9 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
+}
+
+.action-btn:active {
+  transform: translateY(0) !important;
+  opacity: 0.8 !important;
 }
 </style> 

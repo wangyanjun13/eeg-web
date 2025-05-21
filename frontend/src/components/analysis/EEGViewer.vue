@@ -914,11 +914,10 @@ onBeforeUnmount(() => {
         placement="top"
       >
         <el-button 
-          type="primary" 
-          :plain="!isYAxisInverted" 
+          class="invert-button"
+          :class="{ 'active': isYAxisInverted }"
           size="small" 
           @click="toggleYAxisDirection"
-          class="invert-button"
           v-if="localViewMode === 'time'"
         >
           {{ isYAxisInverted ? '恢复' : '坐标反转' }}
@@ -980,6 +979,22 @@ onBeforeUnmount(() => {
 .invert-button {
   padding: 6px 15px;
   font-size: 12px;
+  background-color: var(--button-use) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.invert-button:hover {
+  opacity: 0.9;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.invert-button.active {
+  background-color: var(--button-use) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .chart-container {

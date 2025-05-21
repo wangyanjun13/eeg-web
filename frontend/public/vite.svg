@@ -1,1 +1,160 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- 透明背景 -->
+  <rect width="200" height="200" fill="none"/>
+  
+  <!-- 渐变定义 -->
+  <defs>
+    <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3498db" />
+      <stop offset="100%" stop-color="#9b59b6" />
+    </linearGradient>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2ecc71" />
+      <stop offset="100%" stop-color="#3498db" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e1bee7" />
+      <stop offset="100%" stop-color="#b39ddb" />
+    </linearGradient>
+    <linearGradient id="neuronGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#d1c4e9" />
+    </linearGradient>
+    <!-- 新增人脑渐变 -->
+    <linearGradient id="brainShineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e74c3c">
+        <animate attributeName="stop-color" values="#e74c3c;#cb4449;#c0392b;#cb4449;#e74c3c" dur="4s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="100%" stop-color="#cb4449">
+        <animate attributeName="stop-color" values="#cb4449;#e74c3c;#cb4449;#c0392b;#cb4449" dur="4s" repeatCount="indefinite" />
+      </stop>
+    </linearGradient>
+  </defs>
+  
+  <!-- 圆形背景 -->
+  <circle cx="100" cy="100" r="80" fill="url(#brainGradient)" opacity="0.15"/>
+  
+  <!-- 神经网络元素 - 在大脑内部 -->
+  <!-- 神经元节点 -->
+  <circle cx="75" cy="80" r="4" fill="#000000" opacity="0.8"/>
+  <circle cx="110" cy="65" r="3" fill="#000000" opacity="0.8"/>
+  <circle cx="90" cy="100" r="3.5" fill="#000000" opacity="0.8"/>
+  <circle cx="125" cy="95" r="4" fill="#000000" opacity="0.8"/>
+  <circle cx="70" cy="115" r="3" fill="#000000" opacity="0.8"/>
+  <circle cx="105" cy="125" r="3.5" fill="#000000" opacity="0.8"/>
+  
+  <!-- 神经连接（黑色） -->
+  <path d="M75,80 L110,65" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+  </path>
+  <path d="M75,80 L90,100" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.2s" repeatCount="indefinite" />
+  </path>
+  <path d="M75,80 L70,115" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="1.8s" repeatCount="indefinite" />
+  </path>
+  <path d="M110,65 L125,95" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.1s" repeatCount="indefinite" />
+  </path>
+  <path d="M90,100 L125,95" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="1.9s" repeatCount="indefinite" />
+  </path>
+  <path d="M90,100 L70,115" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.3s" repeatCount="indefinite" />
+  </path>
+  <path d="M90,100 L105,125" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+  </path>
+  <path d="M125,95 L105,125" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="1.7s" repeatCount="indefinite" />
+  </path>
+  <path d="M70,115 L105,125" stroke="#000000" stroke-width="1.2" opacity="0.9">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.4s" repeatCount="indefinite" />
+  </path>
+  <!-- 优化的侧面人脑轮廓 - 放到最底部显示，优先级最低 -->
+  <g style="z-index: -1;">
+    <!-- 主要脑轮廓 -->
+    <path d="M60,70 C65,60 75,55 85,50 C95,45 105,43 115,45 
+             C125,47 135,52 142,60 C148,67 150,75 150,85 
+             C150,95 148,105 145,115 C142,125 138,132 130,138 
+             C125,142 120,145 115,147 C110,148 105,148 100,145 
+             C95,142 90,138 85,135 C80,132 75,130 70,125 
+             C65,120 62,115 60,110 C58,105 55,100 55,95 
+             C55,90 55,80 60,70 Z" 
+          fill="url(#brainShineGradient)" opacity="0.8">
+      <animate attributeName="opacity" values="0.7;0.9;0.7" dur="3s" repeatCount="indefinite" />
+    </path>
+    
+    <!-- 脑沟纹理 -->
+    <path d="M70,75 C80,70 90,68 100,70 C110,72 120,75 125,85" 
+          stroke="#a5324a" stroke-width="1" fill="none" opacity="0.6"/>
+    <path d="M75,90 C85,85 95,83 105,85 C115,87 120,92 125,100" 
+          stroke="#a5324a" stroke-width="1" fill="none" opacity="0.6"/>
+    <path d="M70,105 C80,100 90,98 100,100 C110,102 115,107 120,115" 
+          stroke="#a5324a" stroke-width="1" fill="none" opacity="0.6"/>
+    
+    <!-- 脑叶分界线 -->
+    <path d="M95,50 C100,70 100,90 95,110" 
+          stroke="#a5324a" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <path d="M120,55 C115,75 115,95 120,115" 
+          stroke="#a5324a" stroke-width="0.8" fill="none" opacity="0.5"/>
+    
+    <!-- 闪光效果 -->
+    <circle cx="85" cy="65" r="3" fill="#ffffff" opacity="0.6">
+      <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2.5s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="110" cy="75" r="2" fill="#ffffff" opacity="0.6">
+      <animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="95" cy="95" r="2.5" fill="#ffffff" opacity="0.6">
+      <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite" />
+    </circle>
+  </g>
+  
+  <!-- EEG波形 - 主要波形 -->
+  <path d="M40,100 Q55,100 60,80 T80,120 T100,70 T120,110 T140,90 T160,100" 
+        stroke="url(#waveGradient)" 
+        stroke-width="4" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <!-- 数据点 -->
+  <circle cx="60" cy="80" r="3" fill="#fff"/>
+  <circle cx="80" cy="120" r="3" fill="#fff"/>
+  <circle cx="100" cy="70" r="3" fill="#fff"/>
+  <circle cx="120" cy="110" r="3" fill="#fff"/>
+  <circle cx="140" cy="90" r="3" fill="#fff"/>
+  
+  <!-- 数据分析元素 - 图表 -->
+  <rect x="85" y="115" width="5" height="15" fill="#2ecc71" opacity="0.9"/>
+  <rect x="95" y="110" width="5" height="20" fill="#3498db" opacity="0.9"/>
+  <rect x="105" y="105" width="5" height="25" fill="#9b59b6" opacity="0.9"/>
+  <rect x="115" y="120" width="5" height="10" fill="#2ecc71" opacity="0.9"/>
+  
+  <!-- 连接线 -->
+  <path d="M70,140 C85,160 115,160 130,140" 
+        stroke="#3498db" 
+        stroke-width="2" 
+        fill="none" 
+        opacity="0.6"/>
+        
+  <!-- 添加EEG文字 -->
+  <text x="85" y="165" 
+        font-family="Arial, sans-serif" 
+        font-weight="bold" 
+        font-size="18" 
+        fill="url(#textGradient)"
+        filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.3))">
+    EEG
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite" />
+  </text>
+  
+  <!-- 为文字添加渐变效果 -->
+  <defs>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6c3483" />
+      <stop offset="100%" stop-color="#8e44ad" />
+    </linearGradient>
+  </defs>
+</svg> 

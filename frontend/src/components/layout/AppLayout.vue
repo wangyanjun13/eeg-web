@@ -173,15 +173,14 @@ const goToHome = () => {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.9);
   z-index: -1; /* 确保背景在最底层 */
 }
 
 /*顶部导航栏*/
 .app-header {
-  height: 60px;
-  background-color: rgba(255, 255, 255, 0.9); /* 半透明白色背景 */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 70px; /* 增加高度从60px到70px */
+  background-color: var(--primary-color); /* 半透明白色背景 */
+  box-shadow: 0 2px 8px #ffffff;
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -215,7 +214,7 @@ const goToHome = () => {
 .header-title {
   margin: 0;
   font-size: 22px;
-  color: #303133;
+  color: #ffffff;
   font-weight: 500;
   font-weight:bold;
 }
@@ -240,21 +239,23 @@ const goToHome = () => {
 }
 
 .nav-item:hover {
-  background-color: #e6f1ff; /* 更浅的蓝色 */
-  color: #409EFF;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 16px;
 }
 
 .nav-item.active {
-  background-color: #e1edff; /* 浅蓝色背景 */
-  color: #409EFF;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 16px;
 }
 
 .nav-item .el-icon {
-  font-size: 18px;
+  font-size: 20px;
 }
-
 .header-right {
   margin-left: auto;
+
 }
 
 .user-dropdown-link {
@@ -262,7 +263,7 @@ const goToHome = () => {
   align-items: center;
   cursor: pointer;
   font-size: 14px;
-  color: #409EFF;
+  color: #ffffff;
 }
 
 .username {

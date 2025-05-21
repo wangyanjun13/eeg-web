@@ -144,7 +144,7 @@ const updateFilterResponseChart = () => {
         smooth: true,
         showSymbol: false,
         itemStyle: {
-          color: '#409EFF'
+          color: 'var(--button-use)'
         },
         areaStyle: {
           color: {

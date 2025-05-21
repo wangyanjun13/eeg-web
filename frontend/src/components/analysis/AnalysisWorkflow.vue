@@ -199,13 +199,16 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  padding: 0 16px;
+  padding: 8px 16px;
+  background-color: var(--primary-color);
+  border-radius: 6px;
+  color: white;
 }
 
 .workflow-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #303133;
+  color: white;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.3s;
@@ -216,7 +219,7 @@ defineExpose({
 }
 
 .step-indicator {
-  color: #909399;
+  color: white;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -278,18 +281,18 @@ defineExpose({
 }
 
 .workflow-step.active .step-icon {
-  background-color: #409eff;
+  background-color: var(--primary-color);
   color: white;
 }
 
 .workflow-step.active .step-title {
-  color: #409eff;
+  color: var(--button-use);
   font-weight: 600;
 }
 
 /* 已完成步骤样式 */
 .workflow-step.completed .step-icon {
-  background-color: #67c23a;
+  background-color: var(--success-color);
   color: white;
 }
 

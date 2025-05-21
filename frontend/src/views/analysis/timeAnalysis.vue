@@ -1248,6 +1248,8 @@ const formatChartData = (data, type) => {
 
 .channel-tag {
   margin-right: 0;
+  background-color: var(--success-color);
+  color: #000;
 }
 
 .display-settings {
