@@ -29,6 +29,7 @@ const pagination = ref({
 
 // 数据集列表
 const datasets = ref([]);
+const allDatasets = ref([]); // 存储所有数据集
 const { isLoading: loading, withLoading } = useLoading(false);
 // 控制筛选面板的显示/隐藏
 const showFilterPanel = ref(false);
@@ -60,12 +61,20 @@ const recordVisit = async () => {
   }
 };
 
+// 更新当前页的数据集
+const updatePagedDatasets = () => {
+  const startIndex = (pagination.value.currentPage - 1) * pagination.value.pageSize;
+  const endIndex = startIndex + pagination.value.pageSize;
+  datasets.value = allDatasets.value.slice(startIndex, endIndex);
+};
+
 // 防抖的获取数据集函数
 const debouncedFetchDatasets = useDebounceFn(async () => {
   try {
     const response = await withLoading(datasetService.getDatasets(filterForm.value));
-    datasets.value = response.data || [];
-    pagination.value.total = datasets.value.length;
+    allDatasets.value = response.data || [];
+    pagination.value.total = allDatasets.value.length;
+    updatePagedDatasets();
   } catch (error) {
     console.error('获取数据集列表失败:', error);
     ElMessage.error('获取数据集列表失败');
@@ -91,6 +100,7 @@ const handleFilterChange = () => {
 // 处理页码变化
 const handleCurrentChange = (page) => {
   pagination.value.currentPage = page;
+  updatePagedDatasets();
 };
 
 // 查看数据集详情
@@ -131,6 +141,11 @@ onMounted(() => {
   
   // 记录访问并获取访问量
   recordVisit();
+});
+
+// 监听分页参数变化
+watch(() => pagination.value.currentPage, () => {
+  updatePagedDatasets();
 });
 
 // 暴露方法给父组件

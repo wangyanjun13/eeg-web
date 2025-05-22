@@ -6,11 +6,11 @@
   --text-color-secondary: #666;/*次要文字颜色*/
   --border-color: #dcdfe6;/*边框颜色*/
   --primary-color: #037d96;/*主色*/
-  --primary-hover-color: #037d96;/*悬浮颜色*/
+  --primary-hover-color: #ecf1f2;/*悬浮颜色*/
   --success-color: #439938;/*成功颜色*/
   --warning-color: #E6A23C;/*警告颜色*/
   --danger-color: #F56C6C;/*危险颜色*/
-  --info-color: #909399;/*信息颜色*/
+  --info-color: #2b2d30;/*信息颜色*/
   --card-background: rgba(255, 255, 255, 0.1);/*卡片背景颜色*/
   --header-background: rgba(44, 62, 80, 0.8);/*头部背景颜色*/
   --footer-background: rgba(48, 49, 51, 0.9);/*底部背景颜色*/

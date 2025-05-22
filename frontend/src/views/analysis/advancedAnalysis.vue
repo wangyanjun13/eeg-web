@@ -366,7 +366,7 @@ function goToNextStep() {
     <!-- 分析流程导航 -->
     <AnalysisWorkflow 
       ref="workflowRef"
-      current-step="advanced" 
+      current-step="spatial" 
       :dataset-id="datasetId" 
       :subject-id="subjectId" 
     />
