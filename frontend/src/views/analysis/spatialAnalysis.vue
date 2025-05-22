@@ -232,7 +232,7 @@ const workflowRef = ref(null);
 
 // 前往下一步
 function goToNextStep() {
-  workflowRef.value?.goToNextStep();
+  router.push('/datasets');
 }
 </script>
 
@@ -340,16 +340,16 @@ function goToNextStep() {
         
         <!-- 操作按钮 -->
         <div class="action-buttons">
-          <el-button @click="resetForm">重置参数</el-button>
+          <el-button type="primary" class="custom-button" @click="resetForm">重置参数</el-button>
           <el-button type="primary" @click="runSpatialAnalysis" :loading="isLoading.applying"
                      :disabled="selectedChannels.length === 0">
             运行分析
           </el-button>
-          <el-button @click="loadExampleData" :loading="isLoading.data">
+          <el-button type="primary" class="custom-button" @click="loadExampleData" :loading="isLoading.data">
             加载示例数据
           </el-button>
           <el-button type="success" @click="goToNextStep">
-            下一步
+            返回首页
           </el-button>
         </div>
       </el-card>
@@ -444,6 +444,16 @@ function goToNextStep() {
   justify-content: flex-end;
   margin-top: 20px;
   gap: 10px;
+}
+
+.custom-button {
+  color: white !important;
+}
+
+.custom-button:hover {
+  color: white !important;
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
 }
 
 .data-display {

@@ -288,9 +288,21 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
   padding: 0;
   max-width: 100%;
 }
-
 .back-button {
   margin-bottom: 20px;
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.back-button button {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #dcdfe6;
+}
+
+.back-button button:hover {
+  background-color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .dataset-info-card {
@@ -345,7 +357,7 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
   margin-top: 0;
   margin-bottom: 10px;
   font-size: 16px;
-  color: #606266;
+  color: #36373a;
 }
 
 .author-tag {
@@ -571,7 +583,7 @@ openneuro-py download --dataset={{ dataset?.dataset_id }}</pre>
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
 }
 
-.action-btn:active {s's
+.action-btn:active {
   transform: translateY(0) !important;
   opacity: 0.8 !important;
 }

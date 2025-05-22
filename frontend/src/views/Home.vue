@@ -208,10 +208,10 @@ onMounted(() => {
 
 .header-title {
   font-size: 22px;
-  color: #000000;
+  color: #ffffff;
   margin: 0;
   font-weight: 600;
-  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7); /* 添加文字阴影增加可读性 */
+  text-shadow: 0 1px 4px #000000; /* 添加文字阴影增加可读性 */
 }
 
 /* 主要内容区域 */

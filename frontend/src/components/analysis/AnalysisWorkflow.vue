@@ -6,7 +6,7 @@ const props = defineProps({
   currentStep: {
     type: String,
     required: true,
-    validator: (value) => ['raw', 'preprocessing', 'time', 'frequency', 'spatial', 'advanced'].includes(value)
+    validator: (value) => ['raw', 'preprocessing', 'time', 'frequency', 'spatial'].includes(value)
   },
   datasetId: {
     type: String,
@@ -55,13 +55,6 @@ const steps = [
     icon: 'Position', 
     path: '/analysis/spatial-analysis/:datasetId/:subjectId',
     description: '地形图、源定位分析'
-  },
-  { 
-    key: 'advanced', 
-    label: '高级分析', 
-    icon: 'DataAnalysis', 
-    path: '/analysis/advanced-analysis/:datasetId/:subjectId',
-    description: '连接性分析、机器学习'
   }
 ];
 
@@ -251,7 +244,7 @@ defineExpose({
   justify-content: center;
   align-items: center;
   background-color: #f5f7fa;
-  color: #909399;
+  color: #494c50;
   margin-right: 12px;
   flex-shrink: 0;
   transition: all 0.3s;
@@ -270,7 +263,7 @@ defineExpose({
 
 .step-description {
   font-size: 12px;
-  color: #909399;
+  color: #54565a;
   margin-top: 4px;
   white-space: nowrap;
 }

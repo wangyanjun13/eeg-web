@@ -883,6 +883,7 @@ onBeforeUnmount(() => {
           size="small" 
           @click="toggleChannelSelect"
           :disabled="disableChannelSelect"
+          class="custom-button"
         >
           选择显示通道
         </el-button>
@@ -890,11 +891,23 @@ onBeforeUnmount(() => {
           size="small" 
           @click="toggleViewMode"
           :type="localViewMode === 'time' ? '' : 'primary'"
+          class="custom-button"
+          :class="{'primary-button': localViewMode !== 'time'}"
         >
           {{ localViewMode === 'time' ? '频域视图' : '时域视图' }}
         </el-button>
-        <el-button size="small" @click="toggleTheme">切换主题</el-button>
-        <el-button size="small" @click="toggleFullScreen">
+        <el-button 
+          size="small" 
+          @click="toggleTheme"
+          class="custom-button"
+        >
+          切换主题
+        </el-button>
+        <el-button 
+          size="small" 
+          @click="toggleFullScreen"
+          class="custom-button"
+        >
           {{ isFullScreen ? '退出全屏' : '全屏' }}
         </el-button>
       </el-button-group>
@@ -968,6 +981,34 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   margin-bottom: 16px;
 }
+
+/* 自定义按钮样式，确保悬浮时保持一致 */
+.custom-button {
+  background-color: #f5f7fa !important;
+  color: #000000 !important;
+  border-color: #dcdfe6 !important;
+  transition: none !important;
+}
+
+.custom-button:hover {
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* 主要按钮样式，确保悬浮时保持一致 */
+.primary-button {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
+.primary-button:hover {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
 /* 坐标轴反转按钮样式 */
 .coordinate-controls {
   display: flex;
@@ -975,6 +1016,7 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
   padding-left: 10px;
 }
+
 /* 坐标轴反转按钮样式 */
 .invert-button {
   padding: 6px 15px;
@@ -983,18 +1025,21 @@ onBeforeUnmount(() => {
   color: white !important;
   border: none !important;
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition: none !important;
 }
 
 .invert-button:hover {
-  opacity: 0.9;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  background-color: var(--button-use) !important;
+  color: white !important;
+  border: none !important;
+  opacity: 1;
+  box-shadow: none;
 }
 
 .invert-button.active {
   background-color: var(--button-use) !important;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: none;
 }
 
 .chart-container {

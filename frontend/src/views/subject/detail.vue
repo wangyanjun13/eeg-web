@@ -175,7 +175,7 @@ function goToNextStep() {
           <div class="card-header">
             <h3>EEG原始时间序列可视化</h3>
             <div class="data-controls">
-              <el-radio-group v-model="timeSelectionMode" size="small" style="margin-bottom: 10px;">
+              <el-radio-group v-model="timeSelectionMode" size="small" style="margin-bottom: 10px;" class="custom-radio-group">
                 <el-radio-button label="default">默认(0-10s)</el-radio-button>
                 <el-radio-button label="full">全部时间</el-radio-button>
                 <el-radio-button label="custom">自定义</el-radio-button>
@@ -284,19 +284,61 @@ function goToNextStep() {
 }
 
 /* 时间选择按钮组样式 */
-:deep(.el-radio-button__inner) {
-  border: 1px solid transparent;
-  transition: all 0.3s;
+.custom-radio-group :deep(.el-radio-button__inner) {
+  background-color: var(--primary-color) !important;
+  color: #000000 !important;
+  border-color: var(--primary-color) !important;
+  transition: none !important;
 }
 
-:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  border: 1px solid #000000 !important;
-  box-shadow: 0 0 0 1px #000000 !important;
+.custom-radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background-color: white !important;
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  box-shadow: -1px 0 0 0 var(--primary-color) !important;
+}
+
+/* 移除按钮之间的边框和阴影 */
+.custom-radio-group :deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-left-color: var(--primary-color) !important;
+}
+
+/* 完全移除hover效果 */
+.custom-radio-group :deep(.el-radio-button__inner:hover) {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* 确保选中按钮的hover状态保持白底primary字体 */
+.custom-radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner:hover) {
+  background-color: white !important;
+  color: var(--primary-color) !important;
+}
+
+/* 确保未选中按钮的hover状态保持primary底黑字 */
+.custom-radio-group :deep(.el-radio-button__original-radio:not(:checked) + .el-radio-button__inner:hover) {
+  background-color: var(--primary-color) !important;
+  color: #000000 !important;
 }
 
 /* 应用时间选择按钮样式 */
 .data-controls .el-button--primary {
-  border: 1px solid #000000 !important;
+  background-color: #fdfdfd !important;
+  color: var(--primary-color) !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+  font-weight: 500;
+  transition: none !important;
+}
+
+.data-controls .el-button--primary:hover {
+  background-color: #fdfdfd !important;
+  color: var(--primary-color) !important;
+  opacity: 1 !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
 }
 
 .eeg-data-card {
