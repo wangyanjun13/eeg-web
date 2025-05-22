@@ -7,6 +7,7 @@ import pandas as pd
 from app.models.data_dataset import DatasetInfo, RawDataInfo, RawEEGData, ParticipantInfo
 import numpy as np
 import asyncio
+import math
 
 class DatasetService:
     def __init__(self, data_dir: Path):
@@ -70,32 +71,67 @@ class DatasetService:
                 subject = self._process_subject_dir(dataset_id, dir_name)
                 if subject:
                     subjects.append(subject)
+        
         return sorted(subjects, key=lambda x: x['id'])
 
     def _process_subject_dir(self, dataset_id: str, dir_name: str) -> Optional[Dict]:
         """处理受试者目录，返回受试者信息"""
         try:
             subject_id = dir_name.split('-')[1]
+            
+            # 先检查标准目录结构
             eeg_dir = self.data_dir / dataset_id / dir_name / 'eeg'
+            
+            # 如果标准结构不存在，查找带有会话的结构
+            if not eeg_dir.exists():
+                # 检查是否有会话目录
+                subject_path = self.data_dir / dataset_id / dir_name
+                if subject_path.exists():
+                    # 寻找第一个ses-开头的目录
+                    session_dirs = [d for d in os.listdir(subject_path) if d.startswith('ses-')]
+                    if session_dirs:
+                        eeg_dir = subject_path / session_dirs[0] / 'eeg'
+            
             if not eeg_dir.exists():
                 return None
 
-            set_files = list(eeg_dir.glob('*.set'))
-            if not set_files:
+            # 检查支持的EEG文件格式
+            formats = {
+                'set': '.set', 
+                'edf': '.edf',
+                'bdf': '.bdf'
+            }
+            
+            # 查找第一个可用的EEG文件
+            found_file = None
+            format_name = None
+            
+            for fmt, ext in formats.items():
+                files = list(eeg_dir.glob(f'*{ext}'))
+                if files:
+                    found_file = files[0]
+                    format_name = fmt.upper()
+                    break
+            
+            if not found_file:
                 return None
-
-            set_file = set_files[0]
-            fdt_file = set_file.with_suffix('.fdt')
-
+                
+            # 对于EEGLAB格式，检查.fdt文件是否存在
+            has_fdt = False
+            if format_name == 'SET':
+                fdt_file = found_file.with_suffix('.fdt')
+                has_fdt = fdt_file.exists()
+                
             return {
                 'id': subject_id,
-                'name': set_file.name,
+                'name': found_file.name,
                 'subject': dir_name,
-                'format': 'EEGLAB',
-                'has_fdt': fdt_file.exists(),
+                'format': format_name,
+                'has_fdt': has_fdt,
                 'dataset_id': dataset_id
             }
-        except Exception:
+        except Exception as e:
+            print(f"处理受试者目录失败: {e}")
             return None
 
     def get_dataset_info(self, dataset_id: str) -> Dict:
@@ -141,48 +177,47 @@ class DatasetService:
     def get_subject_info(self, dataset_id: str, subject_id: str) -> Dict:
         """获取受试者详细信息"""
         try:
-            # 读取EEG数据
-            raw = self._read_eeg_file(dataset_id, subject_id)
-            
-            # 基本EEG信息
+            # 基本信息结构
             info = {
-                "channels": raw.ch_names,
-                "sampling_rate": float(raw.info['sfreq']),  # 确保是Python原生float
-                "duration": float(raw.times[-1]),  # 确保是Python原生float
-                "n_channels": int(len(raw.ch_names)),  # 确保是Python原生int
                 "subject_id": f"sub-{subject_id}",
                 "dataset_id": dataset_id
             }
             
-            # 尝试读取participants.tsv获取人口统计学信息
+            # 读取EEG数据和提取基本信息
             try:
-                participants_file = self.data_dir / dataset_id / "participants.tsv"
-                if participants_file.exists():
+                raw = self._read_eeg_file(dataset_id, subject_id)
+                info.update({
+                    "channels": raw.ch_names,
+                    "sampling_rate": float(raw.info['sfreq']),
+                    "duration": float(raw.times[-1]),
+                    "n_channels": int(len(raw.ch_names))
+                })
+            except Exception as e:
+                print(f"读取EEG信息失败: {str(e)}")
+            
+            # 读取人口统计学信息
+            participants_file = self.data_dir / dataset_id / "participants.tsv"
+            if participants_file.exists():
+                try:
                     df = pd.read_csv(participants_file, sep='\t')
-                    # 查找当前受试者
                     participant_row = df[df['participant_id'] == f"sub-{subject_id}"]
                     
                     if not participant_row.empty:
-                        # 添加可用的人口统计学信息，确保转换为Python原生类型
                         for col in df.columns:
                             if col != 'participant_id' and col in participant_row:
-                                # 获取值并转换为Python原生类型
                                 value = participant_row[col].values[0]
                                 
-                                # 根据数据类型进行转换
+                                # 转换为Python原生类型
                                 if pd.isna(value):
-                                    # 处理NaN值
                                     info[col] = None
                                 elif isinstance(value, (np.integer, np.int64)):
                                     info[col] = int(value)
                                 elif isinstance(value, (np.floating, np.float64)):
                                     info[col] = float(value)
                                 else:
-                                    # 字符串和其他类型
                                     info[col] = str(value)
-            except Exception as e:
-                # 如果读取人口统计学信息失败，记录错误但继续返回EEG信息
-                print(f"读取人口统计学信息失败: {str(e)}")
+                except Exception as e:
+                    print(f"读取人口统计学信息失败: {str(e)}")
             
             return info
         except Exception as e:
@@ -247,16 +282,44 @@ class DatasetService:
                 del raw
 
     def _read_eeg_file(self, dataset_id: str, subject_id: str) -> mne.io.Raw:
-        """读取EEG文件"""
-        eeg_dir = self.data_dir / dataset_id / f"sub-{subject_id}" / 'eeg'
+        """读取EEG文件(支持EEGLAB .set, EDF, BDF格式)"""
+        subject_dir = f"sub-{subject_id}"
+        
+        # 先检查标准目录结构：dataset/sub-xx/eeg/
+        eeg_dir = self.data_dir / dataset_id / subject_dir / 'eeg'
+        
+        # 如果标准结构不存在，查找带有会话的结构：dataset/sub-xx/ses-xx/eeg/
         if not eeg_dir.exists():
-            raise FileNotFoundError(f"未找到EEG数据目录: {eeg_dir}")
+            # 检查是否有会话目录
+            subject_path = self.data_dir / dataset_id / subject_dir
+            if subject_path.exists():
+                # 寻找第一个ses-开头的目录
+                session_dirs = [d for d in os.listdir(subject_path) if d.startswith('ses-')]
+                if session_dirs:
+                    eeg_dir = subject_path / session_dirs[0] / 'eeg'
+        
+        if not eeg_dir.exists():
+            raise ValueError(f"未找到EEG数据目录: {subject_dir}/eeg 或 {subject_dir}/ses-xx/eeg")
             
-        set_files = list(eeg_dir.glob('*.set'))
-        if not set_files:
-            raise FileNotFoundError(f"未找到EEG数据文件: {eeg_dir}")
-            
-        return mne.io.read_raw_eeglab(str(set_files[0]), preload=True)
+        # 定义支持的文件格式及其读取方法
+        formats = {
+            'set': {'ext': '.set', 'reader': mne.io.read_raw_eeglab},
+            'edf': {'ext': '.edf', 'reader': mne.io.read_raw_edf},
+            'bdf': {'ext': '.bdf', 'reader': mne.io.read_raw_bdf}
+        }
+        
+        # 尝试按优先级顺序读取文件
+        for fmt, props in formats.items():
+            files = list(eeg_dir.glob(f"*{props['ext']}"))
+            if files:
+                try:
+                    raw = props['reader'](files[0], preload=True)
+                    return raw
+                except Exception as e:
+                    print(f"读取{fmt}格式文件失败: {str(e)}")
+        
+        # 如果没有找到支持的文件格式
+        raise ValueError(f"未找到支持的EEG文件格式(SET/EDF/BDF)在目录: {eeg_dir}")
 
     def _get_time_slice(self, raw: mne.io.Raw, start_time: float, duration: float):
         """获取指定时间段的数据"""
@@ -364,27 +427,29 @@ class DatasetService:
                 if ch_info['loc'] is not None and any(ch_info['loc'][:3]):
                     # 提取3D坐标 (x, y, z)
                     x, y, z = ch_info['loc'][:3]
+                    
+                    # 检查坐标值是否合法（非无穷大或NaN）
+                    if (not math.isfinite(x) or not math.isfinite(y) or not math.isfinite(z)):
+                        continue
+                        
                     positions[ch_name] = {
                         'x': float(x),
                         'y': float(y),
                         'z': float(z)
                     }
-                    # print(f"通道 {ch_name} 位置: x={x}, y={y}, z={z}")
             
             # 如果没有位置信息，返回空字典
             if not positions:
-                print("未找到任何电极位置信息")
                 return {"positions": {}, "source": "none"}
             
-            #print(f"成功获取 {len(positions)} 个电极位置")
             return {
                 "positions": positions,
                 "source": "set_file"
             }
         except Exception as e:
+            # 捕获任何异常，但不向上抛出，而是返回空结果
             print(f"获取电极位置信息失败: {str(e)}")
-            return {"positions": {}, "source": "error", "error": str(e)}
-
+            return {"positions": {}, "source": "none"}
 
     async def stream_subject_data_direct(self, dataset_id: str, subject_id: str):
         """直接流式传输受试者数据，不预先生成完整ZIP文件"""

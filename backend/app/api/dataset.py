@@ -47,6 +47,7 @@ async def get_dataset_subjects(dataset_id: str):
             data=subjects
         )
     except Exception as e:
+        print(f"获取受试者列表失败: {dataset_id} - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{dataset_id}/subjects/{subject_id}/info", response_model=APIResponse)
@@ -59,6 +60,7 @@ async def get_subject_info(dataset_id: str, subject_id: str):
             data=info
         )
     except Exception as e:
+        print(f"获取受试者信息失败: {dataset_id}/{subject_id} - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{dataset_id}/subjects/{subject_id}/raw", response_model=APIResponse)
@@ -79,27 +81,30 @@ async def get_subject_data(
         # 创建取消事件
         cancel_event = asyncio.Event()
         
-        # 检查请求是否已断开
-        async def is_disconnected():
-            return await request.is_disconnected()
-        
-        # 超时或断开连接时取消任务
+        # 监控请求状态
         async def watch_for_cancel():
             try:
+                disconnected = await request.is_disconnected()
+                if disconnected:
+                    cancel_event.set()
+                    return
                 await asyncio.wait_for(cancel_event.wait(), timeout=timeout)
             except asyncio.TimeoutError:
-                pass
-            cancel_event.set()
+                cancel_event.set()
         
         # 启动监控任务
         background_tasks.add_task(watch_for_cancel)
         
-        # 将取消事件传递给服务层
+        # 处理通道参数
+        channel_list = channels.split(',') if channels else None
+        
+        # 获取数据
         data = dataset_service.get_subject_data(
-            dataset_id, subject_id, start_time, duration, channels, cancel_event
+            dataset_id, subject_id, start_time, duration, channel_list, cancel_event
         )
         return APIResponse(message="获取原始数据成功", data=data)
     except Exception as e:
+        print(f"获取原始数据失败: {dataset_id}/{subject_id} - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{dataset_id}/participants", response_model=APIResponse)
@@ -124,7 +129,12 @@ async def get_electrode_positions(dataset_id: str, subject_id: str):
             data=positions
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"获取电极位置失败: {dataset_id}/{subject_id} - {str(e)}")
+        # 返回空结果而不是抛出错误
+        return APIResponse(
+            message="无法获取电极位置信息，但继续提供其他功能",
+            data={"positions": {}, "source": "none"}
+        )
 
 @router.get("/{dataset_id}/subjects/{subject_id}/export")
 async def export_subject_data(dataset_id: str, subject_id: str):
@@ -144,6 +154,7 @@ async def export_subject_data(dataset_id: str, subject_id: str):
             }
         )
     except Exception as e:
+        print(f"导出数据失败: {dataset_id}/{subject_id} - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{dataset_id}/subjects/{subject_id}/events", response_model=APIResponse)
